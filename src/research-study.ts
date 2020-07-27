@@ -94,8 +94,15 @@ export class ResearchStudy {
   site?: Reference[];
   contained?: (Group | Location | Organization | Practitioner)[];
 
-  constructor(id: number) {
-    this.id = String(id);
+  constructor(id: string | number) {
+    if (typeof id === 'number') {
+      // This is mostly for convenience of using array indices as IDs
+      this.id = 'study-' + id;
+    } else {
+      // Pointless toString is to support use from non-TypeScript apps that
+      // try and use something that isn't a string.
+      this.id = id.toString();
+    }
   }
 
   convertStringArrayToCodeableConcept(tsConditions: string): CodeableConcept[] {

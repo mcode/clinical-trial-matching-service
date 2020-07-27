@@ -1,13 +1,12 @@
 import express from 'express';
 import bodyParser from 'body-parser';
 import Configuration from './env';
-import { isBundle } from './bundle';
+import Bundle, { isBundle } from './bundle';
 import { SearchSet } from './searchset';
 import RequestError from './request-error';
 import * as http from 'http';
 
-export type PatientBundle = Record<string, unknown>;
-export type ClinicalTrialMatcher = (patientBundle: PatientBundle) => Promise<SearchSet>;
+export type ClinicalTrialMatcher = (patientBundle: Bundle) => Promise<SearchSet>;
 
 export class ClinicalTrialMatchingService {
   public readonly app: express.Application;
