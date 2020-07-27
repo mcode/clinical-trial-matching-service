@@ -3,7 +3,7 @@
 import fs from 'fs';
 import path from 'path';
 
-const defaults: { [key: string]: string | null } = {
+const defaults: { [key: string]: string | undefined } = {
   PORT: '3000'
 };
 
@@ -46,7 +46,7 @@ export default class Configuration {
   private _port: number;
   constructor() {
     // Default to defaults
-    this._port = parseInt(defaults.PORT);
+    this._port = defaults.PORT ? parseInt(defaults.PORT) : 3000;
   }
 
   get port(): number {

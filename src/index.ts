@@ -2,7 +2,7 @@
 
 // This somewhat ugly code is necessary for TypeScript
 
-import Bundle from './bundle';
+import * as Bundle from './bundle';
 import ClinicalTrialMatchingService, { ClinicalTrialMatcher } from './server';
 import ResearchStudy from './research-study';
 import SearchSet from './searchset';
