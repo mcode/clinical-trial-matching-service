@@ -72,6 +72,8 @@ export interface HumanName {
   text: string;
 }
 
+export type ContainedResource = Group | Location | Organization | Practitioner;
+
 // ResearchStudy implementation
 export class ResearchStudy {
   resourceType = 'ResearchStudy';
@@ -92,7 +94,7 @@ export class ResearchStudy {
   sponsor?: Reference;
   principalInvestigator?: Reference;
   site?: Reference[];
-  contained?: (Group | Location | Organization | Practitioner)[];
+  contained?: ContainedResource[];
 
   constructor(id: string | number) {
     if (typeof id === 'number') {
@@ -103,6 +105,12 @@ export class ResearchStudy {
       // try and use something that isn't a string.
       this.id = id.toString();
     }
+  }
+
+  addContainedResource(resource: ContainedResource) {
+    if (!this.contained)
+      this.contained = [];
+    this.contained.push(resource);
   }
 
   convertStringArrayToCodeableConcept(tsConditions: string): CodeableConcept[] {

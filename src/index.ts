@@ -1,20 +1,16 @@
 // Export our public API from this package
 
-// This somewhat ugly code is necessary for TypeScript
+export * from './bundle';
+export * from './research-study';
+export * from './searchset';
 
-import * as Bundle from './bundle';
-import ClinicalTrialMatchingService, { ClinicalTrialMatcher } from './server';
-import ResearchStudy from './research-study';
-import SearchSet from './searchset';
+// The export { v } from "mod" forms do not appear to work yet
 import RequestError from './request-error';
-
-export {
-  Bundle,
-  ClinicalTrialMatcher,
-  ClinicalTrialMatchingService,
-  RequestError,
-  ResearchStudy,
-  SearchSet
-};
+import ClinicalTrialMatchingService, { ClinicalTrialMatcher } from './server';
 
 export default ClinicalTrialMatchingService;
+export {
+  ClinicalTrialMatcher,
+  ClinicalTrialMatchingService,
+  RequestError
+};
