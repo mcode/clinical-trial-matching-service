@@ -1,11 +1,17 @@
 // Export our public API from this package
 
-import _Service from './server';
-import _ResearchStudy from './research-study';
-import _SearchSet from './searchset';
+// This somewhat ugly code is necessary for TypeScript
 
-export const ClinicalTrialMatchingService = _Service;
-export const ResearchStudy = _ResearchStudy;
-export const SearchSet = _SearchSet;
+import ClinicalTrialMatchingService from './server';
+import ResearchStudy from './research-study';
+import SearchSet from './searchset';
+import RequestError from './request-error';
+
+export {
+  ClinicalTrialMatchingService,
+  RequestError,
+  ResearchStudy,
+  SearchSet
+};
 
 export default ClinicalTrialMatchingService;
