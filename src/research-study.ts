@@ -1,4 +1,7 @@
 // FHIR data types supporting ResearchStudy
+
+import { BaseResource } from './bundle';
+
 export interface Identifier {
   use?: string;
   system?: string;
@@ -10,15 +13,22 @@ export interface CodeableConcept {
   text?: string;
 }
 
+export type ContactPointSystem = 'phone' | 'fax' | 'email' | 'pager' | 'url' | 'sms' | 'other';
+export type ContactPointUse = 'home' | 'work' | 'temp' | 'old' | 'mobile';
+
 export interface ContactDetail {
   name?: string;
-  telecom?: Telecom[];
+  telecom?: ContactPoint[];
 }
 
-export interface Telecom {
-  system?: string;
+// Can't actually make a positive integer type on TypeScript but may as well document it as such
+export type PositiveInteger = number;
+
+export interface ContactPoint {
+  system?: ContactPointSystem;
   value?: string;
-  use?: string;
+  use?: ContactPointUse;
+  rank?: PositiveInteger;
 }
 
 export interface Arm {
@@ -46,11 +56,11 @@ export interface Group {
   actual?: boolean;
 }
 
-export interface Location {
-  resourceType?: string;
+export interface Location extends BaseResource {
+  resourceType: 'Location';
   id?: string;
   name?: string;
-  telecom?: Telecom[];
+  telecom?: ContactPoint[];
   position?: { longitude?: number; latitude?: number };
 }
 
@@ -74,9 +84,8 @@ export interface HumanName {
 
 export type ContainedResource = Group | Location | Organization | Practitioner;
 
-// ResearchStudy implementation
-export class ResearchStudy {
-  resourceType = 'ResearchStudy';
+export interface ResearchStudy extends BaseResource {
+  resourceType: 'ResearchStudy';
   id?: string;
   identifier?: Identifier[];
   title?: string;
@@ -95,6 +104,63 @@ export class ResearchStudy {
   principalInvestigator?: Reference;
   site?: Reference[];
   contained?: ContainedResource[];
+}
+
+/**
+ * Utility function to convert a list of strings into a list of CodeableConcepts.
+ *
+ * @param conditions a list of strings to convert to CodeableConcepts
+ */
+export function convertStringArrayToCodeableConcept(conditions: string): CodeableConcept[] {
+  const jsonConditions: string[] = JSON.parse(conditions) as string[];
+  const fhirConditions: CodeableConcept[] = [];
+  for (const condition of jsonConditions) {
+    fhirConditions.push({ text: condition });
+  }
+  return fhirConditions;
+}
+
+export function createReferenceTo(resource: BaseResource): Reference {
+  const reference: Reference = {};
+  if (resource.id) {
+    reference.reference = '#' + resource.id;
+  }
+  if (resource.resourceType) {
+    reference.type = resource.resourceType;
+  }
+  return reference;
+}
+
+function enumerable(value: boolean) {
+  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    descriptor.enumerable = value;
+  };
+}
+
+/**
+ * A basic ResearchStudy implementation, this provides helper methods for
+ * doing things like adding contact information.
+ */
+export class BasicResearchStudy implements ResearchStudy {
+  resourceType = 'ResearchStudy' as const;
+  id?: string;
+  identifier?: Identifier[];
+  title?: string;
+  status?: string;
+  phase?: CodeableConcept;
+  category?: CodeableConcept[];
+  condition?: CodeableConcept[];
+  contact?: ContactDetail[];
+  keyword?: CodeableConcept[];
+  location?: CodeableConcept[];
+  description?: string;
+  arm?: Arm[];
+  objective?: Objective[];
+  enrollment?: Reference[];
+  sponsor?: Reference;
+  principalInvestigator?: Reference;
+  site?: Reference[];
+  contained?: ContainedResource[];
 
   constructor(id: string | number) {
     if (typeof id === 'number') {
@@ -105,39 +171,88 @@ export class ResearchStudy {
       // try and use something that isn't a string.
       this.id = id.toString();
     }
+    // This is done as a closure to avoid adding an enumerable property that
+    // would show up in JSON output
+    this.createReferenceId = (function() {
+      let generatedId = 0;
+      return function(prefix = 'resource') {
+        return prefix + '-' + (generatedId++);
+      };
+    })();
   }
 
-  addContainedResource(resource: ContainedResource) {
+  /**
+   * Add a contained resource
+   * @param resource the resource to add
+   */
+  addContainedResource(resource: ContainedResource): void {
     if (!this.contained)
       this.contained = [];
     this.contained.push(resource);
   }
 
-  convertStringArrayToCodeableConcept(tsConditions: string): CodeableConcept[] {
-    const jsonConditions: string[] = JSON.parse(tsConditions) as string[];
-    const fhirConditions: CodeableConcept[] = [];
-    for (const condition of jsonConditions) {
-      fhirConditions.push({ text: condition });
+  /**
+   * Creates a new, probably unique ID for a contained resource. (At present
+   * this doesn't go through the contained resources to ensure the ID is
+   * actually unique.)
+   * @param prefix the prefix for the reference
+   */
+  createReferenceId: (prefix?: string) => string;
+
+  /**
+   * Adds a contact to the contact field.
+   *
+   * @param contact the contact to add
+   */
+  addContact(contact: ContactDetail): void;
+  /**
+   * Adds a contact to the contact field.
+   *
+   * @param name the name of the contact
+   * @param phone the work phone number of the contact
+   * @param email the work email of the contact
+   */
+  addContact(name: string, phone: string, email: string): void;
+  addContact(nameOrContact: ContactDetail | string, phone?: string, email?: string): void {
+    const contact: ContactDetail = typeof nameOrContact === 'string' ? {} : nameOrContact;
+    if (typeof nameOrContact === 'string') {
+      if (name) {
+        contact.name = name;
+      }
+      if (phone || email) {
+        const telecoms: ContactPoint[] = [];
+        if (phone) {
+          telecoms.push({ system: 'phone', value: phone, use: 'work' });
+        }
+        if (email) {
+          telecoms.push({ system: 'email', value: email, use: 'work' });
+        }
+        contact.telecom = telecoms;
+      }
     }
-    return fhirConditions;
+    if (!this.contact)
+      this.contact = [];
+    this.contact.push(contact);
   }
 
-  setContact(name: string, phone: string, email: string): ContactDetail[] {
-    const contact: ContactDetail = {};
-    if (name) {
-      contact.name = name;
-    }
-    if (phone || email) {
-      const telecoms: Telecom[] = [];
-      if (phone) {
-        telecoms.push({ system: 'phone', value: phone, use: 'work' });
-      }
-      if (email) {
-        telecoms.push({ system: 'email', value: email, use: 'work' });
-      }
-      contact.telecom = telecoms;
-    }
-    return [contact];
+  /**
+   * Adds a site as a contained resource.
+   * @param name the name of the site to add
+   * @return the location added
+   */
+  addSite(name: string): Location;
+
+  addSite(location: Location): Location;
+
+  addSite(nameOrLocation: string | Location): Location {
+    const location: Location = typeof nameOrLocation === 'string' ?
+      { resourceType: 'Location', id: this.createReferenceId('location'), name: nameOrLocation } :
+      nameOrLocation;
+    if (!this.site)
+      this.site = [];
+    this.site.push(createReferenceTo(location));
+    this.addContainedResource(location);
+    return location;
   }
 }
 
