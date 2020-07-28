@@ -8,6 +8,9 @@ export * from './searchset';
 import RequestError from './request-error';
 import ClinicalTrialMatchingService, { ClinicalTrialMatcher } from './server';
 
+// Export the utility for configuring from the environment
+export * from './env';
+
 export default ClinicalTrialMatchingService;
 export {
   ClinicalTrialMatcher,

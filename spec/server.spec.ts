@@ -8,9 +8,10 @@ describe('server', () => {
   let service: ClinicalTrialMatchingService;
   let server: http.Server;
   beforeAll(() => {
+    // Note we use port 0 to get a free port since we don't care what we listen on
     service = new ClinicalTrialMatchingService(() => {
       return Promise.resolve(new SearchSet([]));
-    });
+    }, { port: 0 });
     server = service.listen();
   });
   afterAll(() => {

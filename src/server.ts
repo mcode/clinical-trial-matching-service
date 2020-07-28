@@ -1,6 +1,5 @@
 import express from 'express';
 import bodyParser from 'body-parser';
-import Configuration from './env';
 import Bundle, { isBundle } from './bundle';
 import { SearchSet } from './searchset';
 import RequestError from './request-error';
@@ -8,14 +7,21 @@ import * as http from 'http';
 
 export type ClinicalTrialMatcher = (patientBundle: Bundle) => Promise<SearchSet>;
 
+export interface Configuration {
+  // This may be further loosened in the future
+  [key: string]: string | number | undefined;
+  port?: number;
+  host?: string;
+}
+
 export class ClinicalTrialMatchingService {
   public readonly app: express.Application;
   private readonly configuration: Configuration;
   private _server: http.Server | null = null;
 
-  constructor(public matcher: ClinicalTrialMatcher) {
+  constructor(public matcher: ClinicalTrialMatcher, configuration?: Configuration) {
     this.app = express();
-    this.configuration = new Configuration();
+    this.configuration = configuration ? configuration : {};
     this.app.use(
       bodyParser.json({
         // Need to increase the payload limit to receive patient bundles
@@ -49,8 +55,25 @@ export class ClinicalTrialMatchingService {
       this.getClinicalTrial(request, response);
     });
   }
-  get server(): http.Server {
+
+  /**
+   * Gets the server object, if it's running, or `null` if it isn't.
+   */
+  get server(): http.Server | null {
     return this.server;
+  }
+
+  /**
+   * Gets the configured port. If the port configuration is invalid, this
+   * returns the default port, 3000.
+   */
+  get port(): number {
+    if (typeof this.configuration.port === 'number') {
+      const port = Math.floor(this.configuration.port);
+      if (port >= 0 && port <= 0xFFFF)
+        return port;
+    }
+    return 3000;
   }
 
   getClinicalTrial(request: express.Request, response: express.Response): void {
@@ -87,6 +110,9 @@ export class ClinicalTrialMatchingService {
     }
   }
 
+  /**
+   * Closes the server if it's running.
+   */
   close(): void {
     if (this._server !== null) {
       this._server.close();
@@ -94,9 +120,33 @@ export class ClinicalTrialMatchingService {
     }
   }
 
+  /**
+   * Logs a message. The default simply invokes console.log, but subclasses
+   * may override to use more fine-grained logging.
+   * @param message the message to log
+   */
+  log(message: string): void {
+    console.log(message);
+  }
+
+  /**
+   * Starts the server running, returning the newly running instance. If the
+   * server is already running, simply returns the already running instance.
+   */
   listen(): http.Server {
-    console.log(`Starting server on port ${this.configuration.port}...`);
-    return (this._server = this.app.listen(this.configuration.port));
+    if (this._server !== null) {
+      return this._server;
+    }
+    const port = this.port;
+    this._server = this.app.listen(port);
+    const listeningOn = this._server.address();
+    if (typeof listeningOn === 'object' && listeningOn !== null) {
+      this.log(`Server listening on ${listeningOn.address}:${listeningOn.port}...`);
+    } else {
+      // Should not be possible at this point but whatever
+      this.log(`Server listening on ${listeningOn === null ? 'unknown address' : listeningOn}.`);
+    }
+    return this._server;
   }
 }
 
