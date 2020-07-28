@@ -131,12 +131,6 @@ export function createReferenceTo(resource: BaseResource): Reference {
   return reference;
 }
 
-function enumerable(value: boolean) {
-  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-    descriptor.enumerable = value;
-  };
-}
-
 /**
  * A basic ResearchStudy implementation, this provides helper methods for
  * doing things like adding contact information.
