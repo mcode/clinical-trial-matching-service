@@ -1,7 +1,7 @@
 {
   "name": "clinical-trial-matching-service",
   "version": "0.0.1",
-  "description": "Provides a core library for accessing TrialScope code",
+  "description": "Provides a core library for interacting with the clinical-trial-matching-engine",
   "main": "dist/index.js",
   "repository": {
     "type": "git",

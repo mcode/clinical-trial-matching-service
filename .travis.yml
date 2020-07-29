@@ -8,5 +8,9 @@ cache: npm
 
 script:
   - npm install
+  - npm install codecov -g
   - npm run lint
   - npm test
+
+after_success: 
+  - codecov
