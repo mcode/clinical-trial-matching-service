@@ -115,6 +115,22 @@ export function convertStringArrayToCodeableConcept(conditions: string): Codeabl
   return fhirConditions;
 }
 
+export type Container<TContainer, TContained, K extends keyof TContainer> = {
+  [P in K]: Array<TContained> | undefined
+};
+export function addToContainer<TContainer, TContained, K extends keyof TContainer>(
+  container: Container<TContainer, TContained, K>,
+  propertyName: K,
+  item: TContained
+): void {
+  if (!container[propertyName]) {
+    container[propertyName] = [];
+  }
+  // I'm unclear why TypeScript won't make this inference when the type is
+  // optional, but it won't
+  (container[propertyName] as Array<TContained>).push(item);
+}
+
 export function createReferenceTo(resource: BaseResource): Reference {
   const reference: Reference = {};
   if (resource.id) {
@@ -130,7 +146,7 @@ export function createReferenceTo(resource: BaseResource): Reference {
  * A basic ResearchStudy implementation, this provides helper methods for
  * doing things like adding contact information.
  */
-export class BasicResearchStudy implements ResearchStudy {
+export class ResearchStudy implements ResearchStudy {
   resourceType = 'ResearchStudy' as const;
   id?: string;
   identifier?: Identifier[];
@@ -229,17 +245,24 @@ export class BasicResearchStudy implements ResearchStudy {
    * @param name the name of the site to add
    * @return the location added
    */
-  addSite(name: string): Location;
+  addSite(name: string, phone?: string, email?: string): Location;
 
   addSite(location: Location): Location;
 
-  addSite(nameOrLocation: string | Location): Location {
+  addSite(nameOrLocation: string | Location, phone?: string, email?: string): Location {
     const location: Location = typeof nameOrLocation === 'string' ?
       { resourceType: 'Location', id: this.createReferenceId('location'), name: nameOrLocation } :
       nameOrLocation;
-    if (!this.site)
-      this.site = [];
-    this.site.push(this.addContainedResource(location));
+    if (typeof nameOrLocation === 'string') {
+      // Also possibly add the telecoms
+      if (phone) {
+        addToContainer<Location, ContactPoint, 'telecom'>(location, 'telecom', { system: 'phone', value: phone, use: 'work' });
+      }
+      if (email) {
+        addToContainer<Location, ContactPoint, 'telecom'>(location, 'telecom', { system: 'email', value: email, use: 'work' });
+      }
+    }
+    addToContainer<ResearchStudy, Reference, 'site'>(this, 'site', this.addContainedResource(location));
     return location;
   }
 }

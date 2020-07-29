@@ -1,5 +1,5 @@
 import SearchSet from '../src/searchset';
-import { BasicResearchStudy } from '../src/research-study';
+import { ResearchStudy } from '../src/research-study';
 
 describe('SearchSet', () => {
   it('creates a SearchSet', () => {
@@ -11,7 +11,7 @@ describe('SearchSet', () => {
   });
 
   it('wraps resources in entries', () => {
-    const study = new BasicResearchStudy('test');
+    const study = new ResearchStudy('test');
     const searchSet = new SearchSet([study]);
     expect(searchSet.total).toEqual(1);
     expect(searchSet.entry.length).toEqual(1);
