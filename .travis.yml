@@ -10,8 +10,9 @@ script:
   - npm install
   - npm install codecov -g
   - npm run lint
-  - npm test
+  # Coverage report also runs the tests and will exit with a failure result if
+  # the tests fail.
   - npm run-script coverage
 
-after_success: 
+after_success:
   - codecov
