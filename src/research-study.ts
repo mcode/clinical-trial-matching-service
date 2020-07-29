@@ -49,30 +49,26 @@ export interface Reference {
 }
 
 // FHIR resources contained within ResearchStudy
-export interface Group {
-  resourceType?: string;
-  id?: string;
+export interface Group extends BaseResource {
+  resourceType: 'Group';
   type?: string;
   actual?: boolean;
 }
 
 export interface Location extends BaseResource {
   resourceType: 'Location';
-  id?: string;
   name?: string;
   telecom?: ContactPoint[];
   position?: { longitude?: number; latitude?: number };
 }
 
-export interface Organization {
-  resourceType?: string;
-  id?: string;
+export interface Organization extends BaseResource {
+  resourceType: 'Organization';
   name?: string;
 }
 
-export interface Practitioner {
-  resourceType?: string;
-  id?: string;
+export interface Practitioner extends BaseResource {
+  resourceType: 'Practitioner';
   name?: HumanName[];
 }
 
@@ -86,7 +82,6 @@ export type ContainedResource = Group | Location | Organization | Practitioner;
 
 export interface ResearchStudy extends BaseResource {
   resourceType: 'ResearchStudy';
-  id?: string;
   identifier?: Identifier[];
   title?: string;
   status?: string;
@@ -176,13 +171,15 @@ export class BasicResearchStudy implements ResearchStudy {
   }
 
   /**
-   * Add a contained resource
+   * Add a contained resource, returning a reference to it that can be added
+   * elsewhere.
    * @param resource the resource to add
    */
-  addContainedResource(resource: ContainedResource): void {
+  addContainedResource(resource: ContainedResource): Reference {
     if (!this.contained)
       this.contained = [];
     this.contained.push(resource);
+    return createReferenceTo(resource);
   }
 
   /**
@@ -206,13 +203,11 @@ export class BasicResearchStudy implements ResearchStudy {
    * @param phone the work phone number of the contact
    * @param email the work email of the contact
    */
-  addContact(name: string, phone: string, email: string): void;
+  addContact(name: string, phone?: string, email?: string): void;
   addContact(nameOrContact: ContactDetail | string, phone?: string, email?: string): void {
     const contact: ContactDetail = typeof nameOrContact === 'string' ? {} : nameOrContact;
     if (typeof nameOrContact === 'string') {
-      if (name) {
-        contact.name = name;
-      }
+      contact.name = nameOrContact;
       if (phone || email) {
         const telecoms: ContactPoint[] = [];
         if (phone) {
@@ -244,8 +239,7 @@ export class BasicResearchStudy implements ResearchStudy {
       nameOrLocation;
     if (!this.site)
       this.site = [];
-    this.site.push(createReferenceTo(location));
-    this.addContainedResource(location);
+    this.site.push(this.addContainedResource(location));
     return location;
   }
 }

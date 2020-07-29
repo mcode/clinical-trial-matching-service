@@ -60,7 +60,7 @@ export class ClinicalTrialMatchingService {
    * Gets the server object, if it's running, or `null` if it isn't.
    */
   get server(): http.Server | null {
-    return this.server;
+    return this._server;
   }
 
   /**
