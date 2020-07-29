@@ -11,6 +11,7 @@ script:
   - npm install codecov -g
   - npm run lint
   - npm test
+  - npm run-script coverage
 
 after_success: 
   - codecov
