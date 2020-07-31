@@ -1,6 +1,23 @@
 import { configFromEnv } from '../src/env';
 
 describe('configFromEnv', () => {
+  it('defaults to process.env', () => {
+    process.env['TEST_PREFIX_VALUE'] = 'a value';
+    const config = configFromEnv(undefined, 'TEST_PREFIX_');
+    expect(config['value']).toEqual('a value');
+  });
+
+  it('handles a prefix', () => {
+    const config = configFromEnv({ 'CLINICAL_TRIAL_MATCHING_SERVICE_PORT': '8080' }, 'CLINICAL_TRIAL_MATCHING_SERVICE_');
+    expect(config.port).toEqual(8080);
+  });
+
+  it('handles keys with a value of undefined', () => {
+    const config = configFromEnv({ 'foo': undefined });
+    // This doesn't really prove anything, but the key should be ignored
+    expect('foo' in config).toBeFalse();
+  });
+
   it('parses a port', () => {
     const config = configFromEnv({ 'port': '8080' });
     expect(config.port).toEqual(8080);

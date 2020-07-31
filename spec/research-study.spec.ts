@@ -1,4 +1,12 @@
-import ResearchStudy, { Group, Practitioner, Location } from '../src/research-study';
+import ResearchStudy, { Group, Practitioner, Location, convertStringArrayToCodeableConcept } from '../src/research-study';
+
+describe('convertStringArrayToCodeableConcept', () => {
+  it('converts to codeable concepts', () => {
+    expect(convertStringArrayToCodeableConcept('["a","b","c"]')).toEqual([
+      { text: 'a' }, { text: 'b' }, { text: 'c' }
+    ]);
+  });
+});
 
 describe('ResearchStudy', () => {
   it('converts to JSON properly', () => {

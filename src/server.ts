@@ -14,6 +14,18 @@ export interface Configuration {
   host?: string;
 }
 
+/**
+ * The JSON request from the client. This exists more for documentation purposes
+ * than anything else.
+ */
+export interface ClinicalTrialMatchServiceRequest {
+  /**
+   * The patient data. If a string, it's parsed as JSON. The string use should
+   * be deprecated.
+   */
+  patientData: Bundle | string;
+}
+
 export class ClinicalTrialMatchingService {
   public readonly app: express.Application;
   private readonly configuration: Configuration;
@@ -83,23 +95,23 @@ export class ClinicalTrialMatchingService {
         ? JSON.parse(postBody.patientData)
         : postBody.patientData) as Record<string, unknown>;
       if (isBundle(patientBundle)) {
+        // Error handler for exceptions raised (as it should be handled on the
+        // resulting Promise and if invoking the matcher itself fails)
+        const handleError = (error: unknown): void => {
+          if (error instanceof RequestError) {
+            response.status(error.httpStatus).send({ error: error.message });
+          } else {
+            response.status(500).send({ error: 'Internal server error', exception: Object.prototype.toString.call(error) as string });
+          }
+        };
         try {
           this.matcher(patientBundle)
             .then((result) => {
               response.status(200).send(JSON.stringify(result));
             })
-            .catch((error) => {
-              console.error(error);
-              response
-                .status(500)
-                .send({ error: 'Error from server', exception: Object.prototype.toString.call(error) as string });
-            });
+            .catch(handleError);
         } catch (ex) {
-          if (ex instanceof RequestError) {
-            response.status(ex.httpStatus).send({ error: ex.message });
-          } else {
-            response.status(500).send({ error: 'Internal server error' });
-          }
+          handleError(ex);
         }
       } else {
         response.status(400).send({ error: 'Invalid patientBundle' });
