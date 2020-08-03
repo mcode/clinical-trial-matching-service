@@ -131,10 +131,21 @@ export function addToContainer<TContainer, TContained, K extends keyof TContaine
   (container[propertyName] as Array<TContained>).push(item);
 }
 
+/**
+ * Creates a Reference to a resource, assuming it will be a contained resource.
+ * The resource must have an `id` set on it, otherwise this will raise an error.
+ * @param resource the resource to create a Reference to
+ */
 export function createReferenceTo(resource: BaseResource): Reference {
   const reference: Reference = {};
   if (resource.id) {
     reference.reference = '#' + resource.id;
+  } else {
+    let message = 'no ID to create reference';
+    if (resource.resourceType) {
+      message += ' to ' + resource.resourceType;
+    }
+    throw new Error(message);
   }
   if (resource.resourceType) {
     reference.type = resource.resourceType;
@@ -188,13 +199,18 @@ export class ResearchStudy implements ResearchStudy {
 
   /**
    * Add a contained resource, returning a reference to it that can be added
-   * elsewhere.
+   * elsewhere. If the contained resource does not have an ID, one will be
+   * created, based on the resource type.
    * @param resource the resource to add
+   * @return a reference to the contained resource
    */
   addContainedResource(resource: ContainedResource): Reference {
     if (!this.contained)
       this.contained = [];
     this.contained.push(resource);
+    if (!resource.id) {
+      resource.id = this.createReferenceId(resource.resourceType);
+    }
     return createReferenceTo(resource);
   }
 
@@ -211,16 +227,17 @@ export class ResearchStudy implements ResearchStudy {
    *
    * @param contact the contact to add
    */
-  addContact(contact: ContactDetail): void;
+  addContact(contact: ContactDetail): ContactDetail;
   /**
    * Adds a contact to the contact field.
    *
    * @param name the name of the contact
    * @param phone the work phone number of the contact
    * @param email the work email of the contact
+   * @returns the newly created contact
    */
-  addContact(name: string, phone?: string, email?: string): void;
-  addContact(nameOrContact: ContactDetail | string, phone?: string, email?: string): void {
+  addContact(name: string, phone?: string, email?: string): ContactDetail;
+  addContact(nameOrContact: ContactDetail | string, phone?: string, email?: string): ContactDetail {
     const contact: ContactDetail = typeof nameOrContact === 'string' ? {} : nameOrContact;
     if (typeof nameOrContact === 'string') {
       contact.name = nameOrContact;
@@ -238,6 +255,7 @@ export class ResearchStudy implements ResearchStudy {
     if (!this.contact)
       this.contact = [];
     this.contact.push(contact);
+    return contact;
   }
 
   /**

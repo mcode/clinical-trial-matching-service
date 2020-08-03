@@ -1,10 +1,39 @@
-import ResearchStudy, { Group, Practitioner, Location, convertStringArrayToCodeableConcept } from '../src/research-study';
+import ResearchStudy, {
+  ContactDetail,
+  Group,
+  Practitioner,
+  Location,
+  convertStringArrayToCodeableConcept,
+  createReferenceTo
+} from '../src/research-study';
+import { BaseResource } from '../src/bundle';
 
 describe('convertStringArrayToCodeableConcept', () => {
   it('converts to codeable concepts', () => {
     expect(convertStringArrayToCodeableConcept('["a","b","c"]')).toEqual([
       { text: 'a' }, { text: 'b' }, { text: 'c' }
     ]);
+  });
+});
+
+describe('createReferenceTo', () => {
+  it('handles resources with no resourceType', () => {
+    // This is actually impossible within TypeScript as it ensures resourceType
+    // is set, as that's what makes something a BaseResource. However, to allow
+    // us to work with JSON objects coming from outside TypeScript, it should be
+    // handled.
+    const resource: BaseResource = { id: 'example' } as BaseResource;
+    const reference = createReferenceTo(resource);
+    expect(reference.reference).toEqual('#example');
+    expect(reference.type).toBeUndefined();
+  });
+
+  it('raises an error if no ID exists on the resource being referenced', () => {
+    expect(() => { createReferenceTo({ resourceType: 'ResearchStudy' }) }).toThrowError('no ID to create reference to ResearchStudy');
+    // See above: this is invalid in TypeScript but a likely source of objects
+    // is JSON
+    const resource: BaseResource = { } as BaseResource;
+    expect(() => { createReferenceTo(resource) }).toThrowError('no ID to create reference');
   });
 });
 
@@ -56,6 +85,34 @@ describe('ResearchStudy', () => {
           expect(contact.telecom[1].value).toEqual('test@example.com');
         }
       }
+      // Make sure adding a second also works
+      const secondContact: ContactDetail = { name: 'Another Contact' };
+      researchStudy.addContact(secondContact);
+      if (researchStudy.contact) {
+        expect(researchStudy.contact.length).toEqual(2);
+        const contact = researchStudy.contact[1];
+        expect(contact.name).toEqual('Another Contact');
+      }
+    });
+
+    it('handles either phone or email or both being undefined', () => {
+      const researchStudy = new ResearchStudy('test');
+      const contact = researchStudy.addContact('Example Contact');
+      expect(contact.telecom).toBeUndefined();
+      const contactWithPhone = researchStudy.addContact('Phone Contact', '781-555-0102');
+      expect(Array.isArray(contactWithPhone.telecom)).toBeTrue();
+      if (contactWithPhone.telecom) {
+        expect(contactWithPhone.telecom.length).toEqual(1);
+        expect(contactWithPhone.telecom[0].system).toEqual('phone');
+        expect(contactWithPhone.telecom[0].value).toEqual('781-555-0102');
+      }
+      const contactWithEmail = researchStudy.addContact('Email Contact', undefined, 'test@example.com');
+      expect(Array.isArray(contactWithEmail.telecom)).toBeTrue();
+      if (contactWithEmail.telecom) {
+        expect(contactWithEmail.telecom.length).toEqual(1);
+        expect(contactWithEmail.telecom[0].system).toEqual('email');
+        expect(contactWithEmail.telecom[0].value).toEqual('test@example.com');
+      }
     });
   });
 
@@ -94,6 +151,37 @@ describe('ResearchStudy', () => {
       if (researchStudy.contained) {
         expect(researchStudy.contained[1]).toBe(secondLocation);
       }
+    });
+
+    it('handles either phone or email or both being undefined', () => {
+      const researchStudy = new ResearchStudy('test');
+      const location = researchStudy.addSite('Hospital');
+      expect(location.telecom).toBeUndefined();
+      const locationWithPhone = researchStudy.addSite('Lab', '781-555-0102');
+      expect(Array.isArray(locationWithPhone.telecom)).toBeTrue();
+      if (locationWithPhone.telecom) {
+        expect(locationWithPhone.telecom.length).toEqual(1);
+        expect(locationWithPhone.telecom[0].system).toEqual('phone');
+        expect(locationWithPhone.telecom[0].value).toEqual('781-555-0102');
+      }
+      const locationWithEmail = researchStudy.addSite('University', undefined, 'test@example.com');
+      expect(Array.isArray(locationWithEmail.telecom)).toBeTrue();
+      if (locationWithEmail.telecom) {
+        expect(locationWithEmail.telecom.length).toEqual(1);
+        expect(locationWithEmail.telecom[0].system).toEqual('email');
+        expect(locationWithEmail.telecom[0].value).toEqual('test@example.com');
+      }
+    });
+  });
+
+  describe('#createReferenceId', () => {
+    it('defaults to resource', () => {
+      expect(new ResearchStudy('id').createReferenceId()).toEqual("resource-0");
+    });
+    it('increments each call', () => {
+      const study = new ResearchStudy('id');
+      expect(study.createReferenceId('test')).toEqual('test-0');
+      expect(study.createReferenceId('other')).toEqual('other-1');
     });
   });
 });
