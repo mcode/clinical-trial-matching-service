@@ -159,5 +159,13 @@ describe('server', () => {
         expect((fakeServer as http.Server).address).toHaveBeenCalled();
       });
     });
+
+    it('uses the host config', () => {
+      const testService = new ClinicalTrialMatchingService(service.matcher, { host: '127.0.0.1', port: 3000 });
+      const fakeServer = jasmine.createSpyObj('http.Server', { address: { address: '127.0.0.1', port: 3000 } }) as unknown;
+      const listenSpy: jasmine.Spy = spyOn(testService.app, 'listen').and.returnValue(fakeServer as http.Server);
+      testService.listen();
+      expect(listenSpy).toHaveBeenCalledWith(3000, '127.0.0.1');
+    });
   });
 });

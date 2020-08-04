@@ -3,12 +3,12 @@ import { configFromEnv } from '../src/env';
 describe('configFromEnv', () => {
   it('defaults to process.env', () => {
     process.env['TEST_PREFIX_VALUE'] = 'a value';
-    const config = configFromEnv(undefined, 'TEST_PREFIX_');
+    const config = configFromEnv('TEST_PREFIX_');
     expect(config['value']).toEqual('a value');
   });
 
   it('handles a prefix', () => {
-    const config = configFromEnv({ 'CLINICAL_TRIAL_MATCHING_SERVICE_PORT': '8080' }, 'CLINICAL_TRIAL_MATCHING_SERVICE_');
+    const config = configFromEnv('CLINICAL_TRIAL_MATCHING_SERVICE_', { 'CLINICAL_TRIAL_MATCHING_SERVICE_PORT': '8080' });
     expect(config.port).toEqual(8080);
   });
 

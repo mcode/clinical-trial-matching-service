@@ -7,10 +7,21 @@ import * as http from 'http';
 
 export type ClinicalTrialMatcher = (patientBundle: Bundle) => Promise<SearchSet>;
 
+/**
+ * Server configuration.
+ */
 export interface Configuration {
   // This may be further loosened in the future
   [key: string]: string | number | undefined;
+  /**
+   * The port to listen on (must be in the range 0-65535, if outside or unset,
+   * the default of 3000 is used).
+   */
   port?: number;
+  /**
+   * The host address to bind to, if unset, uses the default from
+   * http.Server#listen.
+   */
   host?: string;
 }
 
@@ -31,6 +42,11 @@ export class ClinicalTrialMatchingService {
   private readonly configuration: Configuration;
   private _server: http.Server | null = null;
 
+  /**
+   * Create a new service.
+   * @param matcher the matcher function
+   * @param configuration the server configuration
+   */
   constructor(public matcher: ClinicalTrialMatcher, configuration?: Configuration) {
     this.app = express();
     this.configuration = configuration ? configuration : {};
@@ -86,6 +102,10 @@ export class ClinicalTrialMatchingService {
         return port;
     }
     return 3000;
+  }
+
+  get host(): string | undefined {
+    return typeof this.configuration.host === 'string' ? this.configuration.host : undefined;
   }
 
   getClinicalTrial(request: express.Request, response: express.Response): void {
@@ -150,7 +170,9 @@ export class ClinicalTrialMatchingService {
       return this._server;
     }
     const port = this.port;
-    this._server = this.app.listen(port);
+    const host = this.host;
+    // It's unclear if we can pass undefined to listen
+    this._server = host ? this.app.listen(port, host) : this.app.listen(port);
     const listeningOn = this._server.address();
     if (typeof listeningOn === 'object' && listeningOn !== null) {
       this.log(`Server listening on ${listeningOn.address}:${listeningOn.port}...`);

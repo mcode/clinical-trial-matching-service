@@ -29,6 +29,24 @@ const service = new ClinicalTrialMatchingService(customMatchingFunction);
 service.listen();
 ```
 
+## Configuring the service
+
+The `ClinicalTrialMatchingService` can optionally take a `Configuration` object that describes the server's configuration. At present, it has two fields, that are both handed off to the underlying `net.Server#listen` directly:
+
+ * `port` - the port to listen on, must be in the range 0-65535. If 0, a default open port is used.
+ * `host` - the host address to bind to
+
+For more information about how these are used, read the [Node.js `net.Server#listen` documentation](https://nodejs.org/dist/latest-v12.x/docs/api/net.html#net_server_listen_port_host_backlog_callback).
+
+The `configFromEnv()` helper function can be used to pull in all environment variables (or all environment variables starting with a given prefix) into a configuration object that can be passed to the `ClinicalTrialMatchingService` constructor. The function will remove the prefix (if one is given) and lowercase the key for all environment variables in the final configuration (meaning `PORT` and `port` both specify a value for `port`). The function has the following overloads:
+
+ * `configFromEnv()` - load all environment variables in `process.env` with no prefix
+ * `configFromEnv(prefix: string)` - load all environment variables in `process.env` with the given prefix
+ * `configFromEnv(env: Record<string, string | undefined>)` - convert the given object
+ * `configFromEnv(prefix: string, env: Record<string, string | undefined>)` - using the given prefix, convert the given object
+
+It is recommended that you use something like [dotenv-flow](https://github.com/kerimdzhanov/dotenv-flow) to load configuration into the environment and then this helper to create the configuration itself.
+
 # Helper Classes
 
 Various classes and types are provided to make implementing another service easier.
@@ -83,4 +101,4 @@ Construct an error with the given `message` string and possibly with an `httpSta
 
 # Lint and tests
 
-Use `npm run lint` to run the linter and `npm test` to run tests. Additionally, `npm coverage` generates a coverage report and `npm comverage:html` generates an HTML coverage report that can be viewed in a browser.
+Use `npm run-script lint` to run the linter and `npm test` to run tests. Additionally, `npm run-script coverage` generates a coverage report and `npm run-script coverage:html` generates an HTML coverage report that can be viewed in a browser.
