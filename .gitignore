@@ -1,0 +1,18 @@
+# Ignore built files
+/dist
+/dist-spec
+
+# Ignore Instanbul coverage files
+/.nyc_output
+/coverage
+
+# Ignore Node modules
+/node_modules
+
+# Ignore local configuration
+.env.local
+
+# Ignore OS-generated files
+*~
+.DS_Store
+Thumbs.db
