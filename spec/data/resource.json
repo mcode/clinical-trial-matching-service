@@ -1,0 +1,554 @@
+{
+    "resourceType": "Bundle",
+    "type": "searchset",
+    "entry": [
+      {
+        "resource": {
+          "resourceType": "ResearchStudy",
+          "id": "0",
+          "identifier": [
+            {
+              "use": "official",
+              "system": "http://clinicaltrials.gov",
+              "value": "NCT02513394"
+            }
+          ],
+          "title": "PALbociclib CoLlaborative Adjuvant Study: A Randomized Phase III Trial of Palbociclib With Standard Adjuvant Endocrine Therapy Versus Standard Adjuvant Endocrine Therapy Alone for Hormone Receptor Positive (HR+) / Human Epidermal Growth Factor Receptor 2 (HER2)-Negative Early Breast Cancer",
+          "status": "active",
+          "phase": {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/research-study-phase",
+                "code": "phase-3",
+                "display": "Phase 3"
+              }
+            ],
+            "text": "Phase 3"
+          },
+          "category": [
+            {
+              "text": "Interventional"
+            }
+          ],
+          "condition": [
+            {
+              "text": "Breast Cancer"
+            }
+          ],
+          "contact": [
+            {
+              "name": "Edward Habermehl"
+            }
+          ],
+          "keyword": [
+            {
+              "text": "HR+/HER2- breast cancer"
+            },
+            {
+              "text": "Palbociclib"
+            }
+          ],
+          "location": [
+            {
+              "text": "Australia"
+            },
+            {
+              "text": "Canada"
+            },
+            {
+              "text": "Israel"
+            },
+            {
+              "text": "Japan"
+            },
+            {
+              "text": "Korea, Republic of"
+            },
+            {
+              "text": "Mexico"
+            },
+            {
+              "text": "Switzerland"
+            },
+            {
+              "text": "Taiwan"
+            },
+            {
+              "text": "United States"
+            }
+          ],
+          "objective": [
+            {
+              "name": "PALbociclib CoLlaborative Adjuvant Study: A Randomized Phase III Trial of Palbociclib With Standard Adjuvant Endocrine Therapy Versus Standard Adjuvant Endocrine Therapy Alone for Hormone Receptor Positive (HR+) / Human Epidermal Growth Factor Receptor 2 (HER2)-Negative Early Breast Cancer"
+            }
+          ]
+        },
+        "search": {
+          "mode": "match",
+          "score": 1
+        }
+      },
+      {
+        "resource": {
+          "resourceType": "ResearchStudy",
+          "id": "1",
+          "identifier": [
+            {
+              "use": "official",
+              "system": "http://clinicaltrials.gov",
+              "value": "NCT01674140"
+            }
+          ],
+          "title": "S1207 Hormone Therapy With or Without Everolimus in Treating Patients With Breast Cancer",
+          "status": "active",
+          "phase": {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/research-study-phase",
+                "code": "phase-3",
+                "display": "Phase 3"
+              }
+            ],
+            "text": "Phase 3"
+          },
+          "category": [
+            {
+              "text": "Interventional"
+            }
+          ],
+          "condition": [
+            {
+              "text": "Breast Cancer"
+            }
+          ],
+          "contact": [
+            {
+              "name": "Cara Laubach, MIIM",
+              "telecom": [
+                {
+                  "system": "phone",
+                  "value": "2106148808",
+                  "use": "work"
+                },
+                {
+                  "system": "email",
+                  "value": "claubach@swog.org",
+                  "use": "work"
+                }
+              ]
+            }
+          ],
+          "keyword": [
+            {
+              "text": "estrogen receptor-positive breast cancer"
+            },
+            {
+              "text": "HER2-negative breast cancer"
+            },
+            {
+              "text": "stage IA breast cancer"
+            },
+            {
+              "text": "stage IB breast cancer"
+            },
+            {
+              "text": "stage II breast cancer"
+            },
+            {
+              "text": "stage IIIA breast cancer"
+            },
+            {
+              "text": "stage IIIB breast cancer"
+            },
+            {
+              "text": "stage IIIC breast cancer"
+            },
+            {
+              "text": "progesterone receptor-positive breast cancer"
+            },
+            {
+              "text": "male breast cancer"
+            }
+          ],
+          "location": [
+            {
+              "text": "Puerto Rico"
+            },
+            {
+              "text": "United States"
+            }
+          ],
+          "description": "\n      OBJECTIVES:\n\n      Primary\n\n        -  To compare whether the addition of one year of everolimus (10 mg daily) to standard\n           adjuvant endocrine therapy improves invasive disease-free survival (IDFS) in patients\n           with high-risk, hormone-receptor (HR)-positive, and human epidermal growth factor\n           receptor (HER)2-negative breast cancer.\n\n      Secondary\n\n        -  To compare whether the addition of one year of everolimus to standard adjuvant endocrine\n           therapy improves overall survival (OS) and distant recurrence-free survival (DRFS) in\n           this patient population.\n\n        -  To evaluate the safety, toxicities, and tolerability of one year of everolimus in\n           combination with standard adjuvant endocrine therapy and to compare it with standard\n           adjuvant endocrine therapy plus placebo in this patient population.\n\n        -  To determine whether the benefit of one year of everolimus use in addition to standard\n           adjuvant endocrine therapy varies by recurrence score (RS), nodal status, or other\n           commonly used prognostic factors.\n\n        -  To evaluate adherence to 1-year treatment of everolimus in comparison to placebo in\n           addition to standard adjuvant endocrine therapy in this patient population.\n\n        -  To collect specimens in order to evaluate biomarkers of therapeutic efficacy.\n           (exploratory)\n\n      OUTLINE: This is a multicenter study. Patients are stratified according to risk level\n      (node-negative and recurrence score [RS] > 25 in the primary tumor, and a tumor measuring ≥ 2\n      cm in greatest diameter treated with adjuvant therapy vs 1-3 positive lymph nodes and RS > 25\n      treated with adjuvant therapy vs ≥ 4 positive lymph nodes [any RS value] treated with\n      adjuvant therapy vs ≥ 4 positive lymph nodes [any RS value] prior to or after neoadjuvant\n      chemotherapy). Patients are randomized to 1 of 2 treatment arms.\n\n        -  Arm I: Patients receive an approved endocrine therapy comprising tamoxifen citrate*,\n           goserelin acetate** or leuprolide acetate**, or aromatase inhibitor (anastrozole,\n           letrozole, or exemestane) for 2-5 years. Patients also receive a placebo orally (PO)\n           daily for 1 year in the absence of disease progression or unacceptable toxicity.\n\n        -  Arm II: Patients receive an approved endocrine therapy regimen as in arm I. Patients\n           also receive everolimus PO daily for 1 year in the absence of disease progression or\n           unacceptable toxicity.\n\n      NOTE: *Men receive tamoxifen citrate PO for 5 years.\n\n      NOTE: **Goserelin acetate or leuprolide acetate is given if patient is or becomes\n      postmenopausal.\n\n      Blood and tissue samples are collected for biomarker studies.\n\n      After completion of study treatment, patients are followed up every 6 months for 2 years and\n      then yearly thereafter for 10 years.\n    ",
+          "objective": [
+            {
+              "name": "Phase III Randomized, Placebo-Controlled Clinical Trial Evaluating the Use of Adjuvant Endocrine Therapy +/- One Year of Everolimus in Patients With High-Risk, Hormone Receptor-Positive and HER2/Neu Negative Breast Cancer"
+            }
+          ]
+        },
+        "search": {
+          "mode": "match",
+          "score": 1
+        }
+      },
+      {
+        "resource": {
+          "resourceType": "ResearchStudy",
+          "id": "2",
+          "identifier": [
+            {
+              "use": "official",
+              "system": "http://clinicaltrials.gov",
+              "value": "NCT03488693"
+            }
+          ],
+          "title": "Regional Radiotherapy in Biomarker Low Risk Node Positive Breast Cancer",
+          "status": "active",
+          "phase": {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/research-study-phase",
+                "code": "n-a",
+                "display": "N/A"
+              }
+            ],
+            "text": "N/A"
+          },
+          "category": [
+            {
+              "text": "Interventional"
+            }
+          ],
+          "condition": [
+            {
+              "text": "Breast Cancer"
+            }
+          ],
+          "contact": [
+            {
+              "name": "Wendy Parulekar",
+              "telecom": [
+                {
+                  "system": "phone",
+                  "value": "613-533-6430",
+                  "use": "work"
+                },
+                {
+                  "system": "email",
+                  "value": "wparulekar@ctg.queensu.ca",
+                  "use": "work"
+                }
+              ]
+            }
+          ],
+          "location": [
+            {
+              "text": "Canada"
+            },
+            {
+              "text": "United States"
+            }
+          ],
+          "description": "\n      Women with node positive breast cancer normally will receive endocrine therapy and some may\n      receive chemotherapy to help prevent the cancer from coming back. Many women will also\n      receive radiotherapy to the whole breast/chest area and the surrounding lymph glands (called\n      regional radiotherapy). No one really knows whether patients with low risk breast cancer need\n      to receive regional radiotherapy. Some women may be getting regional radiotherapy who do not\n      need it. These women may be exposed to the side effects of their treatment without benefit.\n    ",
+          "arm": [
+            {
+              "name": "No Regional Radiotherapy",
+              "type": {
+                "text": "Active Comparator"
+              },
+              "description": "A. Whole Breast Irradiation (WBI) following BCS or; B. No Radiotherapy (RT) following mastectomy"
+            },
+            {
+              "name": "Regional Radiotherapy",
+              "type": {
+                "text": "Active Comparator"
+              },
+              "description": "A. WBI plus RT to the regional nodes (supraclavicular, non-dissected axillary, and internal mammary) following BCS or; B. RT to the chestwall and regional nodes (supraclavicular, non-dissected axillary, and internal mammary) following mastectomy"
+            }
+          ],
+          "objective": [
+            {
+              "name": "TAILOR RT: A Randomized Trial of Regional Radiotherapy in Biomarker Low Risk Node Positive Breast Cancer"
+            }
+          ]
+        },
+        "search": {
+          "mode": "match",
+          "score": 1
+        }
+      },
+      {
+        "resource": {
+          "resourceType": "ResearchStudy",
+          "id": "3",
+          "identifier": [
+            {
+              "use": "official",
+              "system": "http://clinicaltrials.gov",
+              "value": "NCT03662204"
+            }
+          ],
+          "title": "Blood Sample Collection to Evaluate Biomarkers in Subjects With Untreated Solid Tumors",
+          "status": "active",
+          "category": [
+            {
+              "text": "Observational"
+            }
+          ],
+          "condition": [
+            {
+              "text": "Breast Cancer"
+            },
+            {
+              "text": "Lung Cancer"
+            },
+            {
+              "text": "Colorectal Cancer"
+            },
+            {
+              "text": "Prostate Cancer"
+            },
+            {
+              "text": "Bladder Cancer"
+            },
+            {
+              "text": "Uterine Cancer"
+            },
+            {
+              "text": "Kidney Cancer"
+            },
+            {
+              "text": "Renal Pelvis Cancer"
+            },
+            {
+              "text": "Pancreatic Cancer"
+            },
+            {
+              "text": "Liver Cancer"
+            },
+            {
+              "text": "Stomach Cancer"
+            },
+            {
+              "text": "Ovarian Cancer"
+            },
+            {
+              "text": "Esophageal Cancer"
+            }
+          ],
+          "contact": [
+            {
+              "name": "Sarah Dunlap, PhD",
+              "telecom": [
+                {
+                  "system": "phone",
+                  "value": "608-733-5531",
+                  "use": "work"
+                },
+                {
+                  "system": "email",
+                  "value": "sdunlap@exactsciences.com",
+                  "use": "work"
+                }
+              ]
+            }
+          ],
+          "keyword": [
+            {
+              "text": "blood draw"
+            },
+            {
+              "text": "sample collection"
+            }
+          ],
+          "location": [
+            {
+              "text": "United States"
+            }
+          ],
+          "description": "\n      Subjects who have been diagnosed, or who have a suspicion of diagnosis based on imaging, with\n      any solid tumor. Subjects will have a blood sample collected at enrollment and provide\n      medical history prior to initiation of treatment. There will be no further follow-up.\n    ",
+          "arm": [
+            {
+              "name": "Breast",
+              "description": "Subjects with clinically confirmed breast cancer and who are treatment naive will provide a blood sample at time of enrollment. No additional blood draws will occur."
+            },
+            {
+              "name": "Lung",
+              "description": "Subjects with clinically confirmed lung cancer and who are treatment naive will provide a blood sample at time of enrollment. No additional blood draws will occur."
+            },
+            {
+              "name": "Colorectal",
+              "description": "Subjects with clinically confirmed colorectal cancer and who are treatment naive will provide a blood sample at time of enrollment. No additional blood draws will occur."
+            },
+            {
+              "name": "Prostate",
+              "description": "Subjects with clinically confirmed prostate cancer and who are treatment naive will provide a blood sample at time of enrollment. No additional blood draws will occur."
+            },
+            {
+              "name": "Bladder",
+              "description": "Subjects with clinically confirmed or suspicion of bladder cancer and who are treatment naive will provide a blood sample at time of enrollment. No additional blood draws will occur."
+            },
+            {
+              "name": "Uterine",
+              "description": "Subjects with clinically confirmed uterine cancer and who are treatment naive will provide a blood sample at time of enrollment. No additional blood draws will occur."
+            },
+            {
+              "name": "Kidney & Renal Pelvis",
+              "description": "Subjects with clinically confirmed or suspicion of kidney or renal pelvis cancer and who are treatment naive will provide a blood sample at time of enrollment. No additional blood draws will occur."
+            },
+            {
+              "name": "Pancreatic",
+              "description": "Subjects with clinically confirmed or suspicion of pancreatic cancer and who are treatment naive will provide a blood sample at time of enrollment. No additional blood draws will occur."
+            },
+            {
+              "name": "Liver",
+              "description": "Subjects with clinically confirmed liver cancer and who are treatment naive will provide a blood sample at time of enrollment. No additional blood draws will occur."
+            },
+            {
+              "name": "Stomach",
+              "description": "Subjects with clinically confirmed stomach cancer and who are treatment naive will provide a blood sample at time of enrollment. No additional blood draws will occur."
+            },
+            {
+              "name": "Ovarian",
+              "description": "Subjects with clinically confirmed or suspicion of ovarian cancer and who are treatment naive will provide a blood sample at time of enrollment. No additional blood draws will occur."
+            },
+            {
+              "name": "Esophageal",
+              "description": "Subjects with clinically confirmed esophageal cancer and who are treatment naive will provide a blood sample at time of enrollment. No additional blood draws will occur."
+            }
+          ],
+          "objective": [
+            {
+              "name": "Blood Sample Collection to Evaluate Biomarkers in Subjects With Untreated Solid Tumors"
+            }
+          ]
+        },
+        "search": {
+          "mode": "match",
+          "score": 1
+        }
+      },
+      {
+        "resource": {
+          "resourceType": "ResearchStudy",
+          "id": "4",
+          "identifier": [
+            {
+              "use": "official",
+              "system": "http://clinicaltrials.gov",
+              "value": "NCT02744092"
+            }
+          ],
+          "title": "Direct Oral Anticoagulants (DOACs) Versus LMWH +/- Warfarin for VTE in Cancer",
+          "status": "active",
+          "phase": {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/research-study-phase",
+                "code": "n-a",
+                "display": "N/A"
+              }
+            ],
+            "text": "N/A"
+          },
+          "category": [
+            {
+              "text": "Interventional"
+            }
+          ],
+          "condition": [
+            {
+              "text": "Cancer"
+            },
+            {
+              "text": "Venous Thromboembolism"
+            },
+            {
+              "text": "Deep Vein Thrombosis (DVT)"
+            },
+            {
+              "text": "Pulmonary Embolism (PE)"
+            },
+            {
+              "text": "Blood Clot"
+            }
+          ],
+          "contact": [
+            {
+              "name": "Deborah Schrag, MD MPH",
+              "telecom": [
+                {
+                  "system": "phone",
+                  "value": "617-582-8301",
+                  "use": "work"
+                },
+                {
+                  "system": "email",
+                  "value": "deb_schrag@dfci.harvard.edu",
+                  "use": "work"
+                }
+              ]
+            }
+          ],
+          "keyword": [
+            {
+              "text": "Rivaroxaban (Xarelto)"
+            },
+            {
+              "text": "Apixaban (Eliquis)"
+            },
+            {
+              "text": "Edoxaban (Savaysa)"
+            },
+            {
+              "text": "Dabigatran (Pradaxa)"
+            },
+            {
+              "text": "Warfarin (Coumadin)"
+            },
+            {
+              "text": "Low molecular weight heparin (LMWH)"
+            }
+          ],
+          "location": [
+            {
+              "text": "United States"
+            }
+          ],
+          "description": "\n      Venous blood clots affect nearly a million Americans each year. Venous clots in the legs are\n      called deep venous thrombosis (DVT) and are dangerous because they travel to the lungs where\n      they cause blockages known as pulmonary emboli (PE). DVT and PE are called venous\n      thromboemboli (VTE). Cancer is a risk factor with nearly 200,000 VTEs in cancer patients each\n      year. The purpose of VTE treatment is to prevent the initial clot from spreading and to\n      prevent new clots from forming. This is accomplished by thinning the blood, or\n      anticoagulation. Without anticoagulation, VTEs recur and are often fatal.\n\n      Recently, the FDA has approved 4 new Direct Oral AntiCoagulants (DOACs) for preventing VTE\n      recurrence. Few cancer patients were included in the efficacy trials, and practice guidelines\n      fall silent on whether switching to DOAC therapy is advisable. To fill this knowledge gap,\n      the Alliance Foundation Trials LLC, a research network of academic and community practices\n      across the US, is conducting a pragmatic randomized effectiveness trial.\n\n      The overarching objective of the study is to determine the effectiveness of LMWH/ warfarin\n      vs. DOAC anticoagulation for preventing recurrent VTE in cancer patients. The investigators\n      will conduct a trial of 940 cancer patients followed for 6 months. The intervention strategy\n      is DOAC therapy with edoxaban, apixaban, rivaroxaban, or dabigatran. The comparator is LMWH\n      alone or with warfarin. Within each arm, patients can choose the agent they prefer based on\n      side effects, drug interactions, and practical issues such as co-pays. The trial compares\n      these two strategies in terms of treatment: 1) benefits based on VTE recurrence; 2) harms\n      based on bleeding rates; 3) burdens based on patients' reports of their experiences; and 4)\n      mortality rates.\n\n      The investigators hypothesize that the benefits, harms and burdens of DOAC treatment will be\n      non-inferior to, or better than, usual care with LMWH/ warfarin among cancer patients. The\n      information gained will empower cancer patients and physicians to make more informed choices\n      about anticoagulation strategies to manage VTE.\n    ",
+          "arm": [
+            {
+              "name": "Randomized Arm 1",
+              "type": {
+                "text": "Experimental"
+              },
+              "description": "Randomized Arm 1 will get anticoagulation therapy with a Direct Oral AntiCoagulant (DOAC). There are four FDA-approved DOAC drugs that may be used for this study: Rivaroxaban, Apixaban, Edoxaban, or Dabigatran. The treatment (including dosage form, dosage, frequency and duration) should be administered in accordance with the drug's FDA package insert, and all modifications are at the discretion of the treating investigator."
+            },
+            {
+              "name": "Randomized Arm 2",
+              "type": {
+                "text": "Active Comparator"
+              },
+              "description": "Randomized Arm 2 will get anticoagulation therapy with low molecular weight heparin (LMWH) with or without a transition to warfarin. There are three FDA-approved LMWH drugs that may be used for this study: Dalteparin, Enoxaparin, or Fondaparinux. The treatment (including dosage form, dosage, frequency and duration) should be administered in accordance with the drug's FDA package insert, and all modifications are at the discretion of the treating investigator."
+            },
+            {
+              "name": "Preference Cohort",
+              "type": {
+                "text": "Experimental"
+              },
+              "description": "If an eligible participant is offered randomization and declines randomization, then a limited number of participants (up to N=190) will be allowed to enroll in the Preference Cohort. In this case, the treating physician and patient choose Arm 1 or Arm 2 (non-randomized).\nPreference cohort: Non-randomized Arm 1 will get anticoagulation therapy with a Direct Oral AntiCoagulant (DOAC).\nPreference cohort: Non-randomized Arm 2 will get anticoagulation therapy with low molecular weight heparin (LMWH) with or without a transition to warfarin."
+            }
+          ],
+          "objective": [
+            {
+              "name": "Direct Oral Anticoagulants (DOACs) Versus LMWH +/- Warfarin for VTE in Cancer: A Randomized Effectiveness Trial (CANVAS Trial)"
+            }
+          ]
+        },
+        "search": {
+          "mode": "match",
+          "score": 1
+        }
+      }
+    ],
+    "total": 5
+  }

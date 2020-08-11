@@ -80,7 +80,7 @@ export interface HumanName {
 
 export type ContainedResource = Group | Location | Organization | Practitioner;
 
-export interface ResearchStudy extends BaseResource {
+export interface ResearchStudyInterface extends BaseResource {
   resourceType: 'ResearchStudy';
   identifier?: Identifier[];
   title?: string;
@@ -157,7 +157,7 @@ export function createReferenceTo(resource: BaseResource): Reference {
  * A basic ResearchStudy implementation, this provides helper methods for
  * doing things like adding contact information.
  */
-export class ResearchStudy implements ResearchStudy {
+export class ResearchStudy implements ResearchStudyInterface {
   resourceType = 'ResearchStudy' as const;
   id?: string;
   identifier?: Identifier[];
