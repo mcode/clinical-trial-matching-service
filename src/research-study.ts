@@ -1,105 +1,18 @@
 // FHIR data types supporting ResearchStudy
 
-import { BaseResource } from './bundle';
-
-export interface Identifier {
-  use?: string;
-  system?: string;
-  value?: string;
-}
-
-export interface CodeableConcept {
-  coding?: { system?: string; code?: string; display?: string }[];
-  text?: string;
-}
-
-export type ContactPointSystem = 'phone' | 'fax' | 'email' | 'pager' | 'url' | 'sms' | 'other';
-export type ContactPointUse = 'home' | 'work' | 'temp' | 'old' | 'mobile';
-
-export interface ContactDetail {
-  name?: string;
-  telecom?: ContactPoint[];
-}
-
-// Can't actually make a positive integer type on TypeScript but may as well document it as such
-export type PositiveInteger = number;
-
-export interface ContactPoint {
-  system?: ContactPointSystem;
-  value?: string;
-  use?: ContactPointUse;
-  rank?: PositiveInteger;
-}
-
-export interface Arm {
-  name?: string;
-  type?: CodeableConcept;
-  description?: string;
-}
-
-export interface Objective {
-  name?: string;
-  type?: CodeableConcept;
-}
-
-export interface Reference {
-  reference?: string;
-  type?: string;
-  display?: string;
-}
-
-// FHIR resources contained within ResearchStudy
-export interface Group extends BaseResource {
-  resourceType: 'Group';
-  type?: string;
-  actual?: boolean;
-}
-
-export interface Location extends BaseResource {
-  resourceType: 'Location';
-  name?: string;
-  telecom?: ContactPoint[];
-  position?: { longitude?: number; latitude?: number };
-}
-
-export interface Organization extends BaseResource {
-  resourceType: 'Organization';
-  name?: string;
-}
-
-export interface Practitioner extends BaseResource {
-  resourceType: 'Practitioner';
-  name?: HumanName[];
-}
-
-// FHIR data types supporting resources contained in ResearchStudy
-export interface HumanName {
-  use?: string;
-  text: string;
-}
-
-export type ContainedResource = Group | Location | Organization | Practitioner;
-
-export interface ResearchStudyInterface extends BaseResource {
-  resourceType: 'ResearchStudy';
-  identifier?: Identifier[];
-  title?: string;
-  status?: string;
-  phase?: CodeableConcept;
-  category?: CodeableConcept[];
-  condition?: CodeableConcept[];
-  contact?: ContactDetail[];
-  keyword?: CodeableConcept[];
-  location?: CodeableConcept[];
-  description?: string; // Should actually be markdown
-  arm?: Arm[];
-  objective?: Objective[];
-  enrollment?: Reference[];
-  sponsor?: Reference;
-  principalInvestigator?: Reference;
-  site?: Reference[];
-  contained?: ContainedResource[];
-}
+import {
+  Arm,
+  BaseResource,
+  CodeableConcept,
+  ContactDetail,
+  ContactPoint,
+  ContainedResource,
+  Identifier,
+  Location,
+  Objective,
+  Reference,
+  ResearchStudy as IResearchStudy
+} from './fhir-types';
 
 /**
  * Utility function to convert a list of strings into a list of CodeableConcepts.
@@ -157,7 +70,7 @@ export function createReferenceTo(resource: BaseResource): Reference {
  * A basic ResearchStudy implementation, this provides helper methods for
  * doing things like adding contact information.
  */
-export class ResearchStudy implements ResearchStudyInterface {
+export class ResearchStudy implements IResearchStudy {
   resourceType = 'ResearchStudy' as const;
   id?: string;
   identifier?: Identifier[];

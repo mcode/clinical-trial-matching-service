@@ -1,8 +1,8 @@
-import { ResearchStudyInterface } from './../src/research-study';
+import { ResearchStudy } from '../src/fhir-types';
 import data from './data/resource.json'; //trial missing summary, inclusion/exclusion criteria, phase and study type
 import * as trialbackup from '../src/trialbackup';
 import * as fs from 'fs';
-export function updateTrial(result: ResearchStudyInterface): ResearchStudyInterface {
+export function updateTrial(result: ResearchStudy): ResearchStudy {
   const backup = trialbackup.getDownloadedTrial(result.identifier[0].value);
   if (!result.enrollment) {
     result.enrollment = [
@@ -33,7 +33,7 @@ export function updateTrial(result: ResearchStudyInterface): ResearchStudyInterf
 }
 
 describe('backup tests', () => {
-  let study: ResearchStudyInterface = data as ResearchStudyInterface;
+  let study: ResearchStudy = data as ResearchStudy;
   //convert trialscope object to research study
   const nctIds = [study.identifier[0].value];
   beforeEach(function () {

@@ -1,6 +1,9 @@
 // Export our public API from this package
 
-export * from './bundle';
+/**
+ * Namespace the FHIR types within FHIR as ResearchStudy overlaps otherwise
+ */
+export * as fhir from './fhir-types';
 export * from './research-study';
 export * from './searchset';
 
