@@ -1,8 +1,45 @@
+import { unzip } from 'node-unzip';
 import fs from 'fs';
 import * as parser from 'xml2json';
 import { exec } from 'child_process';
 import * as https from 'https';
 import { ResearchStudy } from './fhir-types';
+
+
+/**
+ * This is the service that handles fetching data.
+ */
+class ClinicalTrialGov {
+    path: string;
+    constructor(public dataDir: string) {
+        this.path = dataDir;
+    }
+    downloadRemoteBackups(ids: string[]) {
+        let url = 'https://clinicaltrials.gov/ct2/download_studies?term=';
+        url = 'https://clinicaltrials.gov/ct2/download_studies?term=' + ids.join('+OR+');
+        console.log(url);
+        const file = fs.createWriteStream(`src/backup.zip`);
+      
+        return new Promise<void>((resolve, reject) => {
+          try {
+            const request = https.get(url, function (response) {
+              response.pipe(file).on('close', () => {
+
+
+               //fs.createReadStream(`src/backup.zip`).pipe( unzip.Extract({ path: 'src/backups' }));
+                exec('unzip src/backup -d src/backups/', (error, stdout, stderr) => {
+                  if (error) console.log(error);
+                  resolve();
+                });
+              });
+            });
+          } catch (err) {
+            reject(err);
+          }
+        });
+      }
+  }
+
 
 /*
 This file contains a backup system for finding necessary trial information if your matching service does not provide it:
@@ -103,62 +140,83 @@ export function findNCTNumber(study: ResearchStudy): string | null {
   return null;
 }
 
-export function getBackupTrial(nctId: string): TrialBackup {
+/** System to fill in data on research studies */
+
+export class BackupSystem {
+    path: string;
+    constructor(public dataDir: string) {
+        this.path = dataDir;
+    }
+getBackupTrial(nctId: string): TrialBackup {
   const filePath = `src/AllPublicXML/${nctId.substr(0, 7)}xxxx/${nctId}.xml`;
   const data = fs.readFileSync(filePath, { encoding: 'utf8' });
   const json: TrialBackup = JSON.parse(parser.toJson(data)) as TrialBackup;
   return json;
 }
 
-export function getDownloadedTrial(nctId: string): TrialBackup {
+getDownloadedTrial(nctId: string): TrialBackup {
   const filePath = `src/backups/${nctId}.xml`;
   const data = fs.readFileSync(filePath, { encoding: 'utf8' });
   const json: TrialBackup = JSON.parse(parser.toJson(data)) as TrialBackup;
   return json;
 }
 
-export function downloadRemoteBackups(ids: string[]): Promise<void> {
-  let url = 'https://clinicaltrials.gov/ct2/download_studies?term=';
-  for (const id of ids) {
-    url += `${id}+OR+`;
-  }
-  //remove trailing +OR+
-  url = url.slice(0, -4);
-  console.log(url);
-  const file = fs.createWriteStream('src/backup.zip');
 
-  return new Promise<void>((resolve, reject) => {
-    try {
-      const request = https.get(url, function (response) {
-        response.pipe(file).on('close', () => {
-          exec('unzip src/backup -d src/backups/', (error, stdout, stderr) => {
-            if (error) console.log(error);
-            resolve();
-          });
-        });
-      });
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
-
-export function getBackupCriteria(trial: TrialBackup): string {
+getBackupCriteria(trial: TrialBackup): string {
   const criteria: string = trial.clinical_study.eligibility.criteria.textblock;
   return criteria;
 }
 
-export function getBackupSummary(trial: TrialBackup): string {
+getBackupSummary(trial: TrialBackup): string {
   const summary: string = trial.clinical_study.brief_summary.textblock;
   return summary;
 }
 
-export function getBackupPhase(trial: TrialBackup): string {
+getBackupPhase(trial: TrialBackup): string {
   const phase: string = trial.clinical_study.phase;
   return phase;
 }
 
-export function getBackupStudyType(trial: TrialBackup): string {
+getBackupStudyType(trial: TrialBackup): string {
   const studytype: string = trial.clinical_study.study_type;
   return studytype;
+}
+
+updateTrial(result: ResearchStudy): ResearchStudy {
+    if(findNCTNumber(result)!==null){
+        const nctId : string = String(findNCTNumber(result));
+        const backup = this.getDownloadedTrial(nctId);
+        if (!result.enrollment) {
+        result.enrollment = [
+            { reference: `#group${result.id}`, type: 'Group', display: this.getBackupCriteria(backup) }
+        ];
+        }
+    
+        if (!result.description) {
+        result.description = this.getBackupSummary(backup);
+        }
+        if (!result.phase) {
+        result.phase = {
+            coding: [
+            {
+                system: 'http://terminology.hl7.org/CodeSystem/research-study-phase',
+                code: (this.getBackupPhase(backup)),
+                display: this.getBackupPhase(backup)
+            }
+            ],
+            text: this.getBackupPhase(backup)
+        };
+        }
+        if (!result.category) {
+        result.category = [{ text: this.getBackupStudyType(backup) }];
+        }
+        //console.log(result);
+        return result;
+    }
+    else {
+        return result;
+    }
+}
+
+
 }
