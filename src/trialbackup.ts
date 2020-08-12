@@ -1,4 +1,4 @@
-import { unzip } from 'node-unzip';
+import * as unzip  from 'node-unzip';
 import fs from 'fs';
 import * as parser from 'xml2json';
 import { exec } from 'child_process';
@@ -9,7 +9,7 @@ import { ResearchStudy } from './fhir-types';
 /**
  * This is the service that handles fetching data.
  */
-class ClinicalTrialGov {
+export class ClinicalTrialGov {
     path: string;
     constructor(public dataDir: string) {
         this.path = dataDir;
@@ -26,7 +26,7 @@ class ClinicalTrialGov {
               response.pipe(file).on('close', () => {
 
 
-               //fs.createReadStream(`src/backup.zip`).pipe( unzip.Extract({ path: 'src/backups' }));
+               //fs.createReadStream(`src/backup.zip`).pipe( unzip.Extract({ path: 'src/backups' }) //.on('close'), () => {resolve();});
                 exec('unzip src/backup -d src/backups/', (error, stdout, stderr) => {
                   if (error) console.log(error);
                   resolve();

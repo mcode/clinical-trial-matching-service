@@ -3,40 +3,6 @@ import data from './data/resource.json'; //trial missing summary, inclusion/excl
 import * as trialbackup from '../src/trialbackup';
 import * as fs from 'fs';
 
-export function updateTrial(result: ResearchStudy): ResearchStudy {
-  const nctNumber = trialbackup.findNCTNumber(result);
-  // Can't do anything with no NCT number
-  if (nctNumber === null)
-    return result;
-  const backup = trialbackup.getDownloadedTrial(nctNumber);
-  if (!result.enrollment) {
-    result.enrollment = [
-      { reference: `#group${result.id}`, type: 'Group', display: trialbackup.getBackupCriteria(backup) }
-    ];
-  }
-
-  if (!result.description) {
-    result.description = trialbackup.getBackupSummary(backup);
-  }
-  if (!result.phase) {
-    result.phase = {
-      coding: [
-        {
-          system: 'http://terminology.hl7.org/CodeSystem/research-study-phase',
-          code: trialbackup.getBackupPhase(backup),
-          display: trialbackup.getBackupPhase(backup)
-        }
-      ],
-      text: trialbackup.getBackupPhase(backup)
-    };
-  }
-  if (!result.category) {
-    result.category = [{ text: trialbackup.getBackupStudyType(backup) }];
-  }
-  //console.log(result);
-  return result;
-}
-
 describe('.findNCTNumber', () => {
   it('finds an NCT number with the proper coding system', () => {
     expect(trialbackup.findNCTNumber({
@@ -106,8 +72,11 @@ describe('backup tests', () => {
     jasmine.DEFAULT_TIMEOUT_INTERVAL = 5000;
   });
   beforeAll(async function () {
-    await trialbackup.downloadRemoteBackups(nctIds);
-    study = updateTrial(study);
+    const filepath = 'TBD'; //fix once file path stuff gets working
+    const downloader = new trialbackup.ClinicalTrialGov(filepath)
+    await downloader.downloadRemoteBackups(nctIds);
+    const backup = new trialbackup.BackupSystem(filepath);
+    study = backup.updateTrial(study);
   });
   //trialbackup.downloadRemoteBackups(nctIds).then( () => {
   //  study = updateTrial(study);
