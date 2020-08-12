@@ -1,4 +1,4 @@
-import * as unzip  from 'node-unzip';
+import { unzip } from 'node-unzip';
 import fs from 'fs';
 import * as parser from 'xml2json';
 import { exec } from 'child_process';
@@ -15,19 +15,19 @@ export class ClinicalTrialGov {
         this.path = dataDir;
     }
     downloadRemoteBackups(ids: string[]) {
-        let url = 'https://clinicaltrials.gov/ct2/download_studies?term=';
-        url = 'https://clinicaltrials.gov/ct2/download_studies?term=' + ids.join('+OR+');
+        let url = 'https://clinicaltrials.gov/ct2/download_studies?term=' + ids.join('+OR+');;
         console.log(url);
-        const file = fs.createWriteStream(`src/backup.zip`);
+        const file = fs.createWriteStream(`${this.path}/backup.zip`);
       
         return new Promise<void>((resolve, reject) => {
           try {
-            const request = https.get(url, function (response) {
+            const request = https.get(url, function (this: ClinicalTrialGov , response) {
+            
               response.pipe(file).on('close', () => {
 
 
-               //fs.createReadStream(`src/backup.zip`).pipe( unzip.Extract({ path: 'src/backups' }) //.on('close'), () => {resolve();});
-                exec('unzip src/backup -d src/backups/', (error, stdout, stderr) => {
+               //fs.createReadStream(`${this.path}/backup.zip`).pipe( unzip.Extract({ path: `${this.path}/backups` })); //.on('close'), () => {resolve();});
+                exec(`unzip ${this.path}/backup -d ${this.path}/backups/`, (error, stdout, stderr) => {
                   if (error) console.log(error);
                   resolve();
                 });
@@ -147,15 +147,16 @@ export class BackupSystem {
     constructor(public dataDir: string) {
         this.path = dataDir;
     }
-getBackupTrial(nctId: string): TrialBackup {
+/**depreceated function
+getBackupTrial(nctId: string): TrialBackup { 
   const filePath = `src/AllPublicXML/${nctId.substr(0, 7)}xxxx/${nctId}.xml`;
   const data = fs.readFileSync(filePath, { encoding: 'utf8' });
   const json: TrialBackup = JSON.parse(parser.toJson(data)) as TrialBackup;
   return json;
 }
-
+*/
 getDownloadedTrial(nctId: string): TrialBackup {
-  const filePath = `src/backups/${nctId}.xml`;
+  const filePath = `${this.path}/backups/${nctId}.xml`;
   const data = fs.readFileSync(filePath, { encoding: 'utf8' });
   const json: TrialBackup = JSON.parse(parser.toJson(data)) as TrialBackup;
   return json;
