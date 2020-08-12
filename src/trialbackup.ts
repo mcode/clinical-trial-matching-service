@@ -2,6 +2,7 @@ import fs from 'fs';
 import * as parser from 'xml2json';
 import { exec } from 'child_process';
 import * as https from 'https';
+import { ResearchStudy } from './fhir-types';
 
 /*
 This file contains a backup system for finding necessary trial information if your matching service does not provide it:
@@ -71,19 +72,52 @@ export interface TrialBackup {
   };
 }
 
+/**
+ * The URL for the "system" field of identifiers that indicate the
+ * ClinicalTrial.gov identifier, or NTC number, of a clinical trial.
+ */
+export const CLINICAL_TRIAL_IDENTIFIER_CODING_SYSTEM_URL = 'http://clinicaltrials.gov/';
+
+/**
+ * Finds the NCT number specified for the given ResearchStudy, assuming there is
+ * one. This requires there to be an identifier on the ResearchStudy that
+ * belongs to the coding system "http://clinicaltrials.gov/". (If no such
+ * identifier is found, it will look for the first identifier that matches
+ * /^NCT[0-9]{8}$/.)
+ * @param study the research study
+ * @returns the NCT number or null if none
+ */
+export function findNCTNumber(study: ResearchStudy): string | null {
+  if (study.identifier && Array.isArray(study.identifier) && study.identifier.length > 0) {
+    for (const identifier of study.identifier) {
+      if (identifier.system === CLINICAL_TRIAL_IDENTIFIER_CODING_SYSTEM_URL && typeof identifier.value === 'string')
+        return identifier.value;
+    }
+    // Fallback: regexp match
+    for (const identifier of study.identifier) {
+      if (typeof identifier.value === 'string' && /^NCT[0-9]{8}$/.test(identifier.value))
+        return identifier.value;
+    }
+  }
+  // Return null on failures
+  return null;
+}
+
 export function getBackupTrial(nctId: string): TrialBackup {
   const filePath = `src/AllPublicXML/${nctId.substr(0, 7)}xxxx/${nctId}.xml`;
   const data = fs.readFileSync(filePath, { encoding: 'utf8' });
   const json: TrialBackup = JSON.parse(parser.toJson(data)) as TrialBackup;
   return json;
 }
+
 export function getDownloadedTrial(nctId: string): TrialBackup {
   const filePath = `src/backups/${nctId}.xml`;
   const data = fs.readFileSync(filePath, { encoding: 'utf8' });
   const json: TrialBackup = JSON.parse(parser.toJson(data)) as TrialBackup;
   return json;
 }
-export function downloadRemoteBackups(ids: string[]) {
+
+export function downloadRemoteBackups(ids: string[]): Promise<void> {
   let url = 'https://clinicaltrials.gov/ct2/download_studies?term=';
   for (const id of ids) {
     url += `${id}+OR+`;
