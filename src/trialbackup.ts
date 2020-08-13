@@ -1,4 +1,4 @@
-import { unzip } from 'node-unzip';
+import unzip from 'unzip';
 import fs from 'fs';
 import * as parser from 'xml2json';
 import { exec } from 'child_process';
@@ -10,35 +10,32 @@ import { ResearchStudy } from './fhir-types';
  * This is the service that handles fetching data.
  */
 export class ClinicalTrialGov {
-    path: string;
-    constructor(public dataDir: string) {
-        this.path = dataDir;
-    }
-    downloadRemoteBackups(ids: string[]) {
-        let url = 'https://clinicaltrials.gov/ct2/download_studies?term=' + ids.join('+OR+');;
-        console.log(url);
-        const file = fs.createWriteStream(`${this.path}/backup.zip`);
-      
-        return new Promise<void>((resolve, reject) => {
-          try {
-            const request = https.get(url, function (this: ClinicalTrialGov , response) {
-            
-              response.pipe(file).on('close', () => {
-
-
-               //fs.createReadStream(`${this.path}/backup.zip`).pipe( unzip.Extract({ path: `${this.path}/backups` })); //.on('close'), () => {resolve();});
-                exec(`unzip ${this.path}/backup -d ${this.path}/backups/`, (error, stdout, stderr) => {
-                  if (error) console.log(error);
-                  resolve();
-                });
-              });
-            });
-          } catch (err) {
-            reject(err);
-          }
-        });
-      }
+  path: string;
+  constructor(public dataDir: string) {
+    this.path = dataDir;
   }
+  downloadRemoteBackups(ids: string[]): Promise<void> {
+    const url = 'https://clinicaltrials.gov/ct2/download_studies?term=' + ids.join('+OR+');;
+    console.log(url);
+    const file = fs.createWriteStream(`${this.path}/backup.zip`);
+
+    return new Promise<void>((resolve, reject) => {
+      try {
+        const request = https.get(url, function (this: ClinicalTrialGov , response) {
+          response.pipe(file).on('close', () => {
+            fs.createReadStream(`${this.path}/backup.zip`).pipe( unzip.Extract({ path: `${this.path}/backups` })); //.on('close'), () => {resolve();});
+            // exec(`unzip ${this.path}/backup -d ${this.path}/backups/`, (error, stdout, stderr) => {
+            //   if (error) console.log(error);
+            //   resolve();
+            // });
+          });
+        });
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+}
 
 
 /*
@@ -143,81 +140,78 @@ export function findNCTNumber(study: ResearchStudy): string | null {
 /** System to fill in data on research studies */
 
 export class BackupSystem {
-    path: string;
-    constructor(public dataDir: string) {
-        this.path = dataDir;
-    }
+  path: string;
+  constructor(public dataDir: string) {
+      this.path = dataDir;
+  }
 /**depreceated function
-getBackupTrial(nctId: string): TrialBackup { 
+getBackupTrial(nctId: string): TrialBackup {
   const filePath = `src/AllPublicXML/${nctId.substr(0, 7)}xxxx/${nctId}.xml`;
   const data = fs.readFileSync(filePath, { encoding: 'utf8' });
   const json: TrialBackup = JSON.parse(parser.toJson(data)) as TrialBackup;
   return json;
 }
 */
-getDownloadedTrial(nctId: string): TrialBackup {
-  const filePath = `${this.path}/backups/${nctId}.xml`;
-  const data = fs.readFileSync(filePath, { encoding: 'utf8' });
-  const json: TrialBackup = JSON.parse(parser.toJson(data)) as TrialBackup;
-  return json;
-}
+  getDownloadedTrial(nctId: string): TrialBackup {
+    const filePath = `${this.path}/backups/${nctId}.xml`;
+    const data = fs.readFileSync(filePath, { encoding: 'utf8' });
+    const json: TrialBackup = JSON.parse(parser.toJson(data)) as TrialBackup;
+    return json;
+  }
 
 
-getBackupCriteria(trial: TrialBackup): string {
-  const criteria: string = trial.clinical_study.eligibility.criteria.textblock;
-  return criteria;
-}
+  getBackupCriteria(trial: TrialBackup): string {
+    const criteria: string = trial.clinical_study.eligibility.criteria.textblock;
+    return criteria;
+  }
 
-getBackupSummary(trial: TrialBackup): string {
-  const summary: string = trial.clinical_study.brief_summary.textblock;
-  return summary;
-}
+  getBackupSummary(trial: TrialBackup): string {
+    const summary: string = trial.clinical_study.brief_summary.textblock;
+    return summary;
+  }
 
-getBackupPhase(trial: TrialBackup): string {
-  const phase: string = trial.clinical_study.phase;
-  return phase;
-}
+  getBackupPhase(trial: TrialBackup): string {
+    const phase: string = trial.clinical_study.phase;
+    return phase;
+  }
 
-getBackupStudyType(trial: TrialBackup): string {
-  const studytype: string = trial.clinical_study.study_type;
-  return studytype;
-}
+  getBackupStudyType(trial: TrialBackup): string {
+    const studytype: string = trial.clinical_study.study_type;
+    return studytype;
+  }
 
-updateTrial(result: ResearchStudy): ResearchStudy {
-    if(findNCTNumber(result)!==null){
-        const nctId : string = String(findNCTNumber(result));
-        const backup = this.getDownloadedTrial(nctId);
-        if (!result.enrollment) {
+  updateTrial(result: ResearchStudy): ResearchStudy {
+    const nctId = findNCTNumber(result);
+    if (nctId !== null) {
+      const backup = this.getDownloadedTrial(nctId);
+      if (!result.enrollment) {
         result.enrollment = [
-            { reference: `#group${result.id}`, type: 'Group', display: this.getBackupCriteria(backup) }
+          { reference: `#group${result.id}`, type: 'Group', display: this.getBackupCriteria(backup) }
         ];
-        }
-    
-        if (!result.description) {
+      }
+      if (!result.description) {
         result.description = this.getBackupSummary(backup);
-        }
-        if (!result.phase) {
+      }
+      if (!result.phase) {
         result.phase = {
-            coding: [
+          coding: [
             {
-                system: 'http://terminology.hl7.org/CodeSystem/research-study-phase',
-                code: (this.getBackupPhase(backup)),
-                display: this.getBackupPhase(backup)
+              system: 'http://terminology.hl7.org/CodeSystem/research-study-phase',
+              code: (this.getBackupPhase(backup)),
+              display: this.getBackupPhase(backup)
             }
-            ],
-            text: this.getBackupPhase(backup)
+          ],
+          text: this.getBackupPhase(backup)
         };
-        }
-        if (!result.category) {
+      }
+      if (!result.category) {
         result.category = [{ text: this.getBackupStudyType(backup) }];
-        }
-        //console.log(result);
-        return result;
+      }
+      //console.log(result);
+      return result;
+    } else {
+      return result;
     }
-    else {
-        return result;
-    }
-}
-
+  }
 
 }
