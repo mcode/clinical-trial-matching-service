@@ -15,7 +15,7 @@ export class ClinicalTrialGov {
         this.path = dataDir;
     }
     downloadRemoteBackups(ids: string[]): Promise<void> {
-        const url = 'https://clinicaltrials.gov/ct2/download_studies?term=' + ids.join('+OR+');;
+        const url = 'https://clinicaltrials.gov/ct2/download_studies?term=' + ids.join('+OR+');
         console.log(url);
         const file = fs.createWriteStream(`${this.path}/backup.zip`);
         const filePath = resolve(String(file.path));
