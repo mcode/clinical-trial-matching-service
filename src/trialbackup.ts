@@ -1,4 +1,4 @@
-import unzip from 'unzip';
+import  StreamZip = require('node-stream-zip');
 import fs from 'fs';
 import * as parser from 'xml2json';
 import { exec } from 'child_process';
@@ -23,11 +23,23 @@ export class ClinicalTrialGov {
       try {
         const request = https.get(url, function (this: ClinicalTrialGov , response) {
           response.pipe(file).on('close', () => {
-            fs.createReadStream(`${this.path}/backup.zip`).pipe( unzip.Extract({ path: `${this.path}/backups` })); //.on('close'), () => {resolve();});
+            //const StreamZip = require('node-stream-zip');
+            const zip = new StreamZip({ 
+                file: String(file.path),
+                storeEntries: true
+            });
+            //fs.createReadStream(`${this.path}/backup.zip`).pipe( unzip.Extract({ path: `${this.path}/backups` })); //.on('close'), () => {resolve();});
             // exec(`unzip ${this.path}/backup -d ${this.path}/backups/`, (error, stdout, stderr) => {
             //   if (error) console.log(error);
             //   resolve();
             // });
+            zip.on('ready', () => {
+                fs.mkdirSync(`${this.path}/backups`);
+                zip.extract(null, `${this.path}/backups`, (err, count) => {
+                    if (err) console.log(err);
+                    zip.close();
+                });
+            });
           });
         });
       } catch (err) {
