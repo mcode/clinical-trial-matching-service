@@ -71,8 +71,9 @@ describe('backup tests', () => {
   afterEach(function () {
     jasmine.DEFAULT_TIMEOUT_INTERVAL = 5000;
   });
+  const filepath = './src';
   beforeAll(async function () {
-    const filepath = 'TBD'; //fix once file path stuff gets working
+    
     const downloader = new trialbackup.ClinicalTrialGov(filepath)
     await downloader.downloadRemoteBackups(nctIds);
     const backup = new trialbackup.BackupSystem(filepath);
@@ -93,7 +94,7 @@ describe('backup tests', () => {
   it('fills in phase', () => {
     expect(study.phase).toBeDefined();
     if (study.phase)
-      expect(study.phase.text).toBe('Phase 2');
+      expect(study.phase.text).toBe('Phase 3');
   });
 
   it('fills in study type', () => {
@@ -120,6 +121,6 @@ describe('backup tests', () => {
         console.log(err);
       }
     });
-    done();
-  });
+    done(); 
+  }); 
 });
