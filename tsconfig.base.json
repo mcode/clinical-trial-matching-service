@@ -5,6 +5,7 @@
     "declaration": true,
     "esModuleInterop": true,
     "noImplicitAny": true,
+    "strict": true,
     "moduleResolution": "node",
     "baseUrl": ".",
     "paths": {

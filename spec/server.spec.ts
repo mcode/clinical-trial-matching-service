@@ -36,7 +36,7 @@ describe('server', () => {
   describe('/getClinicalTrial', () => {
     // This bundle is just enough to get passed to our test handler, which
     // always generates an empty SearchSet.
-    const emptyPatientBundle = { resourceType: 'Bundle', type: 'collection', entry: [] as undefined[] };
+    const emptyPatientBundle = { resourceType: 'Bundle', type: 'collection', entry: [] };
 
     // Helper function to generate the request since it's always the same
     function getClinicalTrial(patientData: Record<string, unknown> | string = emptyPatientBundle): request.Test {
