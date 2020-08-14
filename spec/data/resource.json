@@ -15,21 +15,6 @@
           ],
           "title": "PALbociclib CoLlaborative Adjuvant Study: A Randomized Phase III Trial of Palbociclib With Standard Adjuvant Endocrine Therapy Versus Standard Adjuvant Endocrine Therapy Alone for Hormone Receptor Positive (HR+) / Human Epidermal Growth Factor Receptor 2 (HER2)-Negative Early Breast Cancer",
           "status": "active",
-          "phase": {
-            "coding": [
-              {
-                "system": "http://terminology.hl7.org/CodeSystem/research-study-phase",
-                "code": "phase-3",
-                "display": "Phase 3"
-              }
-            ],
-            "text": "Phase 3"
-          },
-          "category": [
-            {
-              "text": "Interventional"
-            }
-          ],
           "condition": [
             {
               "text": "Breast Cancer"
