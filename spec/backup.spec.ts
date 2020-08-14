@@ -72,14 +72,35 @@ describe('backup tests', () => {
     jasmine.DEFAULT_TIMEOUT_INTERVAL = 5000;
   });
   const filepath = './src';
+  let checker : trialbackup.BackupSystem;
+  let trial : trialbackup.TrialBackup;
   beforeAll(async function () {
     
     const downloader = new trialbackup.ClinicalTrialGov(filepath)
     await downloader.downloadRemoteBackups(nctIds);
     const backup = new trialbackup.BackupSystem(filepath);
     study = backup.updateTrial(study);
+    checker = new trialbackup.BackupSystem(filepath);
+    trial = checker.getDownloadedTrial(nctID);
   });
-  //trialbackup.downloadRemoteBackups(nctIds).then( () => {
+ 
+  it('has backup criteria' , () => {
+    expect(checker.getBackupCriteria(trial)).toBeDefined();
+
+  });
+  it('has backup description' , () => {
+    expect(checker.getBackupSummary(trial)).toBeDefined();
+
+  });
+  it('has backup phase' , () => {
+    expect(checker.getBackupPhase(trial)).toBeDefined();
+
+  });
+  it('has backup study type' , () => {
+    expect(checker.getBackupStudyType(trial)).toBeDefined();
+
+  });
+  //trialbackup.downloadRemoteBackups(nctIds).then( (); => {
   //  study = updateTrial(study);
   //console.log(study);
   it('fills in inclusion criteria ', () => {
