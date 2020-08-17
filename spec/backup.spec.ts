@@ -3,7 +3,7 @@ import { ResearchStudy } from '../src/fhir-types';
 import data from './data/resource.json'; //trial missing summary, inclusion/exclusion criteria, phase and study type
 import * as trialbackup from '../src/trialbackup';
 import * as fs from 'fs';
-
+import filled from './data/complete_study.json';
 describe('.findNCTNumber', () => {
   it('finds an NCT number with the proper coding system', () => {
     expect(trialbackup.findNCTNumber({
@@ -81,6 +81,7 @@ describe('backup tests', () => {
     await downloader.downloadRemoteBackups(nctIds);
     const backup = new trialbackup.BackupSystem(filepath);
     study = backup.updateTrial(study);
+    console.log(JSON.stringify(study));
     checker = new trialbackup.BackupSystem(filepath);
     trial = checker.getDownloadedTrial(nctID);
   });
@@ -137,6 +138,13 @@ describe('backup tests', () => {
     expect(backup_service.updateTrial(empty)).toBe(empty);
   
   });
+
+  it('returns on filled out study', () => {
+    const study_filled = filled as ResearchStudy; 
+    const backup_service = new trialbackup.BackupSystem(filepath);
+    expect(backup_service.updateTrial(study_filled)).toBeDefined();
+
+  }); 
 
   afterAll(function (done) {
     fs.unlink('src/backup.zip', (err) => {
