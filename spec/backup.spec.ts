@@ -1,3 +1,4 @@
+import { ResearchStudy as ResearchStudyObj} from './../src/research-study';
 import { ResearchStudy } from '../src/fhir-types';
 import data from './data/resource.json'; //trial missing summary, inclusion/exclusion criteria, phase and study type
 import * as trialbackup from '../src/trialbackup';
@@ -128,6 +129,13 @@ describe('backup tests', () => {
 
   it('fills in description', () => {
     expect(study.description).toBeDefined();
+  });
+
+  it('returns same object on empty study', () => {
+    const empty = new ResearchStudyObj(2);
+    const backup_service = new trialbackup.BackupSystem(filepath);
+    expect(backup_service.updateTrial(empty)).toBe(empty);
+  
   });
 
   afterAll(function (done) {
