@@ -8,39 +8,10 @@ import fs from 'fs';
 import path from 'path';
 import * as parser from 'xml2json';
 import * as https from 'https';
+// Needed for types:
+import * as http from 'http';
 import extract from 'extract-zip';
 import { ResearchStudy } from './fhir-types';
-
-/**
- * This is the service that handles fetching data.
- */
-export class ClinicalTrialGov {
-  path: string;
-  constructor(public dataDir: string) {
-    this.path = dataDir;
-  }
-  downloadRemoteBackups(ids: string[]): Promise<void> {
-    const url = 'https://clinicaltrials.gov/ct2/download_studies?term=' + ids.join('+OR+');
-    console.log(url);
-    // FIXME: Save to a temp file (this will break if called while still resolving another download)
-    const file = fs.createWriteStream(`${this.path}/backup.zip`);
-    const filePath = path.resolve(String(file.path));
-    const dirPath = filePath.slice(0,-11);
-    //console.log(dirPath);
-    return new Promise<void>((resolve, reject) => {
-      try {
-        https.get(url, function (response) {
-          response.pipe(file).on('close', async function() {
-            await extract(filePath, { dir: `${dirPath}/backups` });
-            resolve();
-          });
-        });
-      } catch (err) {
-        reject(err);
-      }
-    });
-  }
-}
 
 export interface TrialBackup {
   clinical_study: {
@@ -111,14 +82,23 @@ export interface TrialBackup {
 export const CLINICAL_TRIAL_IDENTIFIER_CODING_SYSTEM_URL = 'http://clinicaltrials.gov/';
 
 /**
+ * Checks to ensure that a given NCT number is valid. This checks to make sure
+ * it matches the regular expression /^NCT[0-9]{8}$/.
+ * @param nctNumber the NCT number to check
+ */
+export function isValidNCTNumber(nctNumber: string): boolean {
+  return /^NCT[0-9]{8}$/.test(nctNumber);
+}
+
+/**
  * Finds the NCT number specified for the given ResearchStudy, assuming there is
  * one. This requires an identifier on the given ResearchStudy that either
- * belongs to the coding system "http://clinicaltrials.gov/" or matches the
- * regular expression /^NCT[0-9]{8}$/.
+ * belongs to the coding system "http://clinicaltrials.gov/" or is a valid NCT
+ * number as determined by #isValidNCTNumber.
  *
  * This will return the value of the first identifier belonging to the coding
  * system "http://clinicaltrials.gov/", and if there is no identifier, return
- * the first identifier value that matches the above regular expression.
+ * the first identifier value that is considered valid.
  *
  * @param study the research study
  * @returns the NCT number or null if none
@@ -131,7 +111,7 @@ export function findNCTNumber(study: ResearchStudy): string | null {
     }
     // Fallback: regexp match
     for (const identifier of study.identifier) {
-      if (typeof identifier.value === 'string' && /^NCT[0-9]{8}$/.test(identifier.value))
+      if (typeof identifier.value === 'string' && isValidNCTNumber(identifier.value))
         return identifier.value;
     }
   }
@@ -139,20 +119,52 @@ export function findNCTNumber(study: ResearchStudy): string | null {
   return null;
 }
 
-/** System to fill in data on research studies */
-
-export class BackupSystem {
+/**
+ * System to fill in data on research studies based on the trial data from
+ * https://clinicaltrials.gov/
+ */
+export class ClinicalTrialGovService {
   constructor(public dataDir: string) {
     // TODO: Validate dataDir exists, possibly make it if it doesn't
   }
-  /**deprecated function
-  getBackupTrial(nctId: string): TrialBackup {
-    const filePath = `src/AllPublicXML/${nctId.substr(0, 7)}xxxx/${nctId}.xml`;
-    const data = fs.readFileSync(filePath, { encoding: 'utf8' });
-    const json: TrialBackup = JSON.parse(parser.toJson(data)) as TrialBackup;
-    return json;
+
+  /**
+   * Downloads the given trials from ClinicalTrials.gov and stores them in the
+   * data directory.
+   * @param ids the trials to download
+   */
+  downloadTrials(ids: string[]): Promise<void> {
+    const url = 'https://clinicaltrials.gov/ct2/download_studies?term=' + ids.join('+OR+');
+    console.log(url);
+    // FIXME: Save to a temp file (this will break if called while still resolving another download)
+    const file = fs.createWriteStream(`${this.dataDir}/backup.zip`);
+    const filePath = path.resolve(String(file.path));
+    const dirPath = filePath.slice(0,-11);
+    //console.log(dirPath);
+    return new Promise<void>((resolve, reject) => {
+      try {
+        this.getURL(url, function (response) {
+          response.pipe(file).on('close', async function() {
+            await extract(filePath, { dir: `${dirPath}/backups` });
+            resolve();
+          });
+        });
+      } catch (err) {
+        reject(err);
+      }
+    });
   }
-  */
+
+  /**
+   * Provides a method that can be overridden to alter how a web request is
+   * made. Defaults to simply calling https.get directly.
+   * @param url the URL to get
+   * @param callback the callback
+   */
+  getURL(url: string, callback: (res: http.IncomingMessage) => void): http.ClientRequest {
+    return https.get(url, callback);
+  }
+
   getDownloadedTrial(nctId: string): TrialBackup {
     const filePath = `${this.dataDir}/backups/${nctId}.xml`;
     // TODO: Catch the file not existing.
@@ -160,7 +172,6 @@ export class BackupSystem {
     const json = JSON.parse(parser.toJson(data)) as TrialBackup;
     return json;
   }
-
 
   getBackupCriteria(trial: TrialBackup): string {
     return trial.clinical_study.eligibility.criteria.textblock;

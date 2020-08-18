@@ -6,6 +6,7 @@
 export * as fhir from './fhir-types';
 export * from './research-study';
 export * from './searchset';
+export * from './clinicaltrialgov';
 
 // The export { v } from "mod" forms do not appear to work yet
 import RequestError from './request-error';
