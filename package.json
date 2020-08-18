@@ -39,6 +39,7 @@
     "@typescript-eslint/parser": "^3.7.1",
     "eslint": "^7.5.0",
     "jasmine": "^3.5.0",
+    "nock": "^13.0.4",
     "nyc": "^15.1.0",
     "source-map-support": "^0.5.19",
     "supertest": "^4.0.2",

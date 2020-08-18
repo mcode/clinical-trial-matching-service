@@ -10,6 +10,7 @@ import * as parser from 'xml2json';
 import * as https from 'https';
 // Needed for types:
 import * as http from 'http';
+import * as stream from 'stream';
 import extract from 'extract-zip';
 import { ResearchStudy } from './fhir-types';
 
@@ -124,8 +125,47 @@ export function findNCTNumber(study: ResearchStudy): string | null {
  * https://clinicaltrials.gov/
  */
 export class ClinicalTrialGovService {
+  /**
+   * Creates a new instance. This does NOT check that the data directory exists,
+   * use init() for that.
+   * @param dataDir the data directory to use
+   */
   constructor(public dataDir: string) {
-    // TODO: Validate dataDir exists, possibly make it if it doesn't
+  }
+
+  /**
+   * Creates the data directory is necessary.
+   */
+  init(): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      fs.opendir(this.dataDir, (err, dir) => {
+        if (err) {
+          // Check to see if the err is ENOENT - this is OK and means we should
+          // create the directory
+          if (err.code === 'ENOENT') {
+            fs.mkdir(this.dataDir, { recursive: true }, (err) => {
+              if (err) {
+                reject(err);
+              } else {
+                resolve();
+              }
+            });
+          } else {
+            // Otherwise, this error can't be handled
+            reject(err);
+          }
+        } else {
+          dir.close((err) => {
+            if (err) {
+              // ???
+              console.error('Error closing data directory: ' + err);
+            }
+            // Resolve anyway
+            resolve();
+          });
+        }
+      })
+    });
   }
 
   /**
@@ -135,19 +175,15 @@ export class ClinicalTrialGovService {
    */
   downloadTrials(ids: string[]): Promise<void> {
     const url = 'https://clinicaltrials.gov/ct2/download_studies?term=' + ids.join('+OR+');
-    console.log(url);
-    // FIXME: Save to a temp file (this will break if called while still resolving another download)
-    const file = fs.createWriteStream(`${this.dataDir}/backup.zip`);
-    const filePath = path.resolve(String(file.path));
-    const dirPath = filePath.slice(0,-11);
-    //console.log(dirPath);
     return new Promise<void>((resolve, reject) => {
       try {
-        this.getURL(url, function (response) {
-          response.pipe(file).on('close', async function() {
-            await extract(filePath, { dir: `${dirPath}/backups` });
-            resolve();
-          });
+        this.getURL(url, (response) => {
+          if (response.statusCode !== 200) {
+            // Assume some sort of server error
+            reject(new Error(`Server error: ${response.statusCode} ${response.statusMessage}`));
+          } else {
+            this.extractResults(response).then(resolve).catch(reject);
+          }
         });
       } catch (err) {
         reject(err);
@@ -165,6 +201,26 @@ export class ClinicalTrialGovService {
     return https.get(url, callback);
   }
 
+  /**
+   *
+   * @param results a readable stream that is a set of results
+   */
+  extractResults(results: stream.Readable): Promise<void> {
+    // FIXME: Save to a temp file (this will break if called while still resolving another download)
+    const file = fs.createWriteStream(`${this.dataDir}/backup.zip`);
+    const filePath = path.resolve(String(file.path));
+    const dirPath = filePath.slice(0,-11);
+    console.log(dirPath);
+    return new Promise((resolve, reject) => {
+      results.on('error', (err: Error) => {
+        reject(err);
+      });
+      results.pipe(file).on('close', function() {
+        extract(filePath, { dir: `${dirPath}/backups` }).then(resolve).catch(reject);
+      });
+    });
+  }
+
   getDownloadedTrial(nctId: string): TrialBackup {
     const filePath = `${this.dataDir}/backups/${nctId}.xml`;
     // TODO: Catch the file not existing.
@@ -173,48 +229,33 @@ export class ClinicalTrialGovService {
     return json;
   }
 
-  getBackupCriteria(trial: TrialBackup): string {
-    return trial.clinical_study.eligibility.criteria.textblock;
-  }
-
-  getBackupSummary(trial: TrialBackup): string {
-    return trial.clinical_study.brief_summary.textblock;
-  }
-
-  getBackupPhase(trial: TrialBackup): string {
-    return trial.clinical_study.phase;
-  }
-
-  getBackupStudyType(trial: TrialBackup): string {
-    return trial.clinical_study.study_type;
-  }
-
   updateTrial(result: ResearchStudy): ResearchStudy {
     const nctId = findNCTNumber(result);
     if (nctId !== null) {
       const backup = this.getDownloadedTrial(nctId);
+      const study = backup.clinical_study;
       if (!result.enrollment) {
         result.enrollment = [
-          { reference: `#group${result.id}`, type: 'Group', display: this.getBackupCriteria(backup) }
+          { reference: `#group${result.id}`, type: 'Group', display: study.eligibility.criteria.textblock }
         ];
       }
       if (!result.description) {
-        result.description = this.getBackupSummary(backup);
+        result.description = study.brief_summary.textblock;
       }
       if (!result.phase) {
         result.phase = {
           coding: [
             {
               system: 'http://terminology.hl7.org/CodeSystem/research-study-phase',
-              code: (this.getBackupPhase(backup)),
-              display: this.getBackupPhase(backup)
+              code: study.phase,
+              display: study.phase
             }
           ],
-          text: this.getBackupPhase(backup)
+          text: study.phase
         };
       }
       if (!result.category) {
-        result.category = [{ text: this.getBackupStudyType(backup) }];
+        result.category = [{ text: study.study_type }];
       }
       //console.log(result);
       return result;
@@ -222,4 +263,13 @@ export class ClinicalTrialGovService {
       return result;
     }
   }
+}
+
+export function createClinicalTrialGovService(dataDir: string): Promise<ClinicalTrialGovService> {
+  return new Promise<ClinicalTrialGovService>((resolve, reject) => {
+    const result = new ClinicalTrialGovService(dataDir);
+    result.init().then(() => {
+      resolve(result);
+    }).catch(reject);
+  });
 }
