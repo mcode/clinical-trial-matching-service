@@ -284,13 +284,13 @@ describe('ClinicalTrialGovService', () => {
     });
   });
 
-  // afterAll(function (done) {
-  //   // Clean up temp directory
-  //   fs.rmdir(tempDataDirPath, { recursive: true }, (err) => {
-  //     if (err) {
-  //       console.log(err);
-  //     }
-  //   });
-  //   done();
-  // });
+  afterAll(function (done) {
+    // Clean up temp directory
+    fs.rmdir(tempDataDirPath, { recursive: true }, (err) => {
+      if (err) {
+        console.log(err);
+      }
+    });
+    done();
+  });
 });
