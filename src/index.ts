@@ -1,8 +1,12 @@
 // Export our public API from this package
 
-export * from './bundle';
+/**
+ * Namespace the FHIR types within FHIR as ResearchStudy overlaps otherwise
+ */
+export * as fhir from './fhir-types';
 export * from './research-study';
 export * from './searchset';
+export * from './clinicaltrialgov';
 
 // The export { v } from "mod" forms do not appear to work yet
 import RequestError from './request-error';

@@ -1,12 +1,13 @@
 import ResearchStudy, {
-  ContactDetail,
-  Group,
-  Practitioner,
-  Location,
   convertStringArrayToCodeableConcept,
   createReferenceTo
 } from '../src/research-study';
-import { BaseResource } from '../src/bundle';
+import { BaseResource,
+  ContactDetail,
+  Group,
+  Practitioner,
+  Location
+} from '../src/fhir-types';
 
 describe('convertStringArrayToCodeableConcept', () => {
   it('converts to codeable concepts', () => {

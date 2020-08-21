@@ -1,5 +1,4 @@
-import { ResearchStudy } from './research-study';
-
+import { ResearchStudy } from './fhir-types';
 export interface SearchResult {
   mode: string;
   score: number;

@@ -1,0 +1,51 @@
+{
+  "resourceType": "ResearchStudy",
+  "id": "0",
+  "identifier": [
+    {
+      "use": "official",
+      "system": "http://clinicaltrials.gov",
+      "value": "NCT02513394"
+    }
+  ],
+  "title": "PALbociclib CoLlaborative Adjuvant Study: A Randomized Phase III Trial of Palbociclib With Standard Adjuvant Endocrine Therapy Versus Standard Adjuvant Endocrine Therapy Alone for Hormone Receptor Positive (HR+) / Human Epidermal Growth Factor Receptor 2 (HER2)-Negative Early Breast Cancer",
+  "status": "active",
+  "condition": [{ "text": "Breast Cancer" }],
+  "contact": [{ "name": "Edward Habermehl" }],
+  "keyword": [{ "text": "HR+/HER2- breast cancer" }, { "text": "Palbociclib" }],
+  "location": [
+    { "text": "Australia" },
+    { "text": "Canada" },
+    { "text": "Israel" },
+    { "text": "Japan" },
+    { "text": "Korea, Republic of" },
+    { "text": "Mexico" },
+    { "text": "Switzerland" },
+    { "text": "Taiwan" },
+    { "text": "United States" }
+  ],
+  "objective": [
+    {
+      "name": "PALbociclib CoLlaborative Adjuvant Study: A Randomized Phase III Trial of Palbociclib With Standard Adjuvant Endocrine Therapy Versus Standard Adjuvant Endocrine Therapy Alone for Hormone Receptor Positive (HR+) / Human Epidermal Growth Factor Receptor 2 (HER2)-Negative Early Breast Cancer"
+    }
+  ],
+  "enrollment": [
+    {
+      "reference": "#group0",
+      "type": "Group",
+      "display": "Inclusion Criteria:\n\n          -  Signed informed consent prior to study specific procedures.\n\n          -  Age ≥18 years (or per national guidelines).\n\n          -  Pre- and postmenopausal women or men with Stage II (Stage IIA limited to max. 1000\n             patients) or Stage III early invasive breast cancer\n\n          -  Patients with multicentric and/or multifocal and/or bilateral early invasive breast\n             cancer are eligible if all histopathologically examined tumors meet pathologic\n             criteria for ER+ and/or PR+ and HER2-.\n\n          -  Patients must have histologically confirmed ER+ and/or PR+, HER2-, early invasive\n             breast cancer.\n\n          -  Patients must have undergone adequate (definitive) breast surgery for the current\n             malignancy.\n\n        FFPE tumor tissue block must be confirmed to be received at the central sample repository\n        prior to randomization.\n\n          -  ECOG performance status 0-1.\n\n          -  Patients must be able and willing to swallow and retain oral medication.\n\n          -  Serum or urine pregnancy test must be negative in premenopausal women within 14 days\n             of randomization, or in women with amenorrhea of less than 12 months at time of\n             randomization.\n\n          -  Patients who received neo/adjuvant therapy must be after last dose of chemotherapy\n             and/or biologic therapy and must have sufficient resolution of side effects.\n\n          -  Patients who received breast/axilla/post-mastectomy chest wall radiotherapy must be\n             after last dose of radiotherapy and must have sufficient resolution of side effects.\n\n          -  Patients must have sufficient resolution of any surgical side effects (no active wound\n             healing complications).\n\n        -Patients must either be initiating or have already started adjuvant hormonal treatment. -\n\n          -  Patients who already received neo/adjuvant endocrine therapy are eligible as long as\n             they are enrolled within 12 months of initial histological diagnosis and after\n             completing no more than 6 months of adjuvant endocrine therapy.\n\n          -  Absolute neutrophil count ≥ 1,500/µL\n\n          -  Platelets ≥ 100,000/ mm3\n\n          -  Hemoglobin ≥ 10g/dL\n\n          -  Total serum bilirubin ≤ ULN; or total bilirubin ≤ 3.0 × ULN with direct bilirubin\n             within normal range in patients with documented Gilbert's Syndrome.\n\n          -  Aspartate amino transferase (AST or SGOT) and alanine amino transferase (ALT or SGPT)\n             ≤ 1.5 × institutional ULN.\n\n          -  Serum creatinine below the upper limit of the institutional normal range (ULN) or\n             creatinine clearance ≥ 60 mL/min/1.73 m2 for patients with serum creatinine levels\n             above institutional ULN.\n\n        Exclusion Criteria:\n\n          -  Concurrent therapy with other Investigational Products.\n\n          -  Prior therapy with any CDK inhibitor.\n\n          -  Patients with Stage I or IV breast cancer are not eligible.\n\n          -  History of allergic reactions attributed to compounds of chemical or biologic\n             composition similar to palbociclib.\n\n          -  Patients receiving any medications or substances that are potent inhibitors or\n             inducers of\n\n          -  CYP3A isoenzymes within 7 days of randomization.\n\n          -  Uncontrolled intercurrent illness that would limit compliance with study requirements.\n\n          -  Pregnant women, or women of childbearing potential without a negative pregnancy test\n             within 14 days prior to randomization.\n\n          -  Patients with a history of any malignancy are ineligible\n\n          -  Patients who previously received endocrine therapy within 5 years prior to diagnosis\n             of the current malignancy.\n\n          -  Patients on antiretroviral therapy.\n\n          -  Patients with clinically significant history of any chronic liver disease.\n\n          -  Patients receiving concurrent exogenous hormone therapy (topical vaginal estrogen\n             therapy is allowable)."
+    }
+  ],
+  "description": "This is a prospective, two arm, international, multicenter, randomized, open-label Phase III\n      study evaluating the addition of 2 years of palbociclib to standard adjuvant endocrine\n      therapy for patients with HR+ / HER2- early breast cancer (EBC).\n\n      The purpose of the PALLAS study is to determine whether the addition of palbociclib to\n      adjuvant endocrine therapy will improve outcomes over endocrine therapy alone for HR+/HER2-\n      early breast cancer. Assessment of a variety of correlative analysis, including evaluation of\n      the effect of palbociclib in genomically defined tumor subgroups, is planned.",
+  "phase": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/research-study-phase",
+        "code": "Phase 3",
+        "display": "Phase 3"
+      }
+    ],
+    "text": "Phase 3"
+  },
+  "category": [{ "text": "Interventional" }]
+}
