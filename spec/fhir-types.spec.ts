@@ -1,4 +1,4 @@
-import { isBundle } from '../src/bundle';
+import { isBundle } from '../src/fhir-types';
 
 describe('isBundle()', () => {
   it('returns false if given a non-bundle', () => {

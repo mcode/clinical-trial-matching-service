@@ -1,4 +1,4 @@
-import { ResearchStudy } from './research-study';
+import { ResearchStudy } from './fhir-types';
 
 /**
  * The search entry mode valueset (from https://www.hl7.org/fhir/valueset-search-entry-mode.html).
