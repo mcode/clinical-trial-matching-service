@@ -1,24 +1,24 @@
-import { ResearchStudy } from './fhir-types';
+import {
+  BundleEntry,
+  ResearchStudy,
+  SearchEntryMode,
+  SearchResult,
+  SearchSet as SearchSetBundle,
+  isResearchStudy
+} from './fhir-types';
 
 /**
- * The search entry mode valueset (from https://www.hl7.org/fhir/valueset-search-entry-mode.html).
+ * Same as a BundleEntry but with the search parameters required.
  */
-export type SearchEntryMode = 'match' | 'include' |	'outcome';
-
-export interface SearchResult {
-  mode?: string;
-  score?: number;
+export interface SearchBundleEntry extends BundleEntry {
+  search: SearchResult;
 }
 
-export interface SearchBundleEntry {
-  resource: ResearchStudy;
-  search?: SearchResult;
-}
-
-export class SearchSet {
+export class SearchSet implements SearchSetBundle {
+  // Yes, this looks weird. Yes, this is required: otherwise the infered type is string and not the constant string.
+  resourceType: 'Bundle' = 'Bundle';
   // Class attributes
-  resourceType = 'Bundle';
-  type = 'searchset';
+  type: 'searchset' = 'searchset';
   /**
    * The total number of results. As a bundle support pagination, this defaults
    * to the current number of studies, but may be overridden. (See
@@ -31,13 +31,17 @@ export class SearchSet {
   /**
    * Creates a new SearchSet, adding the given array of studies with a default
    * score of 1.0.
-   * @param studies the studies to add
+   * @param entries the entries to add
    */
-  constructor(studies?: ResearchStudy[]) {
-    if (studies) {
-      for (const study of studies) {
-        this.addEntry(study);
-      }
+  constructor(entries?: Array<ResearchStudy | SearchBundleEntry>) {
+    if (entries) {
+      this.addEntries(...entries);
+    }
+  }
+
+  addEntries(...entries: Array<ResearchStudy | SearchBundleEntry>): void {
+    for (const entry of entries) {
+      this.addEntry(entry);
     }
   }
 
@@ -51,7 +55,16 @@ export class SearchSet {
    * @param score the score, from [0..1]
    * @param mode the mode, defaults to 'match'
    */
-  addEntry(study: ResearchStudy, score = 1, mode: SearchEntryMode = 'match'): void {
+  addEntry(entry: SearchBundleEntry): void;
+  addEntry(study: ResearchStudy, score?: number, mode?: SearchEntryMode): void;
+  // This overload is sort of implied, but TypeScript needs us to give it outright
+  addEntry(studyOrEntry: SearchBundleEntry | ResearchStudy): void;
+  addEntry(studyOrEntry: SearchBundleEntry | ResearchStudy, score = 1, mode: SearchEntryMode = 'match'): void {
+    const entry: SearchBundleEntry = isResearchStudy(studyOrEntry)
+      ? { resource: studyOrEntry, search: { mode: mode } }
+      : studyOrEntry;
+    // Grab the score out of the entry if one was given
+    if (entry.search.score) score = entry.search.score;
     // This somewhat bizarre logic is to catch NaN
     if (!(score > 0 && score < 1)) {
       if (score < 0) {
@@ -60,7 +73,9 @@ export class SearchSet {
         score = 1;
       }
     }
-    this.entry.push({ resource: study, search: { mode: mode, score: score } });
+    // Now that we've made score valid, use it
+    entry.search.score = score;
+    this.entry.push(entry);
     this.total++;
   }
 }

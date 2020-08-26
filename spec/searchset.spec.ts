@@ -58,5 +58,10 @@ describe('SearchSet', () => {
       searchSet.addEntry(researchStudy);
       expect(searchSet.total).toEqual(2);
     });
+    it('accepts an entry', () => {
+      searchSet.addEntry({resource: new ResearchStudy(1), search: { score: 0.125, mode: 'match' } });
+      expect(searchSet.entry.length).toEqual(1);
+      expect(searchSet.entry[0].search.score).toEqual(0.125);
+    });
   });
 });

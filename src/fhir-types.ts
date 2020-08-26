@@ -15,20 +15,68 @@ export interface BaseResource {
 }
 
 export interface BundleEntry {
-  resource: Resource;
+  resource: BaseResource;
   fullUrl?: URLString;
+  search?: SearchResult;
 }
+
+/**
+ * The search entry mode valueset (from https://www.hl7.org/fhir/valueset-search-entry-mode.html).
+ */
+export type SearchEntryMode = 'match' | 'include' |	'outcome';
+
+export interface SearchResult {
+  mode?: SearchEntryMode;
+  score?: number;
+}
+
+export type BundleType =
+  | 'document'
+  | 'message'
+  | 'transaction'
+  | 'transaction-response'
+  | 'batch'
+  | 'batch-response'
+  | 'history'
+  | 'searchset'
+  | 'collection';
+
+export const BUNDLE_TYPES = new Set<BundleType>([
+  'document',
+  'message',
+  'transaction',
+  'transaction-response',
+  'batch',
+  'batch-response',
+  'history',
+  'searchset',
+  'collection'
+]);
 
 export interface Bundle extends BaseResource {
   resourceType: 'Bundle';
-  type: 'collection';
+  type: BundleType;
   entry: BundleEntry[];
+}
+
+/**
+ * A Bundle that is a Collection.
+ */
+export interface Collection extends Bundle {
+  type: 'collection';
+}
+
+/**
+ * A Bundle that is a SearchSet.
+ */
+export interface SearchSet extends Bundle {
+  type: 'searchset';
 }
 
 export function isBundle(o: unknown): o is Bundle {
   if (typeof o !== 'object' || o === null) return false;
   const other = o as Bundle;
-  return other.resourceType === 'Bundle' && other.type === 'collection' && Array.isArray(other.entry);
+  return other.resourceType === 'Bundle' && BUNDLE_TYPES.has(other.type) && Array.isArray(other.entry);
 }
 
 export interface Parameters extends BaseResource {
@@ -45,8 +93,6 @@ export interface Condition extends BaseResource {
   resourceType: 'Condition';
   code: Code;
 }
-
-export type Resource = Condition | Parameters;
 
 export interface Identifier {
   use?: string;
@@ -145,4 +191,11 @@ export interface ResearchStudy extends BaseResource {
   principalInvestigator?: Reference;
   site?: Reference[];
   contained?: ContainedResource[];
+}
+
+export function isResearchStudy(o: unknown): o is ResearchStudy {
+  if (typeof o !== 'object' || o === null) {
+    return false;
+  }
+  return (o as ResearchStudy).resourceType === 'ResearchStudy';
 }
