@@ -46,7 +46,27 @@ export interface Condition extends BaseResource {
   code: Code;
 }
 
-export type Resource = Condition | Parameters;
+export interface Observation extends BaseResource {
+  resourceType: 'Observation';
+  valueCodeableConcept: Code;
+}
+
+export interface Patient extends BaseResource {
+  resourceType: 'Patient';
+  birthDate: string;
+}
+
+export interface Procedure extends BaseResource {
+  resourceType: 'Procedure';
+  code: Code;
+}
+
+export interface MedicationStatement extends BaseResource {
+  resourceType: 'MedicationStatement';
+  code: Code;
+}
+
+export type Resource = Condition | Parameters | Observation | Patient | Procedure | MedicationStatement;
 
 export interface Identifier {
   use?: string;
