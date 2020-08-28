@@ -15,7 +15,7 @@ export interface BaseResource {
 }
 
 export interface BundleEntry {
-  resource: BaseResource;
+  resource: Resource;
   fullUrl?: URLString;
   search?: SearchResult;
 }
@@ -113,8 +113,6 @@ export interface MedicationStatement extends BaseResource {
   resourceType: 'MedicationStatement';
   code: Code;
 }
-
-export type Resource = Condition | Parameters | Observation | Patient | Procedure | MedicationStatement;
 
 export interface Identifier {
   use?: string;
@@ -214,6 +212,8 @@ export interface ResearchStudy extends BaseResource {
   site?: Reference[];
   contained?: ContainedResource[];
 }
+
+export type Resource = Condition | Parameters | Observation | Patient | Procedure | MedicationStatement | ResearchStudy;
 
 export function isResearchStudy(o: unknown): o is ResearchStudy {
   if (typeof o !== 'object' || o === null) {
