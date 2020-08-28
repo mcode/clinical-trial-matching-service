@@ -15,7 +15,7 @@ export interface BaseResource {
 }
 
 export interface BundleEntry {
-  resource: BaseResource;
+  resource: Resource;
   fullUrl?: URLString;
   search?: SearchResult;
 }
