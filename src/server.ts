@@ -1,7 +1,6 @@
 import express from 'express';
 import bodyParser from 'body-parser';
-import { Bundle, isBundle } from './fhir-types';
-import { SearchSet } from './searchset';
+import { Bundle, SearchSet, isBundle } from './fhir-types';
 import RequestError from './request-error';
 import * as http from 'http';
 
