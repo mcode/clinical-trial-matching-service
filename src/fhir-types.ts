@@ -114,8 +114,6 @@ export interface MedicationStatement extends BaseResource {
   code: Code;
 }
 
-export type Resource = Condition | Parameters | Observation | Patient | Procedure | MedicationStatement;
-
 export interface Identifier {
   use?: string;
   system?: string;
@@ -214,6 +212,8 @@ export interface ResearchStudy extends BaseResource {
   site?: Reference[];
   contained?: ContainedResource[];
 }
+
+export type Resource = Condition | Parameters | Observation | Patient | Procedure | MedicationStatement | ResearchStudy;
 
 export function isResearchStudy(o: unknown): o is ResearchStudy {
   if (typeof o !== 'object' || o === null) {
