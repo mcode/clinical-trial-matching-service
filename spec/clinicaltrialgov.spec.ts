@@ -239,6 +239,7 @@ describe('ClinicalTrialGovService', () => {
     let updatedTrial: ResearchStudy;
     beforeAll(async function () {
       downloader = new ctg.ClinicalTrialGovService(tempDataDirPath);
+      await downloader.init();
       // "Import" the trial
       await downloader.extractResults(fs.createReadStream(specFilePath('search_result.zip')));
       // Note this mutates study, which doesn't actually matter at present.

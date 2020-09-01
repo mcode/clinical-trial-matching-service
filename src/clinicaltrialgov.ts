@@ -69,7 +69,6 @@ export function parseClinicalTrialXML(fileContents: string): Promise<TrialBackup
   });
 }
 
-
 function convertArrayToCodeableConcept(trialConditions: string[]): CodeableConcept[] {
   const fhirConditions: CodeableConcept[] = [];
   for (const condition of trialConditions) {
@@ -201,88 +200,8 @@ export class ClinicalTrialGovService {
       return Promise.resolve(result);
     }
     return this.getDownloadedTrial(nctId).then((backup) => {
-      return this.updateTrialWithBackup(result, backup);
+      return updateTrialWithBackup(result, backup);
     });
-  }
-
-  updateTrialWithBackup(result: ResearchStudy, backup: TrialBackup): ResearchStudy {
-    const study = backup.clinical_study;
-    if (!result.enrollment) {
-      const eligibility = study.eligibility;
-      if (eligibility) {
-        const criteria = eligibility[0].criteria;
-        if (criteria) {
-          const group: Group = { resourceType: 'Group', id: 'group' + result.id, type: 'person', actual: false };
-          addContainedResource(result, group);
-          result.enrollment = [
-            { reference: `#group${result.id}`, type: 'Group', display: criteria[0].textblock[0] }
-          ];
-        }
-      }
-    }
-    if (!result.description) {
-      const briefSummary = study.brief_summary;
-      if (briefSummary) {
-        result.description = briefSummary[0].textblock[0];
-      }
-    }
-    if (!result.phase) {
-      const phase = study.phase;
-      if (phase) {
-        result.phase = {
-          coding: [
-            {
-              system: 'http://terminology.hl7.org/CodeSystem/research-study-phase',
-              code: phase[0],
-              display: phase[0]
-            }
-          ],
-          text: phase[0]
-        };
-      }
-    }
-    if (!result.category) {
-      const studyType = study.study_type;
-      if (studyType) {
-        result.category = [{ text: studyType[0] }];
-      }
-    }
-    if (!result.status) {
-      const overallStatus = study.overall_status;
-      if (overallStatus) {
-        result.status = overallStatus[0];
-      }
-    }
-
-  const backupCondition = study.condition;
-
-  if (backupCondition) {
-    result.condition = convertArrayToCodeableConcept(backupCondition);
-    result.enrollment = [ addContainedResource(result, { resourceType: 'Group', id: 'group' + result.id, type: 'person', actual: false }) ];
-  }
-  if (!result.site) {
-    if (study.location) {
-      let index = 0;
-      for (const location of study.location) {
-        const fhirLocation: Location = { resourceType: 'Location', id: 'location-' + (index++) };
-        if (location.facility && location.facility[0].name)
-          fhirLocation.name = location.facility[0].name[0];
-        if (location.contact) {
-          const contact = location.contact[0];
-          if (contact.email) {
-            addToContainer<Location, ContactPoint, 'telecom'>(fhirLocation, 'telecom', { system: 'email', value: contact.email[0], use: 'work' });
-          }
-          if (contact.phone) {
-            addToContainer<Location, ContactPoint, 'telecom'>(fhirLocation, 'telecom', { system: 'phone', value: contact.phone[0], use: 'work' });
-          }
-        }
-        addToContainer<ResearchStudy, Reference, 'site'>(result, 'site', addContainedResource(result, fhirLocation));
-      }
-    }
-  }
-  return result;
-    //console.log(result);
-    return result;
   }
 }
 
@@ -296,4 +215,88 @@ export function createClinicalTrialGovService(dataDir: string): Promise<Clinical
       })
       .catch(reject);
   });
+}
+
+export function updateTrialWithBackup(result: ResearchStudy, backup: TrialBackup): ResearchStudy {
+  const study = backup.clinical_study;
+  if (!result.enrollment) {
+    const eligibility = study.eligibility;
+    if (eligibility) {
+      const criteria = eligibility[0].criteria;
+      if (criteria) {
+        const group: Group = { resourceType: 'Group', id: 'group' + result.id, type: 'person', actual: false };
+        const reference = addContainedResource(result, group);
+        reference.display = criteria[0].textblock[0];
+        result.enrollment = [ reference ];
+      }
+    }
+  }
+  if (!result.description) {
+    const briefSummary = study.brief_summary;
+    if (briefSummary) {
+      result.description = briefSummary[0].textblock[0];
+    }
+  }
+  if (!result.phase) {
+    const phase = study.phase;
+    if (phase) {
+      result.phase = {
+        coding: [
+          {
+            system: 'http://terminology.hl7.org/CodeSystem/research-study-phase',
+            code: phase[0],
+            display: phase[0]
+          }
+        ],
+        text: phase[0]
+      };
+    }
+  }
+  if (!result.category) {
+    const studyType = study.study_type;
+    if (studyType) {
+      result.category = [{ text: studyType[0] }];
+    }
+  }
+  if (!result.status) {
+    const overallStatus = study.overall_status;
+    if (overallStatus) {
+      result.status = overallStatus[0];
+    }
+  }
+
+  const backupCondition = study.condition;
+
+  if (backupCondition) {
+    result.condition = convertArrayToCodeableConcept(backupCondition);
+  }
+  if (!result.site) {
+    if (study.location) {
+      let index = 0;
+      for (const location of study.location) {
+        const fhirLocation: Location = { resourceType: 'Location', id: 'location-' + index++ };
+        if (location.facility && location.facility[0].name) fhirLocation.name = location.facility[0].name[0];
+        if (location.contact) {
+          const contact = location.contact[0];
+          if (contact.email) {
+            addToContainer<Location, ContactPoint, 'telecom'>(fhirLocation, 'telecom', {
+              system: 'email',
+              value: contact.email[0],
+              use: 'work'
+            });
+          }
+          if (contact.phone) {
+            addToContainer<Location, ContactPoint, 'telecom'>(fhirLocation, 'telecom', {
+              system: 'phone',
+              value: contact.phone[0],
+              use: 'work'
+            });
+          }
+        }
+        addToContainer<ResearchStudy, Reference, 'site'>(result, 'site', addContainedResource(result, fhirLocation));
+      }
+    }
+  }
+  //console.log(result);
+  return result;
 }
