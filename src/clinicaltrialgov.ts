@@ -1,4 +1,3 @@
-
 /**
  * This file contains a backup system for finding necessary trial information if
  * your matching service does not provide it.
@@ -11,64 +10,11 @@ import * as https from 'https';
 // Needed for types:
 import * as http from 'http';
 import * as stream from 'stream';
-import * as util from 'util';
 import extract from 'extract-zip';
-import { ResearchStudy } from './fhir-types';
+import { CodeableConcept, ContactPoint, Group, Location, Reference, ResearchStudy } from './fhir-types';
+import { ClinicalStudy } from './clinicalstudy';
+import { addContainedResource, addToContainer } from './research-study';
 
-// For documentation purposes, indicates an element that will only ever appear once in a valid document. It's still
-// ultimately an array at present.
-type One<T> = Array<T>;
-// For documentation purposes, indicates an element that can appear any number of times.
-// (currently, this is unused, but hey)
-//type Unbounded<T> = Array<T>;
-
-type ActualEnum = "Actual" | "Anticipated" | "Estimate";
-interface EnrollmentStruct {
-  _: string;
-  $: { type: ActualEnum };
-}
-
-interface TextblockStruct {
-  textblock: string[];
-}
-
-/**
- * A text block is, for whatever reason, a list of textblocks. This merges them
- * into a single string. It's unclear if this is "correct" so this exists as a
- * function so that if it's wrong it can be fixed in a single place.
- * @param textblock the textblock to merge
- */
-function mergeTextblock(textblock: TextblockStruct): string {
-  return textblock.textblock.join('\n');
-}
-
-type PhaseEnum = 'N/A'
-| 'Early Phase 1'
-| 'Phase 1'
-| 'Phase 1/Phase 2'
-| 'Phase 2'
-| 'Phase 2/Phase 3'
-| 'Phase 3'
-| 'Phase 4';
-
-type StudyTypeEnum = 'Expanded Access'
-| 'Interventional'
-| 'N/A';
-
-interface EligibilityStruct {
-  criteria?: One<TextblockStruct>;
-}
-
-/**
- * This is a simplified type that currently contains *only* the parts of the result that are used. This does NOT contain
- * the full type. The full schema is here: https://clinicaltrials.gov/ct2/html/images/info/public.xsd
- */
-export interface ClinicalStudy {
-  brief_summary?: One<TextblockStruct>;
-  phase?: One<PhaseEnum>;
-  study_type: One<StudyTypeEnum>;
-  eligibility?: One<EligibilityStruct>;
-}
 export interface TrialBackup {
   clinical_study: ClinicalStudy;
 }
@@ -109,8 +55,7 @@ export function findNCTNumber(study: ResearchStudy): string | null {
     }
     // Fallback: regexp match
     for (const identifier of study.identifier) {
-      if (typeof identifier.value === 'string' && isValidNCTNumber(identifier.value))
-        return identifier.value;
+      if (typeof identifier.value === 'string' && isValidNCTNumber(identifier.value)) return identifier.value;
     }
   }
   // Return null on failures
@@ -124,6 +69,15 @@ export function parseClinicalTrialXML(fileContents: string): Promise<TrialBackup
   });
 }
 
+
+function convertArrayToCodeableConcept(trialConditions: string[]): CodeableConcept[] {
+  const fhirConditions: CodeableConcept[] = [];
+  for (const condition of trialConditions) {
+    fhirConditions.push({ text: condition });
+  }
+  return fhirConditions;
+}
+
 /**
  * System to fill in data on research studies based on the trial data from
  * https://clinicaltrials.gov/
@@ -134,8 +88,7 @@ export class ClinicalTrialGovService {
    * use init() for that.
    * @param dataDir the data directory to use
    */
-  constructor(public dataDir: string) {
-  }
+  constructor(public dataDir: string) {}
 
   /**
    * Creates the data directory is necessary.
@@ -168,7 +121,7 @@ export class ClinicalTrialGovService {
             resolve();
           });
         }
-      })
+      });
     });
   }
 
@@ -213,14 +166,16 @@ export class ClinicalTrialGovService {
     // FIXME: Save to a temp file (this will break if called while still resolving another download)
     const file = fs.createWriteStream(`${this.dataDir}/backup.zip`);
     const filePath = path.resolve(String(file.path));
-    const dirPath = filePath.slice(0,-11);
+    const dirPath = filePath.slice(0, -11);
     console.log(dirPath);
     return new Promise((resolve, reject) => {
       results.on('error', (err: Error) => {
         reject(err);
       });
-      results.pipe(file).on('close', function() {
-        extract(filePath, { dir: `${dirPath}/backups` }).then(resolve).catch(reject);
+      results.pipe(file).on('close', function () {
+        extract(filePath, { dir: `${dirPath}/backups` })
+          .then(resolve)
+          .catch(reject);
       });
     });
   }
@@ -257,8 +212,10 @@ export class ClinicalTrialGovService {
       if (eligibility) {
         const criteria = eligibility[0].criteria;
         if (criteria) {
+          const group: Group = { resourceType: 'Group', id: 'group' + result.id, type: 'person', actual: false };
+          addContainedResource(result, group);
           result.enrollment = [
-            { reference: `#group${result.id}`, type: 'Group', display: mergeTextblock(criteria[0]) }
+            { reference: `#group${result.id}`, type: 'Group', display: criteria[0].textblock[0] }
           ];
         }
       }
@@ -266,7 +223,7 @@ export class ClinicalTrialGovService {
     if (!result.description) {
       const briefSummary = study.brief_summary;
       if (briefSummary) {
-        result.description = mergeTextblock(briefSummary[0]);
+        result.description = briefSummary[0].textblock[0];
       }
     }
     if (!result.phase) {
@@ -290,6 +247,40 @@ export class ClinicalTrialGovService {
         result.category = [{ text: studyType[0] }];
       }
     }
+    if (!result.status) {
+      const overallStatus = study.overall_status;
+      if (overallStatus) {
+        result.status = overallStatus[0];
+      }
+    }
+
+  const backupCondition = study.condition;
+
+  if (backupCondition) {
+    result.condition = convertArrayToCodeableConcept(backupCondition);
+    result.enrollment = [ addContainedResource(result, { resourceType: 'Group', id: 'group' + result.id, type: 'person', actual: false }) ];
+  }
+  if (!result.site) {
+    if (study.location) {
+      let index = 0;
+      for (const location of study.location) {
+        const fhirLocation: Location = { resourceType: 'Location', id: 'location-' + (index++) };
+        if (location.facility && location.facility[0].name)
+          fhirLocation.name = location.facility[0].name[0];
+        if (location.contact) {
+          const contact = location.contact[0];
+          if (contact.email) {
+            addToContainer<Location, ContactPoint, 'telecom'>(fhirLocation, 'telecom', { system: 'email', value: contact.email[0], use: 'work' });
+          }
+          if (contact.phone) {
+            addToContainer<Location, ContactPoint, 'telecom'>(fhirLocation, 'telecom', { system: 'phone', value: contact.phone[0], use: 'work' });
+          }
+        }
+        addToContainer<ResearchStudy, Reference, 'site'>(result, 'site', addContainedResource(result, fhirLocation));
+      }
+    }
+  }
+  return result;
     //console.log(result);
     return result;
   }
@@ -298,8 +289,11 @@ export class ClinicalTrialGovService {
 export function createClinicalTrialGovService(dataDir: string): Promise<ClinicalTrialGovService> {
   return new Promise<ClinicalTrialGovService>((resolve, reject) => {
     const result = new ClinicalTrialGovService(dataDir);
-    result.init().then(() => {
-      resolve(result);
-    }).catch(reject);
+    result
+      .init()
+      .then(() => {
+        resolve(result);
+      })
+      .catch(reject);
   });
 }

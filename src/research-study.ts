@@ -44,6 +44,13 @@ export function addToContainer<TContainer, TContained, K extends keyof TContaine
   (container[propertyName] as Array<TContained>).push(item);
 }
 
+export function addContainedResource(researchStudy: IResearchStudy, resource: ContainedResource): Reference {
+  if (!researchStudy.contained)
+    researchStudy.contained = [];
+  researchStudy.contained.push(resource);
+  return createReferenceTo(resource);
+}
+
 /**
  * Creates a Reference to a resource, assuming it will be a contained resource.
  * The resource must have an `id` set on it, otherwise this will raise an error.
