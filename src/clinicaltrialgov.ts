@@ -6,74 +6,71 @@
 
 import fs from 'fs';
 import path from 'path';
-import * as parser from 'xml2json';
+import * as xml2js from 'xml2js';
 import * as https from 'https';
 // Needed for types:
 import * as http from 'http';
 import * as stream from 'stream';
+import * as util from 'util';
 import extract from 'extract-zip';
 import { ResearchStudy } from './fhir-types';
 
+// For documentation purposes, indicates an element that will only ever appear once in a valid document. It's still
+// ultimately an array at present.
+type One<T> = Array<T>;
+// For documentation purposes, indicates an element that can appear any number of times.
+// (currently, this is unused, but hey)
+//type Unbounded<T> = Array<T>;
+
+type ActualEnum = "Actual" | "Anticipated" | "Estimate";
+interface EnrollmentStruct {
+  _: string;
+  $: { type: ActualEnum };
+}
+
+interface TextblockStruct {
+  textblock: string[];
+}
+
+/**
+ * A text block is, for whatever reason, a list of textblocks. This merges them
+ * into a single string. It's unclear if this is "correct" so this exists as a
+ * function so that if it's wrong it can be fixed in a single place.
+ * @param textblock the textblock to merge
+ */
+function mergeTextblock(textblock: TextblockStruct): string {
+  return textblock.textblock.join('\n');
+}
+
+type PhaseEnum = 'N/A'
+| 'Early Phase 1'
+| 'Phase 1'
+| 'Phase 1/Phase 2'
+| 'Phase 2'
+| 'Phase 2/Phase 3'
+| 'Phase 3'
+| 'Phase 4';
+
+type StudyTypeEnum = 'Expanded Access'
+| 'Interventional'
+| 'N/A';
+
+interface EligibilityStruct {
+  criteria?: One<TextblockStruct>;
+}
+
+/**
+ * This is a simplified type that currently contains *only* the parts of the result that are used. This does NOT contain
+ * the full type. The full schema is here: https://clinicaltrials.gov/ct2/html/images/info/public.xsd
+ */
+export interface ClinicalStudy {
+  brief_summary?: One<TextblockStruct>;
+  phase?: One<PhaseEnum>;
+  study_type: One<StudyTypeEnum>;
+  eligibility?: One<EligibilityStruct>;
+}
 export interface TrialBackup {
-  clinical_study: {
-    required_header: {
-      download_date: string;
-      link_text: string;
-      url: string;
-    };
-    id_info: { org_study_id: string; nct_id: string };
-    brief_title: string;
-    official_title: string;
-    sponsors: { lead_sponsor: [Record<string, unknown>] };
-    source: string;
-    oversight_info: {
-      has_dmc: string;
-      is_fda_regulated_drug: string;
-      is_fda_regulated_device: string;
-    };
-    brief_summary: {
-      textblock: string;
-    };
-    overall_status: string;
-    start_date: { type: string; t: string };
-    completion_date: { type: string; t: string };
-    primary_completion_date: { type: string; t: string };
-    phase: string;
-    study_type: string;
-    has_expanded_access: string;
-    study_design_info: {
-      allocation: string;
-      intervention_model: string;
-      primary_purpose: string;
-      masking: string;
-    };
-    primary_outcome: [[Record<string, unknown>], [Record<string, unknown>]];
-    secondary_outcome: [[Record<string, unknown>], [Record<string, unknown>], [Record<string, unknown>]];
-    number_of_arms: string;
-    enrollment: { type: string; t: string };
-    condition: string;
-    arm_group: [[Record<string, unknown>], [Record<string, unknown>]];
-    intervention: [[Record<string, unknown>], [Record<string, unknown>]];
-    eligibility: {
-      criteria: { textblock: string };
-      gender: string;
-      minimum_age: string;
-      maximum_age: string;
-      healthy_volunteers: string;
-    };
-    location: { facility: [Record<string, unknown>] };
-    location_countries: { country: string };
-    verification_date: string;
-    study_first_submitted: string;
-    study_first_submitted_qc: string;
-    study_first_posted: { type: string; t: string };
-    last_update_submitted: string;
-    last_update_submitted_qc: string;
-    last_update_posted: { type: string; t: string };
-    responsible_party: { responsible_party_type: string };
-    intervention_browse: { mesh_term: string };
-    patient_data: { sharing_ipd: string };
-  };
+  clinical_study: ClinicalStudy;
 }
 
 /**
@@ -118,6 +115,13 @@ export function findNCTNumber(study: ResearchStudy): string | null {
   }
   // Return null on failures
   return null;
+}
+
+export function parseClinicalTrialXML(fileContents: string): Promise<TrialBackup> {
+  const parser = new xml2js.Parser();
+  return parser.parseStringPromise(fileContents).then((result) => {
+    return result as TrialBackup;
+  });
 }
 
 /**
@@ -221,47 +225,73 @@ export class ClinicalTrialGovService {
     });
   }
 
-  getDownloadedTrial(nctId: string): TrialBackup {
+  getDownloadedTrial(nctId: string): Promise<TrialBackup> {
     const filePath = `${this.dataDir}/backups/${nctId}.xml`;
     // TODO: Catch the file not existing.
-    const data = fs.readFileSync(filePath, { encoding: 'utf8' });
-    const json = JSON.parse(parser.toJson(data)) as TrialBackup;
-    return json;
+    return new Promise((resolve, reject) => {
+      fs.readFile(filePath, { encoding: 'utf8' }, (error, data): void => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(parseClinicalTrialXML(data));
+      });
+    });
   }
 
-  updateTrial(result: ResearchStudy): ResearchStudy {
+  updateTrial(result: ResearchStudy): Promise<ResearchStudy> {
     const nctId = findNCTNumber(result);
-    if (nctId !== null) {
-      const backup = this.getDownloadedTrial(nctId);
-      const study = backup.clinical_study;
-      if (!result.enrollment) {
-        result.enrollment = [
-          { reference: `#group${result.id}`, type: 'Group', display: study.eligibility.criteria.textblock }
-        ];
+    if (nctId === null) {
+      // If there is no ID, there is nothing we can do
+      return Promise.resolve(result);
+    }
+    return this.getDownloadedTrial(nctId).then((backup) => {
+      return this.updateTrialWithBackup(result, backup);
+    });
+  }
+
+  updateTrialWithBackup(result: ResearchStudy, backup: TrialBackup): ResearchStudy {
+    const study = backup.clinical_study;
+    if (!result.enrollment) {
+      const eligibility = study.eligibility;
+      if (eligibility) {
+        const criteria = eligibility[0].criteria;
+        if (criteria) {
+          result.enrollment = [
+            { reference: `#group${result.id}`, type: 'Group', display: mergeTextblock(criteria[0]) }
+          ];
+        }
       }
-      if (!result.description) {
-        result.description = study.brief_summary.textblock;
+    }
+    if (!result.description) {
+      const briefSummary = study.brief_summary;
+      if (briefSummary) {
+        result.description = mergeTextblock(briefSummary[0]);
       }
-      if (!result.phase) {
+    }
+    if (!result.phase) {
+      const phase = study.phase;
+      if (phase) {
         result.phase = {
           coding: [
             {
               system: 'http://terminology.hl7.org/CodeSystem/research-study-phase',
-              code: study.phase,
-              display: study.phase
+              code: phase[0],
+              display: phase[0]
             }
           ],
-          text: study.phase
+          text: phase[0]
         };
       }
-      if (!result.category) {
-        result.category = [{ text: study.study_type }];
-      }
-      //console.log(result);
-      return result;
-    } else {
-      return result;
     }
+    if (!result.category) {
+      const studyType = study.study_type;
+      if (studyType) {
+        result.category = [{ text: studyType[0] }];
+      }
+    }
+    //console.log(result);
+    return result;
   }
 }
 

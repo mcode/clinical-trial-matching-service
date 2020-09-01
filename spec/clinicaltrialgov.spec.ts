@@ -242,7 +242,7 @@ describe('ClinicalTrialGovService', () => {
       // "Import" the trial
       await downloader.extractResults(fs.createReadStream(specFilePath('search_result.zip')));
       // Note this mutates study, which doesn't actually matter at present.
-      updatedTrial = downloader.updateTrial(study);
+      updatedTrial = await downloader.updateTrial(study);
     });
 
     it('fills in inclusion criteria', () => {
@@ -274,7 +274,7 @@ describe('ClinicalTrialGovService', () => {
     it('returns same object on empty study', () => {
       const empty = new ResearchStudyObj(2);
       const backup_service = new ctg.ClinicalTrialGovService(tempDataDirPath);
-      expect(backup_service.updateTrial(empty)).toBe(empty);
+      return expectAsync(backup_service.updateTrial(empty)).toBeResolvedTo(empty);
     });
 
     it('returns on filled out study', () => {
