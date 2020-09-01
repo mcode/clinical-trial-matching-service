@@ -15,7 +15,7 @@ import { CodeableConcept, ContactPoint, Group, Location, Reference, ResearchStud
 import { ClinicalStudy } from './clinicalstudy';
 import { addContainedResource, addToContainer } from './research-study';
 
-export interface TrialBackup {
+interface TrialBackup {
   clinical_study: ClinicalStudy;
 }
 
@@ -62,10 +62,10 @@ export function findNCTNumber(study: ResearchStudy): string | null {
   return null;
 }
 
-export function parseClinicalTrialXML(fileContents: string): Promise<TrialBackup> {
+export function parseClinicalTrialXML(fileContents: string): Promise<ClinicalStudy> {
   const parser = new xml2js.Parser();
   return parser.parseStringPromise(fileContents).then((result) => {
-    return result as TrialBackup;
+    return (result as TrialBackup).clinical_study;
   });
 }
 
@@ -179,7 +179,7 @@ export class ClinicalTrialGovService {
     });
   }
 
-  getDownloadedTrial(nctId: string): Promise<TrialBackup> {
+  getDownloadedTrial(nctId: string): Promise<ClinicalStudy> {
     const filePath = `${this.dataDir}/backups/${nctId}.xml`;
     // TODO: Catch the file not existing.
     return new Promise((resolve, reject) => {
@@ -193,14 +193,14 @@ export class ClinicalTrialGovService {
     });
   }
 
-  updateTrial(result: ResearchStudy): Promise<ResearchStudy> {
-    const nctId = findNCTNumber(result);
+  updateResearchStudy(researchStudy: ResearchStudy): Promise<ResearchStudy> {
+    const nctId = findNCTNumber(researchStudy);
     if (nctId === null) {
       // If there is no ID, there is nothing we can do
-      return Promise.resolve(result);
+      return Promise.resolve(researchStudy);
     }
-    return this.getDownloadedTrial(nctId).then((backup) => {
-      return updateTrialWithBackup(result, backup);
+    return this.getDownloadedTrial(nctId).then((clinicalStudy) => {
+      return updateResearchStudyWithClinicalStudy(researchStudy, clinicalStudy);
     });
   }
 }
@@ -217,8 +217,7 @@ export function createClinicalTrialGovService(dataDir: string): Promise<Clinical
   });
 }
 
-export function updateTrialWithBackup(result: ResearchStudy, backup: TrialBackup): ResearchStudy {
-  const study = backup.clinical_study;
+export function updateResearchStudyWithClinicalStudy(result: ResearchStudy, study: ClinicalStudy): ResearchStudy {
   if (!result.enrollment) {
     const eligibility = study.eligibility;
     if (eligibility) {
@@ -265,10 +264,10 @@ export function updateTrialWithBackup(result: ResearchStudy, backup: TrialBackup
     }
   }
 
-  const backupCondition = study.condition;
-
-  if (backupCondition) {
-    result.condition = convertArrayToCodeableConcept(backupCondition);
+  if (!result.condition) {
+    if (study.condition) {
+      result.condition = convertArrayToCodeableConcept(study.condition);
+    }
   }
   if (!result.site) {
     if (study.location) {

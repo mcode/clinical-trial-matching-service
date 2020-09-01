@@ -9,6 +9,7 @@ export * from './searchset';
 export * from './clinicaltrialgov';
 
 // The export { v } from "mod" forms do not appear to work yet
+import { ClinicalStudy } from './clinicalstudy';
 import RequestError from './request-error';
 import ClinicalTrialMatchingService, { ClinicalTrialMatcher, Configuration } from './server';
 
@@ -17,6 +18,7 @@ export * from './env';
 
 export default ClinicalTrialMatchingService;
 export {
+  ClinicalStudy,
   ClinicalTrialMatcher,
   ClinicalTrialMatchingService,
   Configuration as ServiceConfiguration,
