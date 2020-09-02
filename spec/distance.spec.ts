@@ -13,11 +13,11 @@ describe('.isValidNCTNumber', () => {
 
     });
 
-    fit('calculates the distance to research study sites from origin', () => {
+    it('calculates the distance to research study sites from origin', () => {
         const study = data as ResearchStudy;
         
-        dist.addDistance(study);
-
+        const updatedstudy = dist.addDistance(study);
+        expect(updatedstudy.identifier?.length).toBeGreaterThan(1);
     });
 
 

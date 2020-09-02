@@ -61,8 +61,14 @@ export class DistanceService {
     }
     const origin = this.dict?.get(this.zipCode) as GeolibInputCoordinates;
     const ordered = orderByDistance(origin, points);
-    console.log(ordered);
-    console.log(ordered.map((point) => convertDistance(getDistance(origin, point), 'mi')));
+   
+    const closest = ordered.map((point) => convertDistance(getDistance(origin, point), 'mi'));
+    if(study.identifier){
+        study.identifier.push({ 
+            use: "temp",
+            value: `Nearest site as close as ${closest[0]} miles`
+          });
+    }
     return study;
 
     }
