@@ -181,7 +181,10 @@ export class ClinicalTrialGovService {
 
   getDownloadedTrial(nctId: string): Promise<ClinicalStudy> {
     const filePath = `${this.dataDir}/backups/${nctId}.xml`;
-    // TODO: Catch the file not existing.
+    // TODO: Catch the file not existing. This should probably be handled
+    // specially, such as by returns null or something else to differentiate
+    // it from other errors, since an file not existing may mean it simply
+    // needs to be loaded later
     return new Promise((resolve, reject) => {
       fs.readFile(filePath, { encoding: 'utf8' }, (error, data): void => {
         if (error) {
@@ -217,7 +220,16 @@ export function createClinicalTrialGovService(dataDir: string): Promise<Clinical
   });
 }
 
-export function updateResearchStudyWithClinicalStudy(result: ResearchStudy, study: ClinicalStudy): ResearchStudy {
+/**
+ * Updates a research study with data from a clinical study off the ClinicalTrials.gov website. This will only update
+ * fields that do not have data, it will not overwrite any existing data.
+ *
+ * @param result the research study to update
+ * @param study the clinical study to use to update (this takes a partial as the ClinicalStudy type describes the XML
+ * as the schema defines it, so this is designed to handle invalid XML that's missing information that should be
+ * required)
+ */
+export function updateResearchStudyWithClinicalStudy(result: ResearchStudy, study: Partial<ClinicalStudy>): ResearchStudy {
   if (!result.enrollment) {
     const eligibility = study.eligibility;
     if (eligibility) {

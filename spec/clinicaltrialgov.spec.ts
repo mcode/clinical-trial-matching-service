@@ -1,5 +1,5 @@
-import { ResearchStudy as ResearchStudyObj } from './../src/research-study';
-import { ResearchStudy } from '../src/fhir-types';
+import { getContainedResource, ResearchStudy as ResearchStudyObj } from './../src/research-study';
+import { Location, ResearchStudy, ContainedResource } from '../src/fhir-types';
 import * as ctg from '../src/clinicaltrialgov';
 import fs from 'fs';
 import * as os from 'os';
@@ -8,6 +8,7 @@ import nock from 'nock';
 // Trial missing summary, inclusion/exclusion criteria, phase and study type
 import trialMissing from './data/resource.json';
 import trialFilled from './data/complete_study.json';
+import { ClinicalStudy } from '../src/clinicalstudy';
 
 function specFilePath(specFilePath: string): string {
   return path.join(__dirname, '../../spec/data', specFilePath);
@@ -234,16 +235,31 @@ describe('ClinicalTrialGovService', () => {
     });
   });
 
+  describe('#getDownloadedTrial', () => {
+    let downloader: ctg.ClinicalTrialGovService;
+    beforeEach(() => {
+      return ctg.createClinicalTrialGovService(tempDataDirPath).then((service) => {
+        downloader = service;
+      });
+    });
+    it('handles a file that does not exist', () => {
+      return expectAsync(downloader.getDownloadedTrial('this is an invalid id')).toBeRejected();
+    });
+  });
+
   describe('filling out a partial trial', () => {
+    // Downloader is still required because the test data is within the test zip
     let downloader: ctg.ClinicalTrialGovService;
     let updatedTrial: ResearchStudy;
+    let clinicalStudy: ClinicalStudy;
     beforeAll(async function () {
       downloader = new ctg.ClinicalTrialGovService(tempDataDirPath);
       await downloader.init();
       // "Import" the trial
       await downloader.extractResults(fs.createReadStream(specFilePath('search_result.zip')));
+      clinicalStudy = await downloader.getDownloadedTrial(nctID);
       // Note this mutates study, which doesn't actually matter at present.
-      updatedTrial = await downloader.updateResearchStudy(study);
+      updatedTrial = ctg.updateResearchStudyWithClinicalStudy(study, clinicalStudy);
     });
 
     it('fills in inclusion criteria', () => {
@@ -272,7 +288,7 @@ describe('ClinicalTrialGovService', () => {
       expect(updatedTrial.description).toBeDefined();
     });
 
-    it('returns same object on empty study', () => {
+    it('returns the same study if the study has no NCT ID', () => {
       const empty = new ResearchStudyObj(2);
       const backup_service = new ctg.ClinicalTrialGovService(tempDataDirPath);
       return expectAsync(backup_service.updateResearchStudy(empty)).toBeResolvedTo(empty);
@@ -282,6 +298,177 @@ describe('ClinicalTrialGovService', () => {
       const study_filled = trialFilled as ResearchStudy;
       const backup_service = new ctg.ClinicalTrialGovService(tempDataDirPath);
       expect(backup_service.updateResearchStudy(study_filled)).toBeDefined();
+    });
+
+    it('fills out the status', () => {
+      const actual = ctg.updateResearchStudyWithClinicalStudy({ resourceType: 'ResearchStudy' }, {
+        overall_status: [ 'Available' ]
+      });
+      expect(actual.status).toEqual('Available');
+    });
+
+    it('fills out conditions', () => {
+      const actual = ctg.updateResearchStudyWithClinicalStudy({ resourceType: 'ResearchStudy' }, {
+        condition: [
+          'Condition 1', 'Condition 2'
+        ]
+      });
+      expect(actual.condition).toBeDefined();
+      if (actual.condition) {
+        expect(actual.condition.length).toEqual(2);
+        expect(actual.condition[0].text).toEqual('Condition 1');
+        expect(actual.condition[1].text).toEqual('Condition 2');
+      }
+    });
+
+    it('does not overwrite site data', () => {
+      const researchStudy = new ResearchStudyObj('id');
+      const location = researchStudy.addSite('Example');
+      const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
+        location: [ {
+          // Everything here is technically optional
+          facility: [ {
+            name: [ 'Facility ']
+          } ]
+        }]
+      });
+      expect(result.site).toBeDefined();
+      const sites = result.site;
+      if (sites) {
+        expect(sites.length).toEqual(1);
+        if (sites[0]) {
+          expect(sites[0].reference).toEqual('#' + location.id);
+          if (location.id) {
+            const actualLocation = getContainedResource(result, location.id);
+            expect(actualLocation).not.toBeNull();
+            if (actualLocation) {
+              expect(actualLocation.resourceType).toEqual('Location');
+              expect((actualLocation as Location).name).toEqual('Example');
+            }
+          } else {
+            fail('location.id not defined');
+          }
+        } else {
+          fail('sites[0] undefined');
+        }
+      }
+    });
+
+    function expectTelecom(location: Location, type: 'phone' | 'email', expectedValue: string | null) {
+      // Look through the telecoms
+      // If the expected value is null, telecom must be defined, otherwise it
+      // may be empty
+      if (expectedValue !== null)
+        expect(location.telecom).toBeDefined();
+      if (location.telecom) {
+        // If we're expecting a telecom we're expecting it to appear exactly once
+        let found = 0;
+        for (const telecom of location.telecom) {
+          if (telecom.system === type) {
+            found++;
+            if (found > 1) {
+              fail(`Found an extra ${type}`);
+            }
+            if (expectedValue === null) {
+              // If null, it wasn't expected at all
+              fail(`Expected no ${type}, but one was found`);
+            } else {
+              expect(telecom.use).toEqual('work');
+              expect(telecom.value).toEqual(expectedValue);
+            }
+          }
+        }
+        if (expectedValue !== null && found === 0) {
+          fail(`Expected one ${type}, not found`);
+        }
+      }
+    }
+
+    function expectLocation(resource: ContainedResource, expectedName?: string, expectedPhone?: string, expectedEmail?: string) {
+      if (resource.resourceType === 'Location') {
+        const location = resource as Location;
+        if (expectedName) {
+          expect(location.name).toEqual(expectedName);
+        } else {
+          expect(location.name).not.toBeDefined();
+        }
+        expectTelecom(location, 'phone', expectedPhone || null);
+        expectTelecom(location, 'email', expectedEmail || null);
+      } else {
+        fail(`Expected Location, got ${resource.resourceType}`);
+      }
+    }
+
+    it('fills out sites as expected', () => {
+      const result = ctg.updateResearchStudyWithClinicalStudy({ 'resourceType': 'ResearchStudy' }, {
+        'location': [
+          // Everything in location is optional, so this is valid:
+          { },
+          {
+            // Everything in facility is valid, so this is also valid
+            facility: [ { } ]
+          },
+          {
+            facility: [ { name: [ 'Only Email' ] } ],
+            contact: [ { email: [ 'email@example.com' ] } ]
+          },
+          {
+            facility: [ { name: [ 'Only Phone' ] } ],
+            contact: [ { phone: [ '781-555-0100' ] } ]
+          },
+          {
+            facility: [ { name: [ 'Phone and Email' ] } ],
+            contact: [ {
+              email: [ 'hasemail@example.com' ],
+              phone: [ '781-555-0101' ]
+            } ]
+          }
+        ]
+      });
+      // Sites should be filled out
+      expect(result.site).toBeDefined();
+      if (result.site) {
+        expect(result.site.length).toEqual(5);
+      }
+      // Make sure each individual site was created properly - they will be contained resources and should be in order
+      expect(result.contained).toBeDefined();
+      if (result.contained) {
+        // Both 0 and 1 should be empty
+        expectLocation(result.contained[0]);
+        expectLocation(result.contained[1]);
+        expectLocation(result.contained[2], 'Only Email', undefined, 'email@example.com');
+        expectLocation(result.contained[3], 'Only Phone', '781-555-0100');
+        expectLocation(result.contained[4], 'Phone and Email', '781-555-0101', 'hasemail@example.com');
+      }
+    })
+
+    function expectEmptyResearchStudy(researchStudy: ResearchStudy): void {
+      // Technically this is just checking fields updateResearchStudyWithClinicalStudy may change
+      expect(researchStudy.contained).not.toBeDefined('contained');
+      expect(researchStudy.enrollment).not.toBeDefined('enrollment');
+      expect(researchStudy.description).not.toBeDefined('description');
+      expect(researchStudy.phase).not.toBeDefined('phase');
+      expect(researchStudy.category).not.toBeDefined('category');
+      expect(researchStudy.status).not.toBeDefined('status');
+      expect(researchStudy.condition).not.toBeDefined('condition');
+      expect(researchStudy.site).not.toBeDefined('site');
+    }
+
+    it("handles XML with missing data (doesn't crash)", () => {
+      let researchStudy: ResearchStudy;
+      // This is technically invalid, the XML is entirely missing
+      researchStudy = ctg.updateResearchStudyWithClinicalStudy(new ResearchStudyObj('id'), { });
+      // Expect nothing to have changed
+      expectEmptyResearchStudy(researchStudy);
+      // Some partial XML
+      researchStudy = ctg.updateResearchStudyWithClinicalStudy(new ResearchStudyObj('id'), {
+        eligibility: [ {
+          gender: [ 'All' ],
+          minimum_age: [ '18 Years' ],
+          maximum_age: [ 'N/A' ]
+        } ]
+      });
+      expectEmptyResearchStudy(researchStudy);
     });
   });
 

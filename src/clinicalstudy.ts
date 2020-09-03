@@ -7,13 +7,14 @@
  */
 
 /**
- * For documentation purposes, indicates an element that will only ever appear once in a valid document. It's still
- * ultimately an array at present.
+ * For documentation purposes, indicates an element that will only ever appear once in a valid document. It's
+ * implmented as a TypeScript tuple with a single element, which matches how xml2js will ultimately parse the XML.
  */
-type One<T> = Array<T>;
+type One<T> = [ T ];
 
 /**
- * For documentation purposes, indicates an element that can appear any number of times.
+ * For documentation purposes, indicates an element that can appear any number of times. (Conceptually, an empty array
+ * isn't actually valid for these types.)
  */
 type Unbounded<T> = Array<T>;
 
@@ -434,7 +435,7 @@ export type PhaseEnum =
 export type BiospecRetentionEnum = 'None Retained' | 'Samples With DNA' | 'Samples Without DNA';
 
 export interface ClinicalStudy {
-  $: { rank?: string };
+  $?: { rank?: string };
   required_header: One<RequiredHeaderStruct>;
   id_info: One<IdInfoStruct>;
   brief_title: One<string>;
