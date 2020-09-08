@@ -1,6 +1,7 @@
 import ResearchStudy, {
   convertStringArrayToCodeableConcept,
-  createReferenceTo
+  createReferenceTo,
+  getContainedResource
 } from '../src/research-study';
 import { BaseResource,
   ContactDetail,
@@ -36,6 +37,32 @@ describe('createReferenceTo', () => {
     const resource: BaseResource = { } as BaseResource;
     expect(() => { createReferenceTo(resource) }).toThrowError('no ID to create reference');
   });
+});
+
+describe('.getContainedResource', () => {
+  it('returns null if the contained list is empty', () => {
+    expect(getContainedResource({ resourceType: 'ResearchStudy' }, 'anything')).toBeNull();
+  });
+  it('returns null if the contained list does not contain a resource with the given ID', () => {
+    expect(getContainedResource({
+      resourceType: 'ResearchStudy',
+      contained: [
+        { resourceType: 'Location', id: 'foo' }
+      ]
+    }, 'bar')).toBeNull();
+  });
+  it('returns the proper object', () => {
+    const expected: Group = { resourceType: 'Group', id: 'group' };
+    expect(getContainedResource({
+      resourceType: 'ResearchStudy',
+      contained: [
+        { resourceType: 'Location', id: 'location' },
+        { resourceType: 'Organization', id: 'organization' },
+        expected,
+        { resourceType: 'Practitioner', id: 'practitioner' }
+      ]
+    }, 'group')).toEqual(expected);
+  })
 });
 
 describe('ResearchStudy', () => {

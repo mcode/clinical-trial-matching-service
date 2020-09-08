@@ -44,6 +44,32 @@ export function addToContainer<TContainer, TContained, K extends keyof TContaine
   (container[propertyName] as Array<TContained>).push(item);
 }
 
+export function addContainedResource(researchStudy: IResearchStudy, resource: ContainedResource): Reference {
+  if (!researchStudy.contained)
+    researchStudy.contained = [];
+  researchStudy.contained.push(resource);
+  return createReferenceTo(resource);
+}
+
+/**
+ * Looks up a contained resource by ID. This works by scanning through every contained resource in the research study,
+ * so it ultimately operates in O(n) time! If you need to continually look up references, it's recommended that to
+ * instead create a Map<string, ContainedResource> to look them up.
+ * @param id the ID of the resource to look up
+ */
+export function getContainedResource(researchStudy: IResearchStudy, id: string): ContainedResource | null {
+ if (researchStudy.contained) {
+   // Lookup has to be done sequentially for now
+   for (const contained of researchStudy.contained) {
+     if (contained.id === id) {
+       return contained;
+     }
+   }
+ }
+ // Contained empty/nothing found? Return null.
+ return null;
+}
+
 /**
  * Creates a Reference to a resource, assuming it will be a contained resource.
  * The resource must have an `id` set on it, otherwise this will raise an error.

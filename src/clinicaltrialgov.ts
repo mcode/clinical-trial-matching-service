@@ -1,4 +1,3 @@
-
 /**
  * This file contains a backup system for finding necessary trial information if
  * your matching service does not provide it.
@@ -6,74 +5,18 @@
 
 import fs from 'fs';
 import path from 'path';
-import * as parser from 'xml2json';
+import * as xml2js from 'xml2js';
 import * as https from 'https';
 // Needed for types:
 import * as http from 'http';
 import * as stream from 'stream';
 import extract from 'extract-zip';
-import { ResearchStudy } from './fhir-types';
+import { CodeableConcept, ContactPoint, Group, Location, Reference, ResearchStudy } from './fhir-types';
+import { ClinicalStudy } from './clinicalstudy';
+import { addContainedResource, addToContainer } from './research-study';
 
-export interface TrialBackup {
-  clinical_study: {
-    required_header: {
-      download_date: string;
-      link_text: string;
-      url: string;
-    };
-    id_info: { org_study_id: string; nct_id: string };
-    brief_title: string;
-    official_title: string;
-    sponsors: { lead_sponsor: [Record<string, unknown>] };
-    source: string;
-    oversight_info: {
-      has_dmc: string;
-      is_fda_regulated_drug: string;
-      is_fda_regulated_device: string;
-    };
-    brief_summary: {
-      textblock: string;
-    };
-    overall_status: string;
-    start_date: { type: string; t: string };
-    completion_date: { type: string; t: string };
-    primary_completion_date: { type: string; t: string };
-    phase: string;
-    study_type: string;
-    has_expanded_access: string;
-    study_design_info: {
-      allocation: string;
-      intervention_model: string;
-      primary_purpose: string;
-      masking: string;
-    };
-    primary_outcome: [[Record<string, unknown>], [Record<string, unknown>]];
-    secondary_outcome: [[Record<string, unknown>], [Record<string, unknown>], [Record<string, unknown>]];
-    number_of_arms: string;
-    enrollment: { type: string; t: string };
-    condition: string;
-    arm_group: [[Record<string, unknown>], [Record<string, unknown>]];
-    intervention: [[Record<string, unknown>], [Record<string, unknown>]];
-    eligibility: {
-      criteria: { textblock: string };
-      gender: string;
-      minimum_age: string;
-      maximum_age: string;
-      healthy_volunteers: string;
-    };
-    location: { facility: [Record<string, unknown>] };
-    location_countries: { country: string };
-    verification_date: string;
-    study_first_submitted: string;
-    study_first_submitted_qc: string;
-    study_first_posted: { type: string; t: string };
-    last_update_submitted: string;
-    last_update_submitted_qc: string;
-    last_update_posted: { type: string; t: string };
-    responsible_party: { responsible_party_type: string };
-    intervention_browse: { mesh_term: string };
-    patient_data: { sharing_ipd: string };
-  };
+interface TrialBackup {
+  clinical_study: ClinicalStudy;
 }
 
 /**
@@ -112,12 +55,26 @@ export function findNCTNumber(study: ResearchStudy): string | null {
     }
     // Fallback: regexp match
     for (const identifier of study.identifier) {
-      if (typeof identifier.value === 'string' && isValidNCTNumber(identifier.value))
-        return identifier.value;
+      if (typeof identifier.value === 'string' && isValidNCTNumber(identifier.value)) return identifier.value;
     }
   }
   // Return null on failures
   return null;
+}
+
+export function parseClinicalTrialXML(fileContents: string): Promise<ClinicalStudy> {
+  const parser = new xml2js.Parser();
+  return parser.parseStringPromise(fileContents).then((result) => {
+    return (result as TrialBackup).clinical_study;
+  });
+}
+
+function convertArrayToCodeableConcept(trialConditions: string[]): CodeableConcept[] {
+  const fhirConditions: CodeableConcept[] = [];
+  for (const condition of trialConditions) {
+    fhirConditions.push({ text: condition });
+  }
+  return fhirConditions;
 }
 
 /**
@@ -130,8 +87,7 @@ export class ClinicalTrialGovService {
    * use init() for that.
    * @param dataDir the data directory to use
    */
-  constructor(public dataDir: string) {
-  }
+  constructor(public dataDir: string) {}
 
   /**
    * Creates the data directory is necessary.
@@ -164,7 +120,7 @@ export class ClinicalTrialGovService {
             resolve();
           });
         }
-      })
+      });
     });
   }
 
@@ -209,67 +165,149 @@ export class ClinicalTrialGovService {
     // FIXME: Save to a temp file (this will break if called while still resolving another download)
     const file = fs.createWriteStream(`${this.dataDir}/backup.zip`);
     const filePath = path.resolve(String(file.path));
-    const dirPath = filePath.slice(0,-11);
+    const dirPath = filePath.slice(0, -11);
     console.log(dirPath);
     return new Promise((resolve, reject) => {
       results.on('error', (err: Error) => {
         reject(err);
       });
-      results.pipe(file).on('close', function() {
-        extract(filePath, { dir: `${dirPath}/backups` }).then(resolve).catch(reject);
+      results.pipe(file).on('close', function () {
+        extract(filePath, { dir: `${dirPath}/backups` })
+          .then(resolve)
+          .catch(reject);
       });
     });
   }
 
-  getDownloadedTrial(nctId: string): TrialBackup {
+  getDownloadedTrial(nctId: string): Promise<ClinicalStudy> {
     const filePath = `${this.dataDir}/backups/${nctId}.xml`;
-    // TODO: Catch the file not existing.
-    const data = fs.readFileSync(filePath, { encoding: 'utf8' });
-    const json = JSON.parse(parser.toJson(data)) as TrialBackup;
-    return json;
+    // TODO: Catch the file not existing. This should probably be handled
+    // specially, such as by returns null or something else to differentiate
+    // it from other errors, since an file not existing may mean it simply
+    // needs to be loaded later
+    return new Promise((resolve, reject) => {
+      fs.readFile(filePath, { encoding: 'utf8' }, (error, data): void => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(parseClinicalTrialXML(data));
+      });
+    });
   }
 
-  updateTrial(result: ResearchStudy): ResearchStudy {
-    const nctId = findNCTNumber(result);
-    if (nctId !== null) {
-      const backup = this.getDownloadedTrial(nctId);
-      const study = backup.clinical_study;
-      if (!result.enrollment) {
-        result.enrollment = [
-          { reference: `#group${result.id}`, type: 'Group', display: study.eligibility.criteria.textblock }
-        ];
-      }
-      if (!result.description) {
-        result.description = study.brief_summary.textblock;
-      }
-      if (!result.phase) {
-        result.phase = {
-          coding: [
-            {
-              system: 'http://terminology.hl7.org/CodeSystem/research-study-phase',
-              code: study.phase,
-              display: study.phase
-            }
-          ],
-          text: study.phase
-        };
-      }
-      if (!result.category) {
-        result.category = [{ text: study.study_type }];
-      }
-      //console.log(result);
-      return result;
-    } else {
-      return result;
+  updateResearchStudy(researchStudy: ResearchStudy): Promise<ResearchStudy> {
+    const nctId = findNCTNumber(researchStudy);
+    if (nctId === null) {
+      // If there is no ID, there is nothing we can do
+      return Promise.resolve(researchStudy);
     }
+    return this.getDownloadedTrial(nctId).then((clinicalStudy) => {
+      return updateResearchStudyWithClinicalStudy(researchStudy, clinicalStudy);
+    });
   }
 }
 
 export function createClinicalTrialGovService(dataDir: string): Promise<ClinicalTrialGovService> {
   return new Promise<ClinicalTrialGovService>((resolve, reject) => {
     const result = new ClinicalTrialGovService(dataDir);
-    result.init().then(() => {
-      resolve(result);
-    }).catch(reject);
+    result
+      .init()
+      .then(() => {
+        resolve(result);
+      })
+      .catch(reject);
   });
+}
+
+/**
+ * Updates a research study with data from a clinical study off the ClinicalTrials.gov website. This will only update
+ * fields that do not have data, it will not overwrite any existing data.
+ *
+ * @param result the research study to update
+ * @param study the clinical study to use to update (this takes a partial as the ClinicalStudy type describes the XML
+ * as the schema defines it, so this is designed to handle invalid XML that's missing information that should be
+ * required)
+ */
+export function updateResearchStudyWithClinicalStudy(result: ResearchStudy, study: Partial<ClinicalStudy>): ResearchStudy {
+  if (!result.enrollment) {
+    const eligibility = study.eligibility;
+    if (eligibility) {
+      const criteria = eligibility[0].criteria;
+      if (criteria) {
+        const group: Group = { resourceType: 'Group', id: 'group' + result.id, type: 'person', actual: false };
+        const reference = addContainedResource(result, group);
+        reference.display = criteria[0].textblock[0];
+        result.enrollment = [ reference ];
+      }
+    }
+  }
+  if (!result.description) {
+    const briefSummary = study.brief_summary;
+    if (briefSummary) {
+      result.description = briefSummary[0].textblock[0];
+    }
+  }
+  if (!result.phase) {
+    const phase = study.phase;
+    if (phase) {
+      result.phase = {
+        coding: [
+          {
+            system: 'http://terminology.hl7.org/CodeSystem/research-study-phase',
+            code: phase[0],
+            display: phase[0]
+          }
+        ],
+        text: phase[0]
+      };
+    }
+  }
+  if (!result.category) {
+    const studyType = study.study_type;
+    if (studyType) {
+      result.category = [{ text: studyType[0] }];
+    }
+  }
+  if (!result.status) {
+    const overallStatus = study.overall_status;
+    if (overallStatus) {
+      result.status = overallStatus[0];
+    }
+  }
+
+  if (!result.condition) {
+    if (study.condition) {
+      result.condition = convertArrayToCodeableConcept(study.condition);
+    }
+  }
+  if (!result.site) {
+    if (study.location) {
+      let index = 0;
+      for (const location of study.location) {
+        const fhirLocation: Location = { resourceType: 'Location', id: 'location-' + index++ };
+        if (location.facility && location.facility[0].name) fhirLocation.name = location.facility[0].name[0];
+        if (location.contact) {
+          const contact = location.contact[0];
+          if (contact.email) {
+            addToContainer<Location, ContactPoint, 'telecom'>(fhirLocation, 'telecom', {
+              system: 'email',
+              value: contact.email[0],
+              use: 'work'
+            });
+          }
+          if (contact.phone) {
+            addToContainer<Location, ContactPoint, 'telecom'>(fhirLocation, 'telecom', {
+              system: 'phone',
+              value: contact.phone[0],
+              use: 'work'
+            });
+          }
+        }
+        addToContainer<ResearchStudy, Reference, 'site'>(result, 'site', addContainedResource(result, fhirLocation));
+      }
+    }
+  }
+  //console.log(result);
+  return result;
 }
