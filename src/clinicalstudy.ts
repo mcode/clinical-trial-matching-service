@@ -10,7 +10,7 @@
  * For documentation purposes, indicates an element that will only ever appear once in a valid document. It's
  * implmented as a TypeScript tuple with a single element, which matches how xml2js will ultimately parse the XML.
  */
-type One<T> = [ T ];
+type One<T> = [T];
 
 /**
  * For documentation purposes, indicates an element that can appear any number of times. (Conceptually, an empty array
@@ -501,4 +501,11 @@ export interface ClinicalStudy {
   // provided_document_section: provided_document_section_struct; //  minOccurs="0"
   // pending_results: pending_results_struct; //  minOccurs="0"
   // clinical_results: clinical_results_struct; //  minOccurs="0"
+}
+
+export function isClinicalStudy(o: unknown): o is ClinicalStudy {
+  if (typeof o !== 'object' || o === null) return false;
+  // This doesn't check to see if the fields are right, just that they're there
+  const required = ['required_header', 'id_info', 'brief_title', 'sponsors', 'source', 'overall_status', 'study_type'];
+  return required.every((field) => field in o);
 }

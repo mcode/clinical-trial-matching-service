@@ -11,7 +11,8 @@ import {
   Location,
   Objective,
   Reference,
-  ResearchStudy as IResearchStudy
+  ResearchStudy as IResearchStudy,
+  ResearchStudyStatus
 } from './fhir-types';
 
 /**
@@ -101,7 +102,7 @@ export class ResearchStudy implements IResearchStudy {
   id?: string;
   identifier?: Identifier[];
   title?: string;
-  status?: string;
+  status?: ResearchStudyStatus;
   phase?: CodeableConcept;
   category?: CodeableConcept[];
   condition?: CodeableConcept[];

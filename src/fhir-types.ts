@@ -23,7 +23,7 @@ export interface BundleEntry {
 /**
  * The search entry mode valueset (from https://www.hl7.org/fhir/valueset-search-entry-mode.html).
  */
-export type SearchEntryMode = 'match' | 'include' |	'outcome';
+export type SearchEntryMode = 'match' | 'include' | 'outcome';
 
 export interface SearchResult {
   mode?: SearchEntryMode;
@@ -192,11 +192,27 @@ export interface HumanName {
 
 export type ContainedResource = Group | Location | Organization | Practitioner;
 
+/**
+ * Codes from https://www.hl7.org/fhir/codesystem-research-study-status.html
+ */
+export type ResearchStudyStatus =
+  | 'active'
+  | 'administratively-completed'
+  | 'approved'
+  | 'closed-to-accrual'
+  | 'closed-to-accrual-and-intervention'
+  | 'completed'
+  | 'disapproved'
+  | 'in-review'
+  | 'temporarily-closed-to-accrual'
+  | 'temporarily-closed-to-accrual-and-intervention'
+  | 'withdrawn';
+
 export interface ResearchStudy extends BaseResource {
   resourceType: 'ResearchStudy';
   identifier?: Identifier[];
   title?: string;
-  status?: string;
+  status?: ResearchStudyStatus;
   phase?: CodeableConcept;
   category?: CodeableConcept[];
   condition?: CodeableConcept[];

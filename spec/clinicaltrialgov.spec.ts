@@ -304,7 +304,7 @@ describe('ClinicalTrialGovService', () => {
       const actual = ctg.updateResearchStudyWithClinicalStudy({ resourceType: 'ResearchStudy' }, {
         overall_status: [ 'Available' ]
       });
-      expect(actual.status).toEqual('Available');
+      expect(actual.status).toEqual('active');
     });
 
     it('fills out conditions', () => {
