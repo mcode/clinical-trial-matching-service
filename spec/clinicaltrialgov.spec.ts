@@ -14,6 +14,18 @@ function specFilePath(specFilePath: string): string {
   return path.join(__dirname, '../../spec/data', specFilePath);
 }
 
+describe('.isTrialBackup', () => {
+  it('rejects null', () => {
+    expect(ctg.isTrialBackup(null)).toBeFalse();
+  });
+  it('rejects non-objects', () => {
+    expect(ctg.isTrialBackup('string')).toBeFalse();
+    expect(ctg.isTrialBackup(1)).toBeFalse();
+    expect(ctg.isTrialBackup(undefined)).toBeFalse();
+    expect(ctg.isTrialBackup(true)).toBeFalse();
+  });
+});
+
 describe('.isValidNCTNumber', () => {
   it('accepts valid numbers', () => {
     expect(ctg.isValidNCTNumber('NCT12345678')).toBeTrue();
@@ -87,6 +99,14 @@ describe('.findNCTNumber', () => {
       })
     ).toBeNull();
     expect(ctg.findNCTNumber({ resourceType: 'ResearchStudy' })).toBeNull();
+  });
+});
+
+describe('parseClinicalTrialXML', () => {
+  it("rejects if given valid XML that's not a clinical study", () => {
+    return expectAsync(ctg.parseClinicalTrialXML('<?xml version="1.0"?><root><child/></root>')).toBeRejectedWithError(
+      'Unable to parse trial as valid clinical study XML'
+    );
   });
 });
 
@@ -189,19 +209,25 @@ describe('ClinicalTrialGovService', () => {
     });
 
     it('handles failures from https.get', () => {
-      const spy = spyOn(downloader, 'getURL').and.callFake(() => { throw new Error('Test error') });
-      return expectAsync(downloader.downloadTrials(nctIds).finally(() => {
-        expect(spy).toHaveBeenCalled();
-      })).toBeRejectedWithError('Test error');
+      const spy = spyOn(downloader, 'getURL').and.callFake(() => {
+        throw new Error('Test error');
+      });
+      return expectAsync(
+        downloader.downloadTrials(nctIds).finally(() => {
+          expect(spy).toHaveBeenCalled();
+        })
+      ).toBeRejectedWithError('Test error');
     });
 
     it('handles failure responses from the server', () => {
       const scope = nock('https://clinicaltrials.gov')
         .get('/ct2/download_studies?term=' + nctIds.join('+OR+'))
         .reply(404, 'Unknown');
-      return expectAsync(downloader.downloadTrials(nctIds).finally(() => {
-        expect(scope.isDone()).toBeTrue();
-      })).toBeRejected();
+      return expectAsync(
+        downloader.downloadTrials(nctIds).finally(() => {
+          expect(scope.isDone()).toBeTrue();
+        })
+      ).toBeRejected();
     });
 
     it('extracts a ZIP', () => {
@@ -210,9 +236,11 @@ describe('ClinicalTrialGovService', () => {
         .replyWithFile(200, specFilePath('search_result.zip'), {
           'Content-type': 'application/zip'
         });
-      return expectAsync(downloader.downloadTrials(nctIds).finally(() => {
-        expect(scope.isDone()).toBeTrue();
-      })).toBeResolved();
+      return expectAsync(
+        downloader.downloadTrials(nctIds).finally(() => {
+          expect(scope.isDone()).toBeTrue();
+        })
+      ).toBeResolved();
     });
   });
 
@@ -226,7 +254,9 @@ describe('ClinicalTrialGovService', () => {
 
     it('handles the extract failing', () => {
       // For now, just give it a file that does not exist
-      return expectAsync(downloader.extractResults(fs.createReadStream(specFilePath('does_not_exists.file')))).toBeRejected();
+      return expectAsync(
+        downloader.extractResults(fs.createReadStream(specFilePath('does_not_exists.file')))
+      ).toBeRejected();
     });
 
     it('handles an invalid ZIP', () => {
@@ -301,18 +331,22 @@ describe('ClinicalTrialGovService', () => {
     });
 
     it('fills out the status', () => {
-      const actual = ctg.updateResearchStudyWithClinicalStudy({ resourceType: 'ResearchStudy' }, {
-        overall_status: [ 'Available' ]
-      });
-      expect(actual.status).toEqual('active');
+      const actual = ctg.updateResearchStudyWithClinicalStudy(
+        { resourceType: 'ResearchStudy' },
+        {
+          overall_status: ['Available']
+        }
+      );
+      expect(actual.status).toEqual('completed');
     });
 
     it('fills out conditions', () => {
-      const actual = ctg.updateResearchStudyWithClinicalStudy({ resourceType: 'ResearchStudy' }, {
-        condition: [
-          'Condition 1', 'Condition 2'
-        ]
-      });
+      const actual = ctg.updateResearchStudyWithClinicalStudy(
+        { resourceType: 'ResearchStudy' },
+        {
+          condition: ['Condition 1', 'Condition 2']
+        }
+      );
       expect(actual.condition).toBeDefined();
       if (actual.condition) {
         expect(actual.condition.length).toEqual(2);
@@ -325,12 +359,16 @@ describe('ClinicalTrialGovService', () => {
       const researchStudy = new ResearchStudyObj('id');
       const location = researchStudy.addSite('Example');
       const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
-        location: [ {
-          // Everything here is technically optional
-          facility: [ {
-            name: [ 'Facility ']
-          } ]
-        }]
+        location: [
+          {
+            // Everything here is technically optional
+            facility: [
+              {
+                name: ['Facility ']
+              }
+            ]
+          }
+        ]
       });
       expect(result.site).toBeDefined();
       const sites = result.site;
@@ -358,8 +396,7 @@ describe('ClinicalTrialGovService', () => {
       // Look through the telecoms
       // If the expected value is null, telecom must be defined, otherwise it
       // may be empty
-      if (expectedValue !== null)
-        expect(location.telecom).toBeDefined();
+      if (expectedValue !== null) expect(location.telecom).toBeDefined();
       if (location.telecom) {
         // If we're expecting a telecom we're expecting it to appear exactly once
         let found = 0;
@@ -384,7 +421,12 @@ describe('ClinicalTrialGovService', () => {
       }
     }
 
-    function expectLocation(resource: ContainedResource, expectedName?: string, expectedPhone?: string, expectedEmail?: string) {
+    function expectLocation(
+      resource: ContainedResource,
+      expectedName?: string,
+      expectedPhone?: string,
+      expectedEmail?: string
+    ) {
       if (resource.resourceType === 'Location') {
         const location = resource as Location;
         if (expectedName) {
@@ -400,31 +442,36 @@ describe('ClinicalTrialGovService', () => {
     }
 
     it('fills out sites as expected', () => {
-      const result = ctg.updateResearchStudyWithClinicalStudy({ 'resourceType': 'ResearchStudy' }, {
-        'location': [
-          // Everything in location is optional, so this is valid:
-          { },
-          {
-            // Everything in facility is valid, so this is also valid
-            facility: [ { } ]
-          },
-          {
-            facility: [ { name: [ 'Only Email' ] } ],
-            contact: [ { email: [ 'email@example.com' ] } ]
-          },
-          {
-            facility: [ { name: [ 'Only Phone' ] } ],
-            contact: [ { phone: [ '781-555-0100' ] } ]
-          },
-          {
-            facility: [ { name: [ 'Phone and Email' ] } ],
-            contact: [ {
-              email: [ 'hasemail@example.com' ],
-              phone: [ '781-555-0101' ]
-            } ]
-          }
-        ]
-      });
+      const result = ctg.updateResearchStudyWithClinicalStudy(
+        { resourceType: 'ResearchStudy' },
+        {
+          location: [
+            // Everything in location is optional, so this is valid:
+            {},
+            {
+              // Everything in facility is valid, so this is also valid
+              facility: [{}]
+            },
+            {
+              facility: [{ name: ['Only Email'] }],
+              contact: [{ email: ['email@example.com'] }]
+            },
+            {
+              facility: [{ name: ['Only Phone'] }],
+              contact: [{ phone: ['781-555-0100'] }]
+            },
+            {
+              facility: [{ name: ['Phone and Email'] }],
+              contact: [
+                {
+                  email: ['hasemail@example.com'],
+                  phone: ['781-555-0101']
+                }
+              ]
+            }
+          ]
+        }
+      );
       // Sites should be filled out
       expect(result.site).toBeDefined();
       if (result.site) {
@@ -440,7 +487,7 @@ describe('ClinicalTrialGovService', () => {
         expectLocation(result.contained[3], 'Only Phone', '781-555-0100');
         expectLocation(result.contained[4], 'Phone and Email', '781-555-0101', 'hasemail@example.com');
       }
-    })
+    });
 
     function expectEmptyResearchStudy(researchStudy: ResearchStudy): void {
       // Technically this is just checking fields updateResearchStudyWithClinicalStudy may change
@@ -457,16 +504,18 @@ describe('ClinicalTrialGovService', () => {
     it("handles XML with missing data (doesn't crash)", () => {
       let researchStudy: ResearchStudy;
       // This is technically invalid, the XML is entirely missing
-      researchStudy = ctg.updateResearchStudyWithClinicalStudy(new ResearchStudyObj('id'), { });
+      researchStudy = ctg.updateResearchStudyWithClinicalStudy(new ResearchStudyObj('id'), {});
       // Expect nothing to have changed
       expectEmptyResearchStudy(researchStudy);
       // Some partial XML
       researchStudy = ctg.updateResearchStudyWithClinicalStudy(new ResearchStudyObj('id'), {
-        eligibility: [ {
-          gender: [ 'All' ],
-          minimum_age: [ '18 Years' ],
-          maximum_age: [ 'N/A' ]
-        } ]
+        eligibility: [
+          {
+            gender: ['All'],
+            minimum_age: ['18 Years'],
+            maximum_age: ['N/A']
+          }
+        ]
       });
       expectEmptyResearchStudy(researchStudy);
     });

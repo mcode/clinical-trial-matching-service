@@ -30,7 +30,7 @@ interface TrialBackup {
   clinical_study: ClinicalStudy;
 }
 
-function isTrialBackup(o: unknown): o is TrialBackup {
+export function isTrialBackup(o: unknown): o is TrialBackup {
   if (typeof o !== 'object' || o === null) {
     return false;
   }
