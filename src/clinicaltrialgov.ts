@@ -101,12 +101,10 @@ const CLINICAL_STATUS_MAP = new Map<StatusEnum, ResearchStudyStatus>([
   ['Suspended', 'temporarily-closed-to-accrual'],
   ['Terminated', 'administratively-completed'],
   ['Withdrawn', 'withdrawn'],
-  // FIXME: Guessing on this mapping
-  ['Available', 'active'],
+  ['Available', 'completed'],
   ['No longer available', 'closed-to-accrual'],
   ['Temporarily not available', 'temporarily-closed-to-accrual'],
-  // FIXME: what?
-  ['Approved for marketing', 'active'],
+  ['Approved for marketing', 'completed'],
   // FIXME: This does not appear to have a proper mapping
   ['Withheld', 'in-review'],
   // FIXME: This does not appear to have a proper mapping
