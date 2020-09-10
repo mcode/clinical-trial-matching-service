@@ -8,7 +8,7 @@ import nock from 'nock';
 // Trial missing summary, inclusion/exclusion criteria, phase and study type
 import trialMissing from './data/resource.json';
 import trialFilled from './data/complete_study.json';
-import { ClinicalStudy } from '../src/clinicalstudy';
+import { ClinicalStudy, StatusEnum } from '../src/clinicalstudy';
 
 function specFilePath(specFilePath: string): string {
   return path.join(__dirname, '../../spec/data', specFilePath);
@@ -339,6 +339,18 @@ describe('ClinicalTrialGovService', () => {
       );
       expect(actual.status).toEqual('completed');
     });
+
+    it('leaves status alone if unavailable', () => {
+      const actual = ctg.updateResearchStudyWithClinicalStudy(
+        { resourceType: 'ResearchStudy' },
+        {
+          // Lie about types
+          overall_status: ['something invalid' as unknown as StatusEnum]
+        }
+      );
+      // It shouldn't have changed it, because it can't
+      expect(actual.status).toBeUndefined();
+    })
 
     it('fills out conditions', () => {
       const actual = ctg.updateResearchStudyWithClinicalStudy(
