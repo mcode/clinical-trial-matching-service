@@ -1,7 +1,7 @@
 import express from 'express';
 import bodyParser from 'body-parser';
 import { Bundle, SearchSet, isBundle } from './fhir-types';
-import RequestError from './request-error';
+import { isHttpError, restrictToHttpErrors } from './errors';
 import * as http from 'http';
 
 export type ClinicalTrialMatcher = (patientBundle: Bundle) => Promise<SearchSet>;
@@ -117,9 +117,11 @@ export class ClinicalTrialMatchingService {
         // Error handler for exceptions raised (as it should be handled on the
         // resulting Promise and if invoking the matcher itself fails)
         const handleError = (error: unknown): void => {
-          if (error instanceof RequestError) {
-            response.status(error.httpStatus).send({ error: error.message });
+          if (isHttpError(error)) {
+            response.status(restrictToHttpErrors(error.httpStatus)).send({ error: error.message });
           } else {
+            console.error('An unexpected internal server error occurred:');
+            console.error(error);
             response.status(500).send({ error: 'Internal server error', exception: Object.prototype.toString.call(error) as string });
           }
         };

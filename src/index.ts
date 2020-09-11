@@ -10,7 +10,7 @@ export * from './clinicaltrialgov';
 
 // The export { v } from "mod" forms do not appear to work yet
 import { ClinicalStudy } from './clinicalstudy';
-import RequestError from './request-error';
+import BasicHttpError, { HttpError, ServerError, ClientError } from './errors';
 import ClinicalTrialMatchingService, { ClinicalTrialMatcher, Configuration } from './server';
 
 // Export the utility for configuring from the environment
@@ -22,5 +22,8 @@ export {
   ClinicalTrialMatcher,
   ClinicalTrialMatchingService,
   Configuration as ServiceConfiguration,
-  RequestError
+  BasicHttpError,
+  HttpError,
+  ClientError,
+  ServerError
 };

@@ -3,7 +3,7 @@ import request from 'supertest';
 import ClinicalTrialMatchingService from '../src/server';
 import SearchSet from '../src/searchset';
 import http from 'http';
-import RequestError from '../src/request-error';
+import HttpError from '../src/errors';
 
 describe('server', () => {
   let service: ClinicalTrialMatchingService;
@@ -79,8 +79,8 @@ describe('server', () => {
       return getClinicalTrial().expect(500);
     });
 
-    it('handles a matcher raising a RequestError', () => {
-      spyOn(service, 'matcher').and.throwError(new RequestError('Forbidden for some reason', 403));
+    it('handles a matcher raising a HttpError', () => {
+      spyOn(service, 'matcher').and.throwError(new HttpError('Forbidden for some reason', 403));
       return getClinicalTrial().expect(403).then((result) => {
         expect(result.text).toEqual('{"error":"Forbidden for some reason"}');
       });
@@ -93,8 +93,8 @@ describe('server', () => {
       return getClinicalTrial().expect(500);
     });
 
-    it('handles a request returning a rejected Promise that resolves to a RequestError', () => {
-      spyOn(service, 'matcher').and.callFake(() => Promise.reject(new RequestError('Not Found', 404)));
+    it('handles a request returning a rejected Promise that resolves to a HttpError', () => {
+      spyOn(service, 'matcher').and.callFake(() => Promise.reject(new HttpError('Not Found', 404)));
       return getClinicalTrial().expect(404).then((result) => {
         expect(result.text).toEqual('{"error":"Not Found"}');
       });
