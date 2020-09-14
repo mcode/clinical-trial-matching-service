@@ -66,7 +66,7 @@ export class SearchSet implements SearchSetBundle {
     // Grab the score out of the entry if one was given
     if (entry.search.score) score = entry.search.score;
     // This somewhat bizarre logic is to catch NaN
-    if (!(score > 0 && score < 1)) {
+    if (!(score >= 0 && score =< 1)) {
       if (score < 0) {
         score = 0;
       } else {
