@@ -1,5 +1,5 @@
 import ResearchStudy, {
-  convertStringArrayToCodeableConcept,
+  convertStringsToCodeableConcept,
   createReferenceTo,
   getContainedResource
 } from '../src/research-study';
@@ -10,10 +10,25 @@ import { BaseResource,
   Location
 } from '../src/fhir-types';
 
-describe('convertStringArrayToCodeableConcept', () => {
-  it('converts to codeable concepts', () => {
-    expect(convertStringArrayToCodeableConcept('["a","b","c"]')).toEqual([
+describe('convertStringsToCodeableConcept', () => {
+  it('converts JSON to codeable concepts', () => {
+    expect(convertStringsToCodeableConcept('["a","b","c"]')).toEqual([
       { text: 'a' }, { text: 'b' }, { text: 'c' }
+    ]);
+  });
+  it('converts CSV to codeable concepts', () => {
+    expect(convertStringsToCodeableConcept('a, b ,c')).toEqual([
+      { text: 'a' }, { text: 'b' }, { text: 'c' }
+    ]);
+  });
+  it('converts a single string a codeable concept', () => {
+    expect(convertStringsToCodeableConcept('test')).toEqual([
+      { text: 'test' }
+    ]);
+  });
+  it('converts an array to codeable concepts', () => {
+    expect(convertStringsToCodeableConcept(['foo', 'bar', 'baz'])).toEqual([
+      { text: 'foo' }, { text: 'bar' }, { text: 'baz' }
     ]);
   });
 });

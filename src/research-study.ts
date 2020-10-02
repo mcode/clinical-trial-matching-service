@@ -17,11 +17,22 @@ import {
 
 /**
  * Utility function to convert a list of strings into a list of CodeableConcepts.
+ * If given a string that "looks like" it's a JSON array (starts and ends with '[' ']') this will attempt to parse the
+ * list as JSON. (If the JSON is invalid, the exception from JSON.parse will be propegated.) Otherwise, if the
+ * conditions is a string, it will be split on commas.
  *
  * @param conditions a list of strings to convert to CodeableConcepts
  */
-export function convertStringArrayToCodeableConcept(conditions: string): CodeableConcept[] {
-  const jsonConditions: string[] = JSON.parse(conditions) as string[];
+export function convertStringsToCodeableConcept(conditions: string | string[]): CodeableConcept[] {
+  if (typeof conditions === 'string') {
+    if (conditions.startsWith('[') && conditions.endsWith(']')) {
+      conditions = JSON.parse(conditions);
+    }
+  }
+  if (!Array.isArray(conditions)) {
+    conditions = conditions.split(/\s*,\s*/);
+  }
+  const jsonConditions: string[] = conditions;
   const fhirConditions: CodeableConcept[] = [];
   for (const condition of jsonConditions) {
     fhirConditions.push({ text: condition });
