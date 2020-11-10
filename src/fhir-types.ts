@@ -167,9 +167,26 @@ export interface Group extends BaseResource {
   actual?: boolean;
 }
 
+export type AddressUse = 'home' | 'work' | 'temp' | 'old' | 'billing';
+export type AddressType = 'postal' | 'physical' | 'both';
+
+export interface Address {
+  use?: AddressUse;
+  type?: AddressType;
+  text?: string;
+  line?: string[];
+  city?: string;
+  district?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+  period?: string;
+}
+
 export interface Location extends BaseResource {
   resourceType: 'Location';
   name?: string;
+  address?: Address;
   telecom?: ContactPoint[];
   position?: { longitude?: number; latitude?: number };
 }
