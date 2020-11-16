@@ -32,16 +32,27 @@ describe('SearchSet', () => {
       expect(searchSet.entry.length).toEqual(1);
       expect(searchSet.entry[0].search).toBeDefined();
       // And prove it to TypeScript
-      if (searchSet.entry[0].search)
+      if (searchSet.entry[0].search) {
         expect(searchSet.entry[0].search.score).not.toBeDefined();
+        expect(searchSet.entry[0].search.mode).toEqual('match');
+      }
+      // Also try with a specific mode
+      searchSet.addEntry(researchStudy, 'include');
+      expect(searchSet.entry.length).toEqual(2);
+      expect(searchSet.entry[1].search).toBeDefined();
+      // And prove it to TypeScript
+      if (searchSet.entry[1].search) {
+        expect(searchSet.entry[1].search.score).not.toBeDefined();
+        expect(searchSet.entry[1].search.mode).toEqual('include');
+      }
     });
-    it('converts NaN to 1.0', () => {
+    it('does not set a score if the score is NaN', () => {
       searchSet.addEntry(researchStudy, Number.NaN);
       expect(searchSet.entry.length).toEqual(1);
       expect(searchSet.entry[0].search).toBeDefined();
       // And prove it to TypeScript
       if (searchSet.entry[0].search)
-        expect(searchSet.entry[0].search.score).toEqual(1);
+        expect(searchSet.entry[0].search.score).not.toBeDefined();
     });
     it('converts negative scores to 0', () => {
       searchSet.addEntry(researchStudy, -8);
