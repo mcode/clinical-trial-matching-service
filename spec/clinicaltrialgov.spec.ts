@@ -1,5 +1,5 @@
 import { getContainedResource, ResearchStudy as ResearchStudyObj } from './../src/research-study';
-import { Location, ResearchStudy, ContainedResource } from '../src/fhir-types';
+import { Address, Location, ResearchStudy, ContainedResource } from '../src/fhir-types';
 import * as ctg from '../src/clinicaltrialgov';
 import fs from 'fs';
 import * as os from 'os';
@@ -345,12 +345,12 @@ describe('ClinicalTrialGovService', () => {
         { resourceType: 'ResearchStudy' },
         {
           // Lie about types
-          overall_status: ['something invalid' as unknown as StatusEnum]
+          overall_status: [('something invalid' as unknown) as StatusEnum]
         }
       );
       // It shouldn't have changed it, because it can't
       expect(actual.status).toBeUndefined();
-    })
+    });
 
     it('fills out conditions', () => {
       const actual = ctg.updateResearchStudyWithClinicalStudy(
@@ -437,7 +437,8 @@ describe('ClinicalTrialGovService', () => {
       resource: ContainedResource,
       expectedName?: string,
       expectedPhone?: string,
-      expectedEmail?: string
+      expectedEmail?: string,
+      expectedAddress?: Address
     ) {
       if (resource.resourceType === 'Location') {
         const location = resource as Location;
@@ -448,6 +449,12 @@ describe('ClinicalTrialGovService', () => {
         }
         expectTelecom(location, 'phone', expectedPhone || null);
         expectTelecom(location, 'email', expectedEmail || null);
+        if (expectedAddress) {
+          expect(location.address).toBeDefined();
+          expect(location.address).toEqual(expectedAddress);
+        } else {
+          expect(location.address).not.toBeDefined();
+        }
       } else {
         fail(`Expected Location, got ${resource.resourceType}`);
       }
@@ -480,6 +487,9 @@ describe('ClinicalTrialGovService', () => {
                   phone: ['781-555-0101']
                 }
               ]
+            },
+            {
+              facility: [{ name: ['Only Address'], address: [{ city: ['Bedford'], state: ['MA'], country: ['US'], zip: ['01730'] }] }]
             }
           ]
         }
@@ -487,7 +497,7 @@ describe('ClinicalTrialGovService', () => {
       // Sites should be filled out
       expect(result.site).toBeDefined();
       if (result.site) {
-        expect(result.site.length).toEqual(5);
+        expect(result.site.length).toEqual(6);
       }
       // Make sure each individual site was created properly - they will be contained resources and should be in order
       expect(result.contained).toBeDefined();
@@ -498,6 +508,13 @@ describe('ClinicalTrialGovService', () => {
         expectLocation(result.contained[2], 'Only Email', undefined, 'email@example.com');
         expectLocation(result.contained[3], 'Only Phone', '781-555-0100');
         expectLocation(result.contained[4], 'Phone and Email', '781-555-0101', 'hasemail@example.com');
+        expectLocation(result.contained[5], 'Only Address', undefined, undefined, {
+          use: 'work',
+          city: 'Bedford',
+          state: 'MA',
+          postalCode: '01730',
+          country: 'US'
+        });
       }
     });
 

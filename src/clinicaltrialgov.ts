@@ -336,7 +336,21 @@ export function updateResearchStudyWithClinicalStudy(
       let index = 0;
       for (const location of study.location) {
         const fhirLocation: Location = { resourceType: 'Location', id: 'location-' + index++ };
-        if (location.facility && location.facility[0].name) fhirLocation.name = location.facility[0].name[0];
+        if (location.facility) {
+          if (location.facility[0].name)
+            fhirLocation.name = location.facility[0].name[0];
+          if (location.facility[0].address) {
+            // Also add the address information
+            const address = location.facility[0].address[0];
+            fhirLocation.address = { use: 'work', city: address.city[0], country: address.country[0] };
+            if (address.state) {
+              fhirLocation.address.state = address.state[0];
+            }
+            if (address.zip) {
+              fhirLocation.address.postalCode = address.zip[0];
+            }
+          }
+        }
         if (location.contact) {
           const contact = location.contact[0];
           if (contact.email) {
