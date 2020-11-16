@@ -18,7 +18,7 @@ describe('SearchSet', () => {
     expect(searchSet.entry[0].resource).toEqual(study);
     expect(searchSet.entry[0].search).toBeDefined();
     if (searchSet.entry[0].search) {
-      expect(searchSet.entry[0].search.score).toEqual(1);
+      expect(searchSet.entry[0].search.score).not.toBeDefined();
       expect(searchSet.entry[0].search.mode).toEqual('match');
     }
   });
@@ -27,6 +27,14 @@ describe('SearchSet', () => {
     const researchStudy = new ResearchStudy(1);
     let searchSet: SearchSet;
     beforeEach(() => { searchSet = new SearchSet(); });
+    it('does not add a score if none is given', () => {
+      searchSet.addEntry(researchStudy);
+      expect(searchSet.entry.length).toEqual(1);
+      expect(searchSet.entry[0].search).toBeDefined();
+      // And prove it to TypeScript
+      if (searchSet.entry[0].search)
+        expect(searchSet.entry[0].search.score).not.toBeDefined();
+    });
     it('converts NaN to 1.0', () => {
       searchSet.addEntry(researchStudy, Number.NaN);
       expect(searchSet.entry.length).toEqual(1);

@@ -59,22 +59,24 @@ export class SearchSet implements SearchSetBundle {
   addEntry(study: ResearchStudy, score?: number, mode?: SearchEntryMode): void;
   // This overload is sort of implied, but TypeScript needs us to give it outright
   addEntry(studyOrEntry: SearchBundleEntry | ResearchStudy): void;
-  addEntry(studyOrEntry: SearchBundleEntry | ResearchStudy, score = 1, mode: SearchEntryMode = 'match'): void {
+  addEntry(studyOrEntry: SearchBundleEntry | ResearchStudy, score: number | null = null, mode: SearchEntryMode = 'match'): void {
     const entry: SearchBundleEntry = isResearchStudy(studyOrEntry)
       ? { resource: studyOrEntry, search: { mode: mode } }
       : studyOrEntry;
     // Grab the score out of the entry if one was given
     if (entry.search.score) score = entry.search.score;
-    // This somewhat bizarre logic is to catch NaN
-    if (!(score >= 0 && score <= 1)) {
-      if (score < 0) {
-        score = 0;
-      } else {
-        score = 1;
+    if (score !== null) {
+      // This somewhat bizarre logic is to catch NaN
+      if (!(score >= 0 && score <= 1)) {
+        if (score < 0) {
+          score = 0;
+        } else {
+          score = 1;
+        }
       }
+      // Now that we've made score valid, use it
+      entry.search.score = score;
     }
-    // Now that we've made score valid, use it
-    entry.search.score = score;
     this.entry.push(entry);
     this.total++;
   }
