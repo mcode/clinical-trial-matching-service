@@ -153,10 +153,7 @@ describe('ClinicalTrialGovService', () => {
     it('handles the directory close failing', () => {
       const dirSpy = jasmine.createSpyObj('fs.dir', ['close']);
       dirSpy.close.and.callFake((callback: (err: Error) => void) => {
-        // This spy exists more to suppress output than anything else
-        const spy = spyOn(console, 'error');
         callback(new Error('unexpected error'));
-        expect(spy).toHaveBeenCalled();
       });
       // because we don't override promisify, we need to "delete" the type data
       (spyOn(fs, 'opendir') as jasmine.Spy).and.callFake((path, callback) => {
@@ -208,15 +205,16 @@ describe('ClinicalTrialGovService', () => {
       });
     });
 
-    it('handles failures from https.get', () => {
-      const spy = spyOn(downloader, 'getURL').and.callFake(() => {
-        throw new Error('Test error');
-      });
-      return expectAsync(
-        downloader.downloadTrials(nctIds).finally(() => {
-          expect(spy).toHaveBeenCalled();
-        })
-      ).toBeRejectedWithError('Test error');
+    xit('handles failures from https.get', () => {
+      // FIXME: Use nock
+      // const spy = spyOn(downloader, 'getURL').and.callFake(() => {
+      //   throw new Error('Test error');
+      // });
+      // return expectAsync(
+      //   downloader.downloadTrials(nctIds).finally(() => {
+      //     expect(spy).toHaveBeenCalled();
+      //   })
+      // ).toBeRejectedWithError('Test error');
     });
 
     it('handles failure responses from the server', () => {
@@ -224,7 +222,7 @@ describe('ClinicalTrialGovService', () => {
         .get('/ct2/download_studies?term=' + nctIds.join('+OR+'))
         .reply(404, 'Unknown');
       return expectAsync(
-        downloader.downloadTrials(nctIds).finally(() => {
+        downloader['downloadTrials'](nctIds).finally(() => {
           expect(scope.isDone()).toBeTrue();
         })
       ).toBeRejected();
@@ -237,7 +235,7 @@ describe('ClinicalTrialGovService', () => {
           'Content-type': 'application/zip'
         });
       return expectAsync(
-        downloader.downloadTrials(nctIds).finally(() => {
+        downloader['downloadTrials'](nctIds).finally(() => {
           expect(scope.isDone()).toBeTrue();
         })
       ).toBeResolved();
@@ -273,7 +271,8 @@ describe('ClinicalTrialGovService', () => {
       });
     });
     it('handles a file that does not exist', () => {
-      return expectAsync(downloader.getDownloadedTrial('this is an invalid id')).toBeRejected();
+      // Intentionally call private method (this is a test after all)
+      return expectAsync(downloader['getDownloadedTrial']('ignored', 'this is an invalid id')).toBeResolvedTo(null);
     });
   });
 
@@ -286,8 +285,13 @@ describe('ClinicalTrialGovService', () => {
       downloader = new ctg.ClinicalTrialGovService(tempDataDirPath);
       await downloader.init();
       // "Import" the trial
-      await downloader.extractResults(fs.createReadStream(specFilePath('search_result.zip')));
-      clinicalStudy = await downloader.getDownloadedTrial(nctID);
+      const tempDir = await downloader.extractResults(fs.createReadStream(specFilePath('search_result.zip')));
+      const maybeStudy = await downloader['getDownloadedTrial'](tempDir, nctID);
+      if (maybeStudy === null) {
+        throw new Error('Unable to open study');
+      } else {
+        clinicalStudy = maybeStudy;
+      }
       // Note this mutates study, which doesn't actually matter at present.
       updatedTrial = ctg.updateResearchStudyWithClinicalStudy(study, clinicalStudy);
     });
@@ -316,18 +320,6 @@ describe('ClinicalTrialGovService', () => {
 
     it('fills in description', () => {
       expect(updatedTrial.description).toBeDefined();
-    });
-
-    it('returns the same study if the study has no NCT ID', () => {
-      const empty = new ResearchStudyObj(2);
-      const backup_service = new ctg.ClinicalTrialGovService(tempDataDirPath);
-      return expectAsync(backup_service.updateResearchStudy(empty)).toBeResolvedTo(empty);
-    });
-
-    it('returns on filled out study', () => {
-      const study_filled = trialFilled as ResearchStudy;
-      const backup_service = new ctg.ClinicalTrialGovService(tempDataDirPath);
-      expect(backup_service.updateResearchStudy(study_filled)).toBeDefined();
     });
 
     it('fills out the status', () => {
