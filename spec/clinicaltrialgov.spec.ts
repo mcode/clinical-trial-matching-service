@@ -9,6 +9,8 @@ import nock from 'nock';
 import trialMissing from './data/resource.json';
 import trialFilled from './data/complete_study.json';
 import { ClinicalStudy, StatusEnum } from '../src/clinicalstudy';
+import { createClinicalStudy } from './support/clinicalstudy-factory';
+import { createResearchStudy } from './support/researchstudy-factory';
 
 function specFilePath(specFilePath: string): string {
   return path.join(__dirname, '../../spec/data', specFilePath);
@@ -158,7 +160,7 @@ describe('findNCTNumbers', () => {
     const map = ctg.findNCTNumbers(studies);
     expect(map.size).toEqual(2);
     expect(map.get('NCT12345678')).toEqual(studies[2]);
-    expect(map.get('NCT00000001')).toEqual([ studies[1], studies[3], studies[4] ]);
+    expect(map.get('NCT00000001')).toEqual([studies[1], studies[3], studies[4]]);
   });
 });
 
@@ -179,6 +181,14 @@ describe('ClinicalTrialGovService', () => {
   }
   const nctIds = [nctID];
   const tempDataDirPath = path.join(os.tmpdir(), 'clinicaltrialgov_test');
+
+  it('can set a custom logger', () => {
+    const customLogger = (): void => {
+      // Do nothing
+    };
+    const instance = new ctg.ClinicalTrialGovService(tempDataDirPath, customLogger);
+    expect(instance['log']).toEqual(customLogger);
+  });
 
   describe('#init', () => {
     let downloader: ctg.ClinicalTrialGovService;
@@ -257,6 +267,59 @@ describe('ClinicalTrialGovService', () => {
     });
   });
 
+  describe('#updateResearchStudies', () => {
+    let service: ctg.ClinicalTrialGovService;
+    let downloadTrialsSpy: jasmine.Spy;
+
+    beforeEach(() => {
+      // The service is never initialized
+      service = new ctg.ClinicalTrialGovService(tempDataDirPath);
+      // TypeScript won't allow us to install spies the "proper" way on private methods
+      service['downloadTrials'] = downloadTrialsSpy = jasmine.createSpy('downloadTrials').and.callFake(() => {
+        return Promise.resolve('ignored');
+      });
+    });
+
+    // These tests basically are only to ensure that all trials are properly visisted when given.
+    it('updates all the given studies', () => {
+      // Our test studies contain the same NCT ID twice to make sure that works as expected, as well as a NCT ID that
+      // download spy will return null for to indicate a failure.
+      const testStudies: ResearchStudy[] = [
+        createResearchStudy('dupe1', 'NCT00000001'),
+        createResearchStudy('missing', 'NCT00000002'),
+        createResearchStudy('dupe2', 'NCT00000001'),
+        createResearchStudy('singleton', 'NCT00000003')
+      ];
+      const testStudy = createClinicalStudy();
+      const updateSpy = spyOn(service, 'updateResearchStudy').and.returnValue();
+      const getTrialSpy = jasmine.createSpy('getDownloadedTrial').and.callFake((_ignored: string, nctId: string) => {
+        return Promise.resolve(nctId === 'NCT00000002' ? null : testStudy);
+      });
+      // Have to force the getDownloadedTrial spy onto the service as the method is private
+      // (This also lets us ignore that the type returned from the spy is technically wrong. It doesn't matter, because
+      // its only ever sent to our own spies.)
+      service['getDownloadedTrial'] = getTrialSpy;
+      return expectAsync(
+        service.updateResearchStudies(testStudies).then(() => {
+          expect(downloadTrialsSpy).toHaveBeenCalledOnceWith(['NCT00000001', 'NCT00000002', 'NCT00000003']);
+          // Update should have been called three times: twice for the NCT00000001 studies, and once for the NCT00000003 study
+          expect(updateSpy).toHaveBeenCalledWith(testStudies[0], testStudy);
+          expect(updateSpy).not.toHaveBeenCalledWith(testStudies[1], testStudy);
+          expect(updateSpy).toHaveBeenCalledWith(testStudies[2], testStudy);
+          expect(updateSpy).toHaveBeenCalledWith(testStudies[3], testStudy);
+        })
+      ).toBeResolved();
+    });
+
+    it('does nothing if no studies have NCT IDs', () => {
+      return expectAsync(
+        service.updateResearchStudies([{ resourceType: 'ResearchStudy' }]).then(() => {
+          expect(downloadTrialsSpy).not.toHaveBeenCalled();
+        })
+      ).toBeResolved();
+    });
+  });
+
   describe('#downloadTrials', () => {
     let downloader: ctg.ClinicalTrialGovService;
     beforeEach(() => {
@@ -328,6 +391,16 @@ describe('ClinicalTrialGovService', () => {
     it('handles a file that does not exist', () => {
       // Intentionally call private method (this is a test after all)
       return expectAsync(downloader['getDownloadedTrial']('ignored', 'this is an invalid id')).toBeResolvedTo(null);
+    });
+  });
+
+  describe('#updateResearchStudy', () => {
+    it('forwards to updateResearchStudyWithClinicalStudy', () => {
+      const service = new ctg.ClinicalTrialGovService(tempDataDirPath);
+      const testResearchStudy = createResearchStudy('test');
+      const testClinicalStudy = createClinicalStudy();
+      service.updateResearchStudy(testResearchStudy, testClinicalStudy);
+      // There's no really good way to verify this worked. For now, it not blowing up is good enough.
     });
   });
 
@@ -449,6 +522,14 @@ describe('ClinicalTrialGovService', () => {
           fail('sites[0] undefined');
         }
       }
+    });
+
+    it('does not alter a filled out trial', () => {
+      // Clone the trial in the dumbest but also most sensible way
+      const exampleStudy: ResearchStudy = JSON.parse(JSON.stringify(trialFilled));
+      ctg.updateResearchStudyWithClinicalStudy(exampleStudy, clinicalStudy);
+      // Nothing should have changed
+      expect(exampleStudy).toEqual(trialFilled as ResearchStudy);
     });
 
     function expectTelecom(location: Location, type: 'phone' | 'email', expectedValue: string | null) {

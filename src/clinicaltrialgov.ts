@@ -259,10 +259,10 @@ export class ClinicalTrialGovService {
             // Update whatever trials we have
             if (Array.isArray(study)) {
               for (const s of study) {
-                updateResearchStudyWithClinicalStudy(s, clinicalStudy);
+                this.updateResearchStudy(s, clinicalStudy);
               }
             } else {
-              updateResearchStudyWithClinicalStudy(study, clinicalStudy);
+              this.updateResearchStudy(study, clinicalStudy);
             }
           }));
         }
@@ -405,6 +405,18 @@ export class ClinicalTrialGovService {
       });
     });
   }
+
+  /**
+   * The provides a stub that handles updating the research study with data from a clinical study downloaded from the
+   * ClinicalTrials.gov website. This primarily exists as a stub to allow the exact process which updates a research
+   * study to be overridden if necessary.
+   *
+   * @param researchStudy the research study to update
+   * @param clinicalStudy the clinical study to update it with
+   */
+  updateResearchStudy(researchStudy: ResearchStudy, clinicalStudy: ClinicalStudy): void {
+    updateResearchStudyWithClinicalStudy(researchStudy, clinicalStudy);
+  }
 }
 
 /**
@@ -525,6 +537,5 @@ export function updateResearchStudyWithClinicalStudy(
       }
     }
   }
-  //console.log(result);
   return result;
 }
