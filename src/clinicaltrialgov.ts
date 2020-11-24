@@ -296,6 +296,8 @@ export class ClinicalTrialGovService {
         this.getURL(url, (response) => {
           if (response.statusCode !== 200) {
             this.log('Error %d %s from server', response.statusCode, response.statusMessage);
+            // Resume the response to ensure it gets cleaned up properly
+            response.resume();
             // Assume some sort of server error
             reject(new Error(`Server error: ${response.statusCode} ${response.statusMessage}`));
           } else {
@@ -303,6 +305,7 @@ export class ClinicalTrialGovService {
           }
         });
       } catch (err) {
+        this.log('Exception generating request: %o', err);
         reject(err);
       }
     });
@@ -354,7 +357,7 @@ export class ClinicalTrialGovService {
         reject(err);
       });
       results.pipe(file).on('close', () => {
-        const extractedPath = path.join(this.dataDir, tempName);
+        const extractedPath = path.resolve(path.join(this.dataDir, tempName));
         this.log('Extracting to [%s]...', extractedPath);
         // Extract the file
         extract(zipFilePath, { dir: extractedPath })
