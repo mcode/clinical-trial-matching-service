@@ -291,23 +291,21 @@ export class ClinicalTrialGovService {
   protected downloadTrials(ids: string[]): Promise<string> {
     const url = 'https://clinicaltrials.gov/ct2/download_studies?term=' + ids.join('+OR+');
     return new Promise<string>((resolve, reject) => {
-      try {
-        this.log('Fetching [%s]', url);
-        this.getURL(url, (response) => {
-          if (response.statusCode !== 200) {
-            this.log('Error %d %s from server', response.statusCode, response.statusMessage);
-            // Resume the response to ensure it gets cleaned up properly
-            response.resume();
-            // Assume some sort of server error
-            reject(new Error(`Server error: ${response.statusCode} ${response.statusMessage}`));
-          } else {
-            this.extractResults(response).then(resolve).catch(reject);
-          }
-        });
-      } catch (err) {
-        this.log('Exception generating request: %o', err);
-        reject(err);
-      }
+      this.log('Fetching [%s]', url);
+      this.getURL(url, (response) => {
+        if (response.statusCode !== 200) {
+          this.log('Error %d %s from server', response.statusCode, response.statusMessage);
+          // Resume the response to ensure it gets cleaned up properly
+          response.resume();
+          // Assume some sort of server error
+          reject(new Error(`Server error: ${response.statusCode} ${response.statusMessage}`));
+        } else {
+          this.extractResults(response).then(resolve).catch(reject);
+        }
+      }).on('error', (error) => {
+        this.log('Error fetching [%s]: %o', url, error);
+        reject(error);
+      });
     });
   }
 
@@ -379,7 +377,9 @@ export class ClinicalTrialGovService {
   }
 
   /**
-   * Loads a ClinicalStudy from an extracted dataset.
+   * Loads a ClinicalStudy from an extracted dataset. This is currently private as it currently needs to know where
+   * the request was. A future version will likely move the extracted files into a central "repository" of files and
+   * use those, but for now, this method is "internal."
    * @param tempDir the temporary directory where the files were extracted
    * @param nctId the NCT ID
    * @returns a Promise that resolves to either the parsed ClinicalStudy or to null if the ClinicalStudy does not exist

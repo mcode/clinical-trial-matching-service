@@ -102,6 +102,66 @@ describe('.findNCTNumber', () => {
   });
 });
 
+describe('findNCTNumbers', () => {
+  it('builds a map', () => {
+    const studies: ResearchStudy[] = [
+      { resourceType: 'ResearchStudy' },
+      {
+        resourceType: 'ResearchStudy',
+        identifier: [
+          {
+            system: 'http://www.example.com/',
+            value: 'example1'
+          },
+          {
+            system: ctg.CLINICAL_TRIAL_IDENTIFIER_CODING_SYSTEM_URL,
+            value: 'NCT00000001'
+          }
+        ]
+      },
+      {
+        resourceType: 'ResearchStudy',
+        identifier: [
+          {
+            system: ctg.CLINICAL_TRIAL_IDENTIFIER_CODING_SYSTEM_URL,
+            value: 'NCT12345678'
+          }
+        ]
+      },
+      {
+        resourceType: 'ResearchStudy',
+        identifier: [
+          {
+            system: 'http://www.example.com/',
+            value: 'example2'
+          },
+          {
+            system: ctg.CLINICAL_TRIAL_IDENTIFIER_CODING_SYSTEM_URL,
+            value: 'NCT00000001'
+          }
+        ]
+      },
+      {
+        resourceType: 'ResearchStudy',
+        identifier: [
+          {
+            system: 'http://www.example.com/',
+            value: 'example3'
+          },
+          {
+            system: ctg.CLINICAL_TRIAL_IDENTIFIER_CODING_SYSTEM_URL,
+            value: 'NCT00000001'
+          }
+        ]
+      }
+    ];
+    const map = ctg.findNCTNumbers(studies);
+    expect(map.size).toEqual(2);
+    expect(map.get('NCT12345678')).toEqual(studies[2]);
+    expect(map.get('NCT00000001')).toEqual([ studies[1], studies[3], studies[4] ]);
+  });
+});
+
 describe('parseClinicalTrialXML', () => {
   it("rejects if given valid XML that's not a clinical study", () => {
     return expectAsync(ctg.parseClinicalTrialXML('<?xml version="1.0"?><root><child/></root>')).toBeRejectedWithError(
@@ -205,16 +265,11 @@ describe('ClinicalTrialGovService', () => {
       });
     });
 
-    xit('handles failures from https.get', () => {
-      // FIXME: Use nock
-      // const spy = spyOn(downloader, 'getURL').and.callFake(() => {
-      //   throw new Error('Test error');
-      // });
-      // return expectAsync(
-      //   downloader.downloadTrials(nctIds).finally(() => {
-      //     expect(spy).toHaveBeenCalled();
-      //   })
-      // ).toBeRejectedWithError('Test error');
+    it('handles failures from https.get', () => {
+      nock('https://clinicaltrials.gov')
+        .get('/ct2/download_studies?term=' + nctIds.join('+OR+'))
+        .replyWithError('Test error');
+      return expectAsync(downloader['downloadTrials'](nctIds)).toBeRejectedWithError('Test error');
     });
 
     it('handles failure responses from the server', () => {
@@ -481,7 +536,12 @@ describe('ClinicalTrialGovService', () => {
               ]
             },
             {
-              facility: [{ name: ['Only Address'], address: [{ city: ['Bedford'], state: ['MA'], country: ['US'], zip: ['01730'] }] }]
+              facility: [
+                {
+                  name: ['Only Address'],
+                  address: [{ city: ['Bedford'], state: ['MA'], country: ['US'], zip: ['01730'] }]
+                }
+              ]
             }
           ]
         }
