@@ -237,9 +237,11 @@ describe('ClinicalTrialGovService', () => {
       service['downloadTrials'] = downloadTrialsSpy = jasmine.createSpy('downloadTrials').and.callFake(() => {
         return Promise.resolve('ignored');
       });
-      rmdirSpy = (spyOn(fs, 'rmdir') as jasmine.Spy).and.callFake((_dir: string, _options: fs.RmDirOptions, callback: fs.NoParamCallback) => {
-        callback(null);
-      });
+      rmdirSpy = (spyOn(fs, 'rmdir') as jasmine.Spy).and.callFake(
+        (_dir: string, _options: fs.RmDirOptions, callback: fs.NoParamCallback) => {
+          callback(null);
+        }
+      );
     });
 
     // These tests basically are only to ensure that all trials are properly visisted when given.
@@ -286,9 +288,11 @@ describe('ClinicalTrialGovService', () => {
       rmdirSpy.and.callFake((_dir: string, _options: fs.RmDirOptions, callback: fs.NoParamCallback) => {
         callback(new Error('Fake error'));
       });
-      return expectAsync(service.updateResearchStudies([ createResearchStudy('test', 'NCT12345678') ]).then(() => {
-        expect(rmdirSpy).toHaveBeenCalled();
-      })).toBeResolved();
+      return expectAsync(
+        service.updateResearchStudies([createResearchStudy('test', 'NCT12345678')]).then(() => {
+          expect(rmdirSpy).toHaveBeenCalled();
+        })
+      ).toBeResolved();
     });
   });
 
@@ -377,9 +381,11 @@ describe('ClinicalTrialGovService', () => {
       return expectAsync(downloader['getDownloadedTrial']('ignored', 'this is an invalid id')).toBeResolvedTo(null);
     });
     it('handles a file read failing', () => {
-      (spyOn(fs, 'readFile') as jasmine.Spy).and.callFake((_path: string, _options: unknown, callback: (error: NodeJS.ErrnoException | null, data: string) => void) => {
-        callback(new Error('Simulated error'), '');
-      });
+      (spyOn(fs, 'readFile') as jasmine.Spy).and.callFake(
+        (_path: string, _options: unknown, callback: (error: NodeJS.ErrnoException | null, data: string) => void) => {
+          callback(new Error('Simulated error'), '');
+        }
+      );
       return expectAsync(downloader['getDownloadedTrial']('ignored', 'invalid')).toBeRejected();
     });
   });
