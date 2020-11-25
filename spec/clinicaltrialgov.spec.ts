@@ -2,8 +2,9 @@ import { getContainedResource, ResearchStudy as ResearchStudyObj } from './../sr
 import { Address, Location, ResearchStudy, ContainedResource } from '../src/fhir-types';
 import * as ctg from '../src/clinicaltrialgov';
 import fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
+import stream from 'stream';
+import os from 'os';
+import path from 'path';
 import nock from 'nock';
 // Trial missing summary, inclusion/exclusion criteria, phase and study type
 import trialMissing from './data/resource.json';
@@ -107,55 +108,11 @@ describe('.findNCTNumber', () => {
 describe('findNCTNumbers', () => {
   it('builds a map', () => {
     const studies: ResearchStudy[] = [
-      { resourceType: 'ResearchStudy' },
-      {
-        resourceType: 'ResearchStudy',
-        identifier: [
-          {
-            system: 'http://www.example.com/',
-            value: 'example1'
-          },
-          {
-            system: ctg.CLINICAL_TRIAL_IDENTIFIER_CODING_SYSTEM_URL,
-            value: 'NCT00000001'
-          }
-        ]
-      },
-      {
-        resourceType: 'ResearchStudy',
-        identifier: [
-          {
-            system: ctg.CLINICAL_TRIAL_IDENTIFIER_CODING_SYSTEM_URL,
-            value: 'NCT12345678'
-          }
-        ]
-      },
-      {
-        resourceType: 'ResearchStudy',
-        identifier: [
-          {
-            system: 'http://www.example.com/',
-            value: 'example2'
-          },
-          {
-            system: ctg.CLINICAL_TRIAL_IDENTIFIER_CODING_SYSTEM_URL,
-            value: 'NCT00000001'
-          }
-        ]
-      },
-      {
-        resourceType: 'ResearchStudy',
-        identifier: [
-          {
-            system: 'http://www.example.com/',
-            value: 'example3'
-          },
-          {
-            system: ctg.CLINICAL_TRIAL_IDENTIFIER_CODING_SYSTEM_URL,
-            value: 'NCT00000001'
-          }
-        ]
-      }
+      createResearchStudy('no-NCTID'),
+      createResearchStudy('dupe1', 'NCT00000001'),
+      createResearchStudy('singleton', 'NCT12345678'),
+      createResearchStudy('dupe2', 'NCT00000001'),
+      createResearchStudy('dupe3', 'NCT00000001')
     ];
     const map = ctg.findNCTNumbers(studies);
     expect(map.size).toEqual(2);
@@ -213,7 +170,7 @@ describe('ClinicalTrialGovService', () => {
       // because we don't override promisify, we need to "delete" the type data
       (spyOn(fs, 'opendir') as jasmine.Spy).and.callFake((path, callback) => {
         expect(path).toEqual(tempDataDirPath);
-        const err: NodeJS.ErrnoException = new Error('Does not exist');
+        const err: NodeJS.ErrnoException = new Error('Simulated does not exist');
         err.code = 'ENOTDIR';
         callback(err);
       });
@@ -223,7 +180,7 @@ describe('ClinicalTrialGovService', () => {
     it('handles the directory close failing', () => {
       const dirSpy = jasmine.createSpyObj('fs.dir', ['close']);
       dirSpy.close.and.callFake((callback: (err: Error) => void) => {
-        callback(new Error('unexpected error'));
+        callback(new Error('Simulated error'));
       });
       // because we don't override promisify, we need to "delete" the type data
       (spyOn(fs, 'opendir') as jasmine.Spy).and.callFake((path, callback) => {
@@ -238,7 +195,7 @@ describe('ClinicalTrialGovService', () => {
       // because we don't override promisify, we need to "delete" the type data
       (spyOn(fs, 'opendir') as jasmine.Spy).and.callFake((path, callback) => {
         expect(path).toEqual(tempDataDirPath);
-        const err: NodeJS.ErrnoException = new Error('Does not exist');
+        const err: NodeJS.ErrnoException = new Error('Simulated does not exist');
         err.code = 'ENOENT';
         callback(err);
       });
@@ -254,14 +211,14 @@ describe('ClinicalTrialGovService', () => {
       // because we don't override promisify, we need to "delete" the type data
       (spyOn(fs, 'opendir') as jasmine.Spy).and.callFake((path, callback) => {
         expect(path).toEqual(tempDataDirPath);
-        const err: NodeJS.ErrnoException = new Error('Does not exist');
+        const err: NodeJS.ErrnoException = new Error('Simulated does not exist');
         err.code = 'ENOENT';
         callback(err);
       });
       (spyOn(fs, 'mkdir') as jasmine.Spy).and.callFake((path, options, callback) => {
         expect(path).toEqual(tempDataDirPath);
         expect(options.recursive).toEqual(true);
-        callback(new Error('test error'));
+        callback(new Error('Simulated error'));
       });
       return expectAsync(downloader.init()).toBeRejected();
     });
@@ -270,6 +227,8 @@ describe('ClinicalTrialGovService', () => {
   describe('#updateResearchStudies', () => {
     let service: ctg.ClinicalTrialGovService;
     let downloadTrialsSpy: jasmine.Spy;
+    // We need to spy on rmdir because it'll try and delete the temporary directory which we don't actually create
+    let rmdirSpy: jasmine.Spy;
 
     beforeEach(() => {
       // The service is never initialized
@@ -277,6 +236,9 @@ describe('ClinicalTrialGovService', () => {
       // TypeScript won't allow us to install spies the "proper" way on private methods
       service['downloadTrials'] = downloadTrialsSpy = jasmine.createSpy('downloadTrials').and.callFake(() => {
         return Promise.resolve('ignored');
+      });
+      rmdirSpy = (spyOn(fs, 'rmdir') as jasmine.Spy).and.callFake((_dir: string, _options: fs.RmDirOptions, callback: fs.NoParamCallback) => {
+        callback(null);
       });
     });
 
@@ -317,6 +279,16 @@ describe('ClinicalTrialGovService', () => {
           expect(downloadTrialsSpy).not.toHaveBeenCalled();
         })
       ).toBeResolved();
+    });
+
+    it('handles the temporary directory delete failing', () => {
+      // Override the default strategy: we want to fake an error in this test
+      rmdirSpy.and.callFake((_dir: string, _options: fs.RmDirOptions, callback: fs.NoParamCallback) => {
+        callback(new Error('Fake error'));
+      });
+      return expectAsync(service.updateResearchStudies([ createResearchStudy('test', 'NCT12345678') ]).then(() => {
+        expect(rmdirSpy).toHaveBeenCalled();
+      })).toBeResolved();
     });
   });
 
@@ -379,6 +351,18 @@ describe('ClinicalTrialGovService', () => {
       // For now, give it a JSON file to extract
       return expectAsync(downloader.extractResults(fs.createReadStream(specFilePath('resource.json')))).toBeRejected();
     });
+
+    it('handles deleting the temporary ZIP failing', () => {
+      // Spy on the unlink method
+      (spyOn(fs, 'unlink') as jasmine.Spy).and.callFake((_path: string, callback: fs.NoParamCallback) => {
+        callback(new Error('Simulated error'));
+      });
+      // Don't actually do anything
+      downloader['extractZip'] = jasmine.createSpy('extractZip').and.callFake(() => {
+        return Promise.resolve();
+      });
+      return expectAsync(downloader.extractResults(stream.Readable.from('Test'))).toBeResolved();
+    });
   });
 
   describe('#getDownloadedTrial', () => {
@@ -391,6 +375,12 @@ describe('ClinicalTrialGovService', () => {
     it('handles a file that does not exist', () => {
       // Intentionally call private method (this is a test after all)
       return expectAsync(downloader['getDownloadedTrial']('ignored', 'this is an invalid id')).toBeResolvedTo(null);
+    });
+    it('handles a file read failing', () => {
+      (spyOn(fs, 'readFile') as jasmine.Spy).and.callFake((_path: string, _options: unknown, callback: (error: NodeJS.ErrnoException | null, data: string) => void) => {
+        callback(new Error('Simulated error'), '');
+      });
+      return expectAsync(downloader['getDownloadedTrial']('ignored', 'invalid')).toBeRejected();
     });
   });
 

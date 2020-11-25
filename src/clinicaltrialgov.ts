@@ -173,19 +173,47 @@ function convertArrayToCodeableConcept(trialConditions: string[]): CodeableConce
 /**
  * System to fill in data on research studies based on the trial data from
  * https://clinicaltrials.gov/
+ *
+ * The current system works as follows:
+ *
+ * Call updateResearchStudies() with the ResearchStudy objects to update. It will locate all ResearchStudy objects that
+ * contain an NCT ID. It will then:
+ *
+ * 1. Call downloadTrials() is used to download the ClinicalStudy data from clinicaltrials.gov. It starts an HTTPS
+ *    request to download the trial results and, if successful, passes the response stream off to extractResults().
+ * 2. extractResults() saves the stream its given to a temporary ZIP file and extracts that file to a temporary
+ *    directory. Once the ZIP is extracted, it deletes the temporary ZIP. It then returns the directory where the files
+ *    were extracted.
+ * 3. With the path to the extracted ZIP, updateResearchStudies() can now use the downloaded trial data to update the
+ *    trials.
+ * 4. Before resolving, the temporary directory is deleted.
+ *
+ * A future version will likely change this to make it so that rather than immediately deleting the temporary trial
+ * data, it's kept around in a least-recently-used cache and only deleted as the cache exceeds a given size. This will
+ * add a few new public APIs to enable the retrieval of clinical study data by NCT ID. Right now, though, there is no
+ * way to extract the clinical study data directly.
  */
 export class ClinicalTrialGovService {
   /**
    * Internal value to track temporary file names.
    */
   private tempId = 0;
+  //
 
+  /**
+   * Log used to log debug information. Either passed in at creation time or created via the Node.js util.debuglog
+   * function. With the latter, activate by setting the NODE_DEBUG environment variable to "ctgovservice" (or include it
+   * in a comma separated list of debugging modules to include).
+   */
   private log: Logger;
 
   /**
    * Creates a new instance. This does NOT check that the data directory exists,
    * use init() for that.
+   *
    * @param dataDir the data directory to use
+   * @param log an optional function to receive debug log messages. By default this uses util.debuglog('ctgovservice')
+   *     meaning that the log can be activated by setting NODE_DEBUG to "ctgovservice"
    */
   constructor(public dataDir: string, log?: Logger) {
     // If no log was given, create it
@@ -282,11 +310,13 @@ export class ClinicalTrialGovService {
   }
 
   /**
-   * Downloads the given trials from ClinicalTrials.gov and stores them in the
-   * data directory.
+   * Downloads the given trials from ClinicalTrials.gov and stores them in the data directory. It is likely that a
+   * future version will change how this works to move all the downloaded data into a central store. It's also likely
+   * that a future version will support downloading an arbitrary number of trials at once - currently this is limited
+   * to "however many IDs can fit within a URL."
+   *
    * @param ids the IDs of the trials to download
-   * @returns a Promise that resolves to the path where the given IDs were
-   *     downloaded
+   * @returns a Promise that resolves to the path where the given IDs were downloaded
    */
   protected downloadTrials(ids: string[]): Promise<string> {
     const url = 'https://clinicaltrials.gov/ct2/download_studies?term=' + ids.join('+OR+');
@@ -356,9 +386,8 @@ export class ClinicalTrialGovService {
       });
       results.pipe(file).on('close', () => {
         const extractedPath = path.resolve(path.join(this.dataDir, tempName));
-        this.log('Extracting to [%s]...', extractedPath);
         // Extract the file
-        extract(zipFilePath, { dir: extractedPath })
+        this.extractZip(zipFilePath, { dir: extractedPath })
           .then(() => {
             // Since it's done, we should be able to delete the ZIP file now
             fs.unlink(zipFilePath, (error) => {
@@ -374,6 +403,17 @@ export class ClinicalTrialGovService {
           .catch(reject);
       });
     });
+  }
+
+  /**
+   * Stub method for unzipping files. Currently this just logs the attempt but it exists more to allow it to be stubbed
+   * out within the test.
+   * @param zipPath the path to the ZIP file
+   * @param opts the options
+   */
+  private extractZip(zipPath: string, opts: extract.Options): Promise<void> {
+    this.log('Extracting [%s]...', zipPath);
+    return extract(zipPath, opts);
   }
 
   /**
