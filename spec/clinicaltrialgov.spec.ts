@@ -2,13 +2,16 @@ import { getContainedResource, ResearchStudy as ResearchStudyObj } from './../sr
 import { Address, Location, ResearchStudy, ContainedResource } from '../src/fhir-types';
 import * as ctg from '../src/clinicaltrialgov';
 import fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
+import stream from 'stream';
+import os from 'os';
+import path from 'path';
 import nock from 'nock';
 // Trial missing summary, inclusion/exclusion criteria, phase and study type
 import trialMissing from './data/resource.json';
 import trialFilled from './data/complete_study.json';
 import { ClinicalStudy, StatusEnum } from '../src/clinicalstudy';
+import { createClinicalStudy } from './support/clinicalstudy-factory';
+import { createResearchStudy } from './support/researchstudy-factory';
 
 function specFilePath(specFilePath: string): string {
   return path.join(__dirname, '../../spec/data', specFilePath);
@@ -102,6 +105,22 @@ describe('.findNCTNumber', () => {
   });
 });
 
+describe('findNCTNumbers', () => {
+  it('builds a map', () => {
+    const studies: ResearchStudy[] = [
+      createResearchStudy('no-NCTID'),
+      createResearchStudy('dupe1', 'NCT00000001'),
+      createResearchStudy('singleton', 'NCT12345678'),
+      createResearchStudy('dupe2', 'NCT00000001'),
+      createResearchStudy('dupe3', 'NCT00000001')
+    ];
+    const map = ctg.findNCTNumbers(studies);
+    expect(map.size).toEqual(2);
+    expect(map.get('NCT12345678')).toEqual(studies[2]);
+    expect(map.get('NCT00000001')).toEqual([studies[1], studies[3], studies[4]]);
+  });
+});
+
 describe('parseClinicalTrialXML', () => {
   it("rejects if given valid XML that's not a clinical study", () => {
     return expectAsync(ctg.parseClinicalTrialXML('<?xml version="1.0"?><root><child/></root>')).toBeRejectedWithError(
@@ -119,6 +138,14 @@ describe('ClinicalTrialGovService', () => {
   }
   const nctIds = [nctID];
   const tempDataDirPath = path.join(os.tmpdir(), 'clinicaltrialgov_test');
+
+  it('can set a custom logger', () => {
+    const customLogger = (): void => {
+      // Do nothing
+    };
+    const instance = new ctg.ClinicalTrialGovService(tempDataDirPath, customLogger);
+    expect(instance['log']).toEqual(customLogger);
+  });
 
   describe('#init', () => {
     let downloader: ctg.ClinicalTrialGovService;
@@ -143,7 +170,7 @@ describe('ClinicalTrialGovService', () => {
       // because we don't override promisify, we need to "delete" the type data
       (spyOn(fs, 'opendir') as jasmine.Spy).and.callFake((path, callback) => {
         expect(path).toEqual(tempDataDirPath);
-        const err: NodeJS.ErrnoException = new Error('Does not exist');
+        const err: NodeJS.ErrnoException = new Error('Simulated does not exist');
         err.code = 'ENOTDIR';
         callback(err);
       });
@@ -153,10 +180,7 @@ describe('ClinicalTrialGovService', () => {
     it('handles the directory close failing', () => {
       const dirSpy = jasmine.createSpyObj('fs.dir', ['close']);
       dirSpy.close.and.callFake((callback: (err: Error) => void) => {
-        // This spy exists more to suppress output than anything else
-        const spy = spyOn(console, 'error');
-        callback(new Error('unexpected error'));
-        expect(spy).toHaveBeenCalled();
+        callback(new Error('Simulated error'));
       });
       // because we don't override promisify, we need to "delete" the type data
       (spyOn(fs, 'opendir') as jasmine.Spy).and.callFake((path, callback) => {
@@ -171,7 +195,7 @@ describe('ClinicalTrialGovService', () => {
       // because we don't override promisify, we need to "delete" the type data
       (spyOn(fs, 'opendir') as jasmine.Spy).and.callFake((path, callback) => {
         expect(path).toEqual(tempDataDirPath);
-        const err: NodeJS.ErrnoException = new Error('Does not exist');
+        const err: NodeJS.ErrnoException = new Error('Simulated does not exist');
         err.code = 'ENOENT';
         callback(err);
       });
@@ -187,16 +211,88 @@ describe('ClinicalTrialGovService', () => {
       // because we don't override promisify, we need to "delete" the type data
       (spyOn(fs, 'opendir') as jasmine.Spy).and.callFake((path, callback) => {
         expect(path).toEqual(tempDataDirPath);
-        const err: NodeJS.ErrnoException = new Error('Does not exist');
+        const err: NodeJS.ErrnoException = new Error('Simulated does not exist');
         err.code = 'ENOENT';
         callback(err);
       });
       (spyOn(fs, 'mkdir') as jasmine.Spy).and.callFake((path, options, callback) => {
         expect(path).toEqual(tempDataDirPath);
         expect(options.recursive).toEqual(true);
-        callback(new Error('test error'));
+        callback(new Error('Simulated error'));
       });
       return expectAsync(downloader.init()).toBeRejected();
+    });
+  });
+
+  describe('#updateResearchStudies', () => {
+    let service: ctg.ClinicalTrialGovService;
+    let downloadTrialsSpy: jasmine.Spy;
+    // We need to spy on rmdir because it'll try and delete the temporary directory which we don't actually create
+    let rmdirSpy: jasmine.Spy;
+
+    beforeEach(() => {
+      // The service is never initialized
+      service = new ctg.ClinicalTrialGovService(tempDataDirPath);
+      // TypeScript won't allow us to install spies the "proper" way on private methods
+      service['downloadTrials'] = downloadTrialsSpy = jasmine.createSpy('downloadTrials').and.callFake(() => {
+        return Promise.resolve('ignored');
+      });
+      rmdirSpy = (spyOn(fs, 'rmdir') as jasmine.Spy).and.callFake(
+        (_dir: string, _options: fs.RmDirOptions, callback: fs.NoParamCallback) => {
+          callback(null);
+        }
+      );
+    });
+
+    // These tests basically are only to ensure that all trials are properly visisted when given.
+    it('updates all the given studies', () => {
+      // Our test studies contain the same NCT ID twice to make sure that works as expected, as well as a NCT ID that
+      // download spy will return null for to indicate a failure.
+      const testStudies: ResearchStudy[] = [
+        createResearchStudy('dupe1', 'NCT00000001'),
+        createResearchStudy('missing', 'NCT00000002'),
+        createResearchStudy('dupe2', 'NCT00000001'),
+        createResearchStudy('singleton', 'NCT00000003')
+      ];
+      const testStudy = createClinicalStudy();
+      const updateSpy = spyOn(service, 'updateResearchStudy').and.returnValue();
+      const getTrialSpy = jasmine.createSpy('getDownloadedTrial').and.callFake((_ignored: string, nctId: string) => {
+        return Promise.resolve(nctId === 'NCT00000002' ? null : testStudy);
+      });
+      // Have to force the getDownloadedTrial spy onto the service as the method is private
+      // (This also lets us ignore that the type returned from the spy is technically wrong. It doesn't matter, because
+      // its only ever sent to our own spies.)
+      service['getDownloadedTrial'] = getTrialSpy;
+      return expectAsync(
+        service.updateResearchStudies(testStudies).then(() => {
+          expect(downloadTrialsSpy).toHaveBeenCalledOnceWith(['NCT00000001', 'NCT00000002', 'NCT00000003']);
+          // Update should have been called three times: twice for the NCT00000001 studies, and once for the NCT00000003 study
+          expect(updateSpy).toHaveBeenCalledWith(testStudies[0], testStudy);
+          expect(updateSpy).not.toHaveBeenCalledWith(testStudies[1], testStudy);
+          expect(updateSpy).toHaveBeenCalledWith(testStudies[2], testStudy);
+          expect(updateSpy).toHaveBeenCalledWith(testStudies[3], testStudy);
+        })
+      ).toBeResolved();
+    });
+
+    it('does nothing if no studies have NCT IDs', () => {
+      return expectAsync(
+        service.updateResearchStudies([{ resourceType: 'ResearchStudy' }]).then(() => {
+          expect(downloadTrialsSpy).not.toHaveBeenCalled();
+        })
+      ).toBeResolved();
+    });
+
+    it('handles the temporary directory delete failing', () => {
+      // Override the default strategy: we want to fake an error in this test
+      rmdirSpy.and.callFake((_dir: string, _options: fs.RmDirOptions, callback: fs.NoParamCallback) => {
+        callback(new Error('Fake error'));
+      });
+      return expectAsync(
+        service.updateResearchStudies([createResearchStudy('test', 'NCT12345678')]).then(() => {
+          expect(rmdirSpy).toHaveBeenCalled();
+        })
+      ).toBeResolved();
     });
   });
 
@@ -209,14 +305,10 @@ describe('ClinicalTrialGovService', () => {
     });
 
     it('handles failures from https.get', () => {
-      const spy = spyOn(downloader, 'getURL').and.callFake(() => {
-        throw new Error('Test error');
-      });
-      return expectAsync(
-        downloader.downloadTrials(nctIds).finally(() => {
-          expect(spy).toHaveBeenCalled();
-        })
-      ).toBeRejectedWithError('Test error');
+      nock('https://clinicaltrials.gov')
+        .get('/ct2/download_studies?term=' + nctIds.join('+OR+'))
+        .replyWithError('Test error');
+      return expectAsync(downloader['downloadTrials'](nctIds)).toBeRejectedWithError('Test error');
     });
 
     it('handles failure responses from the server', () => {
@@ -224,7 +316,7 @@ describe('ClinicalTrialGovService', () => {
         .get('/ct2/download_studies?term=' + nctIds.join('+OR+'))
         .reply(404, 'Unknown');
       return expectAsync(
-        downloader.downloadTrials(nctIds).finally(() => {
+        downloader['downloadTrials'](nctIds).finally(() => {
           expect(scope.isDone()).toBeTrue();
         })
       ).toBeRejected();
@@ -237,7 +329,7 @@ describe('ClinicalTrialGovService', () => {
           'Content-type': 'application/zip'
         });
       return expectAsync(
-        downloader.downloadTrials(nctIds).finally(() => {
+        downloader['downloadTrials'](nctIds).finally(() => {
           expect(scope.isDone()).toBeTrue();
         })
       ).toBeResolved();
@@ -263,6 +355,18 @@ describe('ClinicalTrialGovService', () => {
       // For now, give it a JSON file to extract
       return expectAsync(downloader.extractResults(fs.createReadStream(specFilePath('resource.json')))).toBeRejected();
     });
+
+    it('handles deleting the temporary ZIP failing', () => {
+      // Spy on the unlink method
+      (spyOn(fs, 'unlink') as jasmine.Spy).and.callFake((_path: string, callback: fs.NoParamCallback) => {
+        callback(new Error('Simulated error'));
+      });
+      // Don't actually do anything
+      downloader['extractZip'] = jasmine.createSpy('extractZip').and.callFake(() => {
+        return Promise.resolve();
+      });
+      return expectAsync(downloader.extractResults(stream.Readable.from('Test'))).toBeResolved();
+    });
   });
 
   describe('#getDownloadedTrial', () => {
@@ -273,7 +377,26 @@ describe('ClinicalTrialGovService', () => {
       });
     });
     it('handles a file that does not exist', () => {
-      return expectAsync(downloader.getDownloadedTrial('this is an invalid id')).toBeRejected();
+      // Intentionally call private method (this is a test after all)
+      return expectAsync(downloader['getDownloadedTrial']('ignored', 'this is an invalid id')).toBeResolvedTo(null);
+    });
+    it('handles a file read failing', () => {
+      (spyOn(fs, 'readFile') as jasmine.Spy).and.callFake(
+        (_path: string, _options: unknown, callback: (error: NodeJS.ErrnoException | null, data: string) => void) => {
+          callback(new Error('Simulated error'), '');
+        }
+      );
+      return expectAsync(downloader['getDownloadedTrial']('ignored', 'invalid')).toBeRejected();
+    });
+  });
+
+  describe('#updateResearchStudy', () => {
+    it('forwards to updateResearchStudyWithClinicalStudy', () => {
+      const service = new ctg.ClinicalTrialGovService(tempDataDirPath);
+      const testResearchStudy = createResearchStudy('test');
+      const testClinicalStudy = createClinicalStudy();
+      service.updateResearchStudy(testResearchStudy, testClinicalStudy);
+      // There's no really good way to verify this worked. For now, it not blowing up is good enough.
     });
   });
 
@@ -286,8 +409,13 @@ describe('ClinicalTrialGovService', () => {
       downloader = new ctg.ClinicalTrialGovService(tempDataDirPath);
       await downloader.init();
       // "Import" the trial
-      await downloader.extractResults(fs.createReadStream(specFilePath('search_result.zip')));
-      clinicalStudy = await downloader.getDownloadedTrial(nctID);
+      const tempDir = await downloader.extractResults(fs.createReadStream(specFilePath('search_result.zip')));
+      const maybeStudy = await downloader['getDownloadedTrial'](tempDir, nctID);
+      if (maybeStudy === null) {
+        throw new Error('Unable to open study');
+      } else {
+        clinicalStudy = maybeStudy;
+      }
       // Note this mutates study, which doesn't actually matter at present.
       updatedTrial = ctg.updateResearchStudyWithClinicalStudy(study, clinicalStudy);
     });
@@ -316,18 +444,6 @@ describe('ClinicalTrialGovService', () => {
 
     it('fills in description', () => {
       expect(updatedTrial.description).toBeDefined();
-    });
-
-    it('returns the same study if the study has no NCT ID', () => {
-      const empty = new ResearchStudyObj(2);
-      const backup_service = new ctg.ClinicalTrialGovService(tempDataDirPath);
-      return expectAsync(backup_service.updateResearchStudy(empty)).toBeResolvedTo(empty);
-    });
-
-    it('returns on filled out study', () => {
-      const study_filled = trialFilled as ResearchStudy;
-      const backup_service = new ctg.ClinicalTrialGovService(tempDataDirPath);
-      expect(backup_service.updateResearchStudy(study_filled)).toBeDefined();
     });
 
     it('fills out the status', () => {
@@ -402,6 +518,14 @@ describe('ClinicalTrialGovService', () => {
           fail('sites[0] undefined');
         }
       }
+    });
+
+    it('does not alter a filled out trial', () => {
+      // Clone the trial in the dumbest but also most sensible way
+      const exampleStudy: ResearchStudy = JSON.parse(JSON.stringify(trialFilled));
+      ctg.updateResearchStudyWithClinicalStudy(exampleStudy, clinicalStudy);
+      // Nothing should have changed
+      expect(exampleStudy).toEqual(trialFilled as ResearchStudy);
     });
 
     function expectTelecom(location: Location, type: 'phone' | 'email', expectedValue: string | null) {
@@ -489,7 +613,12 @@ describe('ClinicalTrialGovService', () => {
               ]
             },
             {
-              facility: [{ name: ['Only Address'], address: [{ city: ['Bedford'], state: ['MA'], country: ['US'], zip: ['01730'] }] }]
+              facility: [
+                {
+                  name: ['Only Address'],
+                  address: [{ city: ['Bedford'], state: ['MA'], country: ['US'], zip: ['01730'] }]
+                }
+              ]
             }
           ]
         }

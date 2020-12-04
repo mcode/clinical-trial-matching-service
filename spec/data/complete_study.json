@@ -47,5 +47,18 @@
     ],
     "text": "Phase 3"
   },
-  "category": [{ "text": "Interventional" }]
+  "category": [{ "text": "Interventional" }],
+  "site": [
+    {
+      "reference": "#site",
+      "type": "Location"
+    }
+  ],
+  "contained": [
+    {
+      "resourceType": "Location",
+      "id": "site",
+      "name": "Site"
+    }
+  ]
 }
