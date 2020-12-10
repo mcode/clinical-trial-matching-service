@@ -144,12 +144,28 @@ export class ClinicalTrialMatchingService {
   }
 
   /**
-   * Closes the server if it's running.
+   * Closes the server if it's running. Unlike the underlying service function,
+   * no error is raised if the server wasn't running.
    */
-  close(): void {
-    if (this._server !== null) {
-      this._server.close();
-      this._server = null;
+  close(): Promise<void> {
+    if (this._server === null) {
+      return Promise.resolve();
+    } else {
+      return new Promise<void>((resolve) => {
+        if (this._server === null) {
+          // It's unclear how this could happen, but in theory if close was
+          // called within a single event loop, server could be set to null
+          // within one Promise before the other Promise got a chance to run.
+          // Handle by resolving immediately: someone else closed the server
+          // if it's null.
+          resolve();
+        } else {
+          this._server.close(() => {
+            resolve();
+          });
+          this._server = null;
+        }
+      });
     }
   }
 
@@ -166,22 +182,44 @@ export class ClinicalTrialMatchingService {
    * Starts the server running, returning the newly running instance. If the
    * server is already running, simply returns the already running instance.
    */
-  listen(): http.Server {
+  listen(): Promise<http.Server> {
     if (this._server !== null) {
-      return this._server;
+      return Promise.resolve(this._server);
     }
-    const port = this.port;
-    const host = this.host;
-    // It's unclear if we can pass undefined to listen
-    this._server = host ? this.app.listen(port, host) : this.app.listen(port);
-    const listeningOn = this._server.address();
-    if (typeof listeningOn === 'object' && listeningOn !== null) {
-      this.log(`Server listening on ${listeningOn.address}:${listeningOn.port}...`);
-    } else {
-      // Should not be possible at this point but whatever
-      this.log(`Server listening on ${listeningOn === null ? 'unknown address' : listeningOn}.`);
-    }
-    return this._server;
+    return new Promise((resolve, reject) => {
+      const port = this.port;
+      const host = this.host;
+      const callback = () => {
+        // Callback shouldn't fire if the server is null but if it does we're in
+        // a weird state. Reject the promise in this instance.
+        if (this._server === null) {
+          reject(new Error('_server is null on listen callback (listen callback ran after server was closed?)'));
+          return;
+        }
+        // Remove the error handler - further errors should not reject this
+        // promise
+        this._server.off('error', errorHandler);
+        const listeningOn = this._server.address();
+        if (typeof listeningOn === 'object' && listeningOn !== null) {
+          this.log(`Server listening on ${listeningOn.address}:${listeningOn.port}...`);
+        } else {
+          // Should not be possible at this point but whatever
+          this.log(`Server listening on ${listeningOn === null ? 'unknown address' : listeningOn}.`);
+        }
+        resolve(this._server);
+      };
+      const errorHandler = (error: Error) => {
+        if (this._server !== null) this._server.off('error', errorHandler);
+        reject(error);
+      };
+      // It's unclear if we can pass undefined to listen
+      this._server = host ? this.app.listen(port, host, callback) : this.app.listen(port, callback);
+      if (this._server === null) {
+        reject(new Error('app.listen returned null'));
+      } else {
+        this._server.on('error', errorHandler);
+      }
+    });
   }
 }
 
