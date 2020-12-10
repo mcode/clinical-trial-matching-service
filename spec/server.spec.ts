@@ -4,6 +4,7 @@ import ClinicalTrialMatchingService from '../src/server';
 import SearchSet from '../src/searchset';
 import http from 'http';
 import HttpError from '../src/errors';
+import MockServer from './support/mock-server';
 
 describe('server', () => {
   let service: ClinicalTrialMatchingService;
@@ -119,36 +120,35 @@ describe('server', () => {
       return expectAsync(new ClinicalTrialMatchingService(service.matcher).close()).toBeResolved();
     });
 
+    it('handles the close failing by rejecting the promise', () => {
+      const testService = new ClinicalTrialMatchingService(service.matcher);
+      const expectedError = new Error('Test error');
+      const fakeServer = new MockServer();
+      (spyOn(testService.app, 'listen') as jasmine.Spy).and.callFake(() => fakeServer.listen());
+      fakeServer.mockErrorOnClose(expectedError);
+      return expectAsync(testService.listen().then(() => {
+        // Immediately close
+        return testService.close();
+      })).toBeRejectedWith(expectedError);
+    });
+
     it('stops the server', async () => {
       // This gets kind of weird
-      const fakeServer: http.Server = jasmine.createSpyObj('http.Server', {
-        address: { address: '0.0.0.0', port: 3000 },
-        on: null,
-        off: null
-      }) as http.Server;
-      fakeServer.close = jasmine.createSpy('close').and.callFake((callback?: (err?: Error) => void): http.Server => {
-        if (callback) {
-          // "Close" the server on the next event loop
-          setTimeout(callback, 0);
-        }
-        return fakeServer;
-      });
       const testService = new ClinicalTrialMatchingService(service.matcher);
+      const fakeServer = new MockServer();
       // Rather than properly type the function, erase the proper type information
-      (spyOn(testService.app, 'listen') as jasmine.Spy).and.callFake((port: number, hostOrCallback: (string | (() => void)), callback?: () => void): http.Server => {
-        if (callback === undefined && typeof hostOrCallback === 'function') {
-          callback = hostOrCallback;
-        } else {
-          throw new Error('no callback given');
-        }
-        setTimeout(callback, 0);
-        return fakeServer;
+      (spyOn(testService.app, 'listen') as jasmine.Spy).and.callFake((): http.Server => {
+        // It would be nice to just pass the arguments along but A) it doesn't
+        // really matter and B) TypeScript doesn't appear to allow it
+        return fakeServer.listen() as unknown as http.Server;
       });
+      const closeSpy = spyOn(fakeServer, 'close').and.callThrough();
       // Fake listen
       await testService.listen();
+      expect(testService.server).not.toBeNull();
       // And fake close
       await testService.close();
-      expect(fakeServer.close).toHaveBeenCalled();
+      expect(closeSpy).toHaveBeenCalled();
       expect(testService.server).toBeNull();
     });
   });
@@ -165,48 +165,36 @@ describe('server', () => {
       });
     });
 
+    it('handles the listen failing by rejecting the promise', () => {
+      const testService = new ClinicalTrialMatchingService(service.matcher);
+      const expectedError = new Error('Test error');
+      const fakeServer = new MockServer();
+      fakeServer.mockErrorOnListen(expectedError);
+      (spyOn(testService.app, 'listen') as jasmine.Spy).and.callFake(() => fakeServer.listen());
+      return expectAsync(testService.listen()).toBeRejectedWith(expectedError);
+    })
+
     it('handles net.Server.address being weird', () => {
       // Handle weird address edge cases
-      const promises: Promise<void>[] = [ 'string_address', null ].map(address => {
+      const promises: Promise<http.Server>[] = [ 'string_address', null ].map(address => {
         const testService = new ClinicalTrialMatchingService(service.matcher);
-        // Fake out TypeScript on the spy - the spy is in no way a complete
-        // implementation, but it doens't need to be
-        const fakeServer = jasmine.createSpyObj('http.Server', { address: address });
-        // listen install an event handler for errors, which we don't simulate
-        fakeServer.on = fakeServer.off = () => { /* no-op */ };
-        (spyOn(testService.app, 'listen') as jasmine.Spy).and.callFake((port, hostOrCallback: (string | (() => void)), callback?: () => void) => {
-          if (!callback && typeof hostOrCallback === 'function') {
-            callback = hostOrCallback;
-          }
-          if (callback) {
-            setTimeout(callback, 0);
-          }
-          return fakeServer;
-        });
-        return testService.listen().then(() => {
-          expect((fakeServer as http.Server).address).toHaveBeenCalled();
-        });
+        const fakeServer = new MockServer();
+        fakeServer.mockAddress(address);
+        (spyOn(testService.app, 'listen') as jasmine.Spy).and.callFake(() => fakeServer.listen());
+        return testService.listen();
       });
       return expectAsync(Promise.all(promises)).toBeResolved();
     });
 
     it('uses the host config', async () => {
       const testService = new ClinicalTrialMatchingService(service.matcher, { host: '127.0.0.1', port: 3000 });
-      const fakeServer = jasmine.createSpyObj('http.Server', { address: { address: '127.0.0.1', port: 3000 } });
-      // Also need to fake the on/off methods - they don't matter
-      fakeServer['on'] = fakeServer.off = () => { return fakeServer; };
+      const fakeServer = new MockServer();
       const listenSpy: jasmine.Spy = spyOn(testService.app, 'listen');
-      listenSpy.and.callFake((port, host, callback: () => void) => {
-        // Basically: resolve "asynchronously"
-        setTimeout(callback, 0);
-        return fakeServer;
+      listenSpy.and.callFake(() => {
+        return fakeServer.listen();
       });
       await testService.listen();
-      expect(listenSpy.calls.count()).toEqual(1);
-      const args = listenSpy.calls.argsFor(0);
-      expect(args[0]).toEqual(3000);
-      expect(args[1]).toEqual('127.0.0.1');
-      expect(typeof args[2]).toEqual('function');
+      expect(listenSpy).toHaveBeenCalledOnceWith(3000, '127.0.0.1');
     });
   });
 });

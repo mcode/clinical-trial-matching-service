@@ -151,7 +151,7 @@ export class ClinicalTrialMatchingService {
     if (this._server === null) {
       return Promise.resolve();
     } else {
-      return new Promise<void>((resolve) => {
+      return new Promise<void>((resolve, reject) => {
         if (this._server === null) {
           // It's unclear how this could happen, but in theory if close was
           // called within a single event loop, server could be set to null
@@ -160,8 +160,12 @@ export class ClinicalTrialMatchingService {
           // if it's null.
           resolve();
         } else {
-          this._server.close(() => {
-            resolve();
+          this._server.close((err?: Error) => {
+            if (err) {
+              reject(err);
+            } else {
+              resolve();
+            }
           });
           this._server = null;
         }
@@ -189,16 +193,18 @@ export class ClinicalTrialMatchingService {
     return new Promise((resolve, reject) => {
       const port = this.port;
       const host = this.host;
-      const callback = () => {
+      // It's unclear if we can pass undefined to listen
+      this._server = host ? this.app.listen(port, host) : this.app.listen(port);
+      this._server.once('error', (error: Error) => {
+        reject(error);
+      });
+      this._server.once('listening', () => {
         // Callback shouldn't fire if the server is null but if it does we're in
         // a weird state. Reject the promise in this instance.
         if (this._server === null) {
           reject(new Error('_server is null on listen callback (listen callback ran after server was closed?)'));
           return;
         }
-        // Remove the error handler - further errors should not reject this
-        // promise
-        this._server.off('error', errorHandler);
         const listeningOn = this._server.address();
         if (typeof listeningOn === 'object' && listeningOn !== null) {
           this.log(`Server listening on ${listeningOn.address}:${listeningOn.port}...`);
@@ -207,18 +213,7 @@ export class ClinicalTrialMatchingService {
           this.log(`Server listening on ${listeningOn === null ? 'unknown address' : listeningOn}.`);
         }
         resolve(this._server);
-      };
-      const errorHandler = (error: Error) => {
-        if (this._server !== null) this._server.off('error', errorHandler);
-        reject(error);
-      };
-      // It's unclear if we can pass undefined to listen
-      this._server = host ? this.app.listen(port, host, callback) : this.app.listen(port, callback);
-      if (this._server === null) {
-        reject(new Error('app.listen returned null'));
-      } else {
-        this._server.on('error', errorHandler);
-      }
+      });
     });
   }
 }
