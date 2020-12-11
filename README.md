@@ -26,7 +26,11 @@ function customMatchingFunction(patientData: Bundle): Promise<SearchSet> {
 }
 
 const service = new ClinicalTrialMatchingService(customMatchingFunction);
-service.listen();
+service.listen().catch(err => {
+  // Handle listen failing
+  console.error('Server failed to start:');
+  console.error(err);
+});
 ```
 
 ## Configuring the service
