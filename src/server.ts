@@ -144,12 +144,24 @@ export class ClinicalTrialMatchingService {
   }
 
   /**
-   * Closes the server if it's running.
+   * Closes the server if it's running. Unlike the underlying service function,
+   * no error is raised if the server wasn't running.
    */
-  close(): void {
-    if (this._server !== null) {
-      this._server.close();
-      this._server = null;
+  close(): Promise<void> {
+    if (this._server === null) {
+      return Promise.resolve();
+    } else {
+      const server: http.Server = this._server;
+      return new Promise<void>((resolve, reject) => {
+        server.close((err?: Error) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+        this._server = null;
+      });
     }
   }
 
@@ -166,22 +178,30 @@ export class ClinicalTrialMatchingService {
    * Starts the server running, returning the newly running instance. If the
    * server is already running, simply returns the already running instance.
    */
-  listen(): http.Server {
+  listen(): Promise<http.Server> {
     if (this._server !== null) {
-      return this._server;
+      return Promise.resolve(this._server);
     }
-    const port = this.port;
-    const host = this.host;
-    // It's unclear if we can pass undefined to listen
-    this._server = host ? this.app.listen(port, host) : this.app.listen(port);
-    const listeningOn = this._server.address();
-    if (typeof listeningOn === 'object' && listeningOn !== null) {
-      this.log(`Server listening on ${listeningOn.address}:${listeningOn.port}...`);
-    } else {
-      // Should not be possible at this point but whatever
-      this.log(`Server listening on ${listeningOn === null ? 'unknown address' : listeningOn}.`);
-    }
-    return this._server;
+    return new Promise((resolve, reject) => {
+      const port = this.port;
+      const host = this.host;
+      // It's unclear if we can pass undefined to listen
+      const server = host ? this.app.listen(port, host) : this.app.listen(port);
+      this._server = server;
+      server.once('error', (error: Error) => {
+        reject(error);
+      });
+      server.once('listening', () => {
+        const listeningOn = server.address();
+        if (typeof listeningOn === 'object' && listeningOn !== null) {
+          this.log(`Server listening on ${listeningOn.address}:${listeningOn.port}...`);
+        } else {
+          // Should not be possible at this point but whatever
+          this.log(`Server listening on ${listeningOn === null ? 'unknown address' : listeningOn}.`);
+        }
+        resolve(server);
+      });
+    });
   }
 }
 

@@ -4,19 +4,20 @@ import ClinicalTrialMatchingService from '../src/server';
 import SearchSet from '../src/searchset';
 import http from 'http';
 import HttpError from '../src/errors';
+import MockServer from './support/mock-server';
 
 describe('server', () => {
   let service: ClinicalTrialMatchingService;
   let server: http.Server;
-  beforeAll(() => {
+  beforeAll(async () => {
     // Note we use port 0 to get a free port since we don't care what we listen on
     service = new ClinicalTrialMatchingService(() => {
       return Promise.resolve(new SearchSet([]));
     }, { port: 0 });
-    server = service.listen();
+    server = await service.listen();
   });
-  afterAll(() => {
-    server.close();
+  afterAll(async () => {
+    await server.close();
   });
 
   it('responds to /', () => {
@@ -116,22 +117,38 @@ describe('server', () => {
   describe('#close()', () => {
     it("does nothing on a service that isn't listening", () => {
       // Basically: this shouldn't crash
-      new ClinicalTrialMatchingService(service.matcher).close();
+      return expectAsync(new ClinicalTrialMatchingService(service.matcher).close()).toBeResolved();
     });
 
-    it('stops the server', () => {
-      // This gets kind of weird
-      const fakeServer: http.Server = jasmine.createSpyObj('http.Server', {
-        address: { address: '0.0.0.0', port: 3000 },
-        close: null
-      }) as http.Server;
+    it('handles the close failing by rejecting the promise', () => {
       const testService = new ClinicalTrialMatchingService(service.matcher);
-      spyOn(testService.app, 'listen').and.returnValue(fakeServer);
+      const expectedError = new Error('Test error');
+      const fakeServer = new MockServer();
+      (spyOn(testService.app, 'listen') as jasmine.Spy).and.callFake(() => fakeServer.listen());
+      fakeServer.mockErrorOnClose(expectedError);
+      return expectAsync(testService.listen().then(() => {
+        // Immediately close
+        return testService.close();
+      })).toBeRejectedWith(expectedError);
+    });
+
+    it('stops the server', async () => {
+      // This gets kind of weird
+      const testService = new ClinicalTrialMatchingService(service.matcher);
+      const fakeServer = new MockServer();
+      // Rather than properly type the function, erase the proper type information
+      (spyOn(testService.app, 'listen') as jasmine.Spy).and.callFake((): http.Server => {
+        // It would be nice to just pass the arguments along but A) it doesn't
+        // really matter and B) TypeScript doesn't appear to allow it
+        return fakeServer.listen() as unknown as http.Server;
+      });
+      const closeSpy = spyOn(fakeServer, 'close').and.callThrough();
       // Fake listen
-      testService.listen();
+      await testService.listen();
+      expect(testService.server).not.toBeNull();
       // And fake close
-      testService.close();
-      expect(fakeServer.close).toHaveBeenCalled();
+      await testService.close();
+      expect(closeSpy).toHaveBeenCalled();
       expect(testService.server).toBeNull();
     });
   });
@@ -143,29 +160,41 @@ describe('server', () => {
 
     it('returns the server object on a second listen() call', () => {
       const listenSpy = spyOn(server, 'listen');
-      expect(service.listen()).toBe(server);
-      expect(listenSpy).not.toHaveBeenCalled();
-    });
-
-    it('handles net.Server.address being weird', () => {
-      // Handle weird address edge cases
-      [ 'string_address', null ].forEach(address => {
-        const testService = new ClinicalTrialMatchingService(service.matcher);
-        // Fake out TypeScript on the spy - the spy is in no way a complete
-        // implementation, but it doens't need to be
-        const fakeServer = jasmine.createSpyObj('http.Server', { address: address }) as unknown;
-        spyOn(testService.app, 'listen').and.returnValue(fakeServer as http.Server);
-        testService.listen();
-        expect((fakeServer as http.Server).address).toHaveBeenCalled();
+      return expectAsync(service.listen()).toBeResolvedTo(server).then(() => {
+        expect(listenSpy).not.toHaveBeenCalled();
       });
     });
 
-    it('uses the host config', () => {
+    it('handles the listen failing by rejecting the promise', () => {
+      const testService = new ClinicalTrialMatchingService(service.matcher);
+      const expectedError = new Error('Test error');
+      const fakeServer = new MockServer();
+      fakeServer.mockErrorOnListen(expectedError);
+      (spyOn(testService.app, 'listen') as jasmine.Spy).and.callFake(() => fakeServer.listen());
+      return expectAsync(testService.listen()).toBeRejectedWith(expectedError);
+    })
+
+    it('handles net.Server.address being weird', () => {
+      // Handle weird address edge cases
+      const promises: Promise<http.Server>[] = [ 'string_address', null ].map(address => {
+        const testService = new ClinicalTrialMatchingService(service.matcher);
+        const fakeServer = new MockServer();
+        fakeServer.mockAddress(address);
+        (spyOn(testService.app, 'listen') as jasmine.Spy).and.callFake(() => fakeServer.listen());
+        return testService.listen();
+      });
+      return expectAsync(Promise.all(promises)).toBeResolved();
+    });
+
+    it('uses the host config', async () => {
       const testService = new ClinicalTrialMatchingService(service.matcher, { host: '127.0.0.1', port: 3000 });
-      const fakeServer = jasmine.createSpyObj('http.Server', { address: { address: '127.0.0.1', port: 3000 } }) as unknown;
-      const listenSpy: jasmine.Spy = spyOn(testService.app, 'listen').and.returnValue(fakeServer as http.Server);
-      testService.listen();
-      expect(listenSpy).toHaveBeenCalledWith(3000, '127.0.0.1');
+      const fakeServer = new MockServer();
+      const listenSpy: jasmine.Spy = spyOn(testService.app, 'listen');
+      listenSpy.and.callFake(() => {
+        return fakeServer.listen();
+      });
+      await testService.listen();
+      expect(listenSpy).toHaveBeenCalledOnceWith(3000, '127.0.0.1');
     });
   });
 });
