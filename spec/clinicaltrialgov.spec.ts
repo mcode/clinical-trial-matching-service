@@ -147,6 +147,29 @@ describe('ClinicalTrialGovService', () => {
     expect(instance['log']).toEqual(customLogger);
   });
 
+  describe('#maxTrialsPerRequest', () => {
+    let service: ctg.ClinicalTrialGovService;
+    beforeEach(() => {
+      // The service is never initialized so the temp directory isn't created
+      service = new ctg.ClinicalTrialGovService(tempDataDirPath);
+    });
+    it('does not allow values less than 1 to be set', () => {
+      // First, set it to a known value - this also makes sure get works
+      service.maxTrialsPerRequest = 10;
+      expect(service.maxTrialsPerRequest).toEqual(10);
+      service.maxTrialsPerRequest = -1;
+      expect(service.maxTrialsPerRequest).toEqual(10);
+      service.maxTrialsPerRequest = 0;
+      expect(service.maxTrialsPerRequest).toEqual(10);
+      service.maxTrialsPerRequest = 0.5;
+      expect(service.maxTrialsPerRequest).toEqual(10);
+    });
+    it('rounds down if given fractions', () => {
+      service.maxTrialsPerRequest = 12.5;
+      expect(service.maxTrialsPerRequest).toEqual(12);
+    });
+  });
+
   describe('#init', () => {
     let downloader: ctg.ClinicalTrialGovService;
     beforeEach(() => {
@@ -291,6 +314,31 @@ describe('ClinicalTrialGovService', () => {
       return expectAsync(
         service.updateResearchStudies([createResearchStudy('test', 'NCT12345678')]).then(() => {
           expect(rmdirSpy).toHaveBeenCalled();
+        })
+      ).toBeResolved();
+    });
+
+    it('handles splitting requests', () => {
+      // Basically, drop the limit to be very low, and make sure we get two calls
+      service.maxTrialsPerRequest = 2;
+      const testStudies: ResearchStudy[] = [
+        createResearchStudy('test1', 'NCT00000001'),
+        createResearchStudy('test2', 'NCT00000002'),
+        createResearchStudy('test3', 'NCT00000003'),
+        createResearchStudy('test4', 'NCT00000004')
+      ];
+      const testStudy = createClinicalStudy();
+      spyOn(service, 'updateResearchStudy').and.returnValue();
+      const getTrialSpy = jasmine.createSpy('getDownloadedTrial').and.callFake(() => {
+        return Promise.resolve(testStudy);
+      });
+      // Have to force the getDownloadedTrial spy onto the service as the method is private
+      service['getDownloadedTrial'] = getTrialSpy;
+      return expectAsync(
+        service.updateResearchStudies(testStudies).then(() => {
+          expect(downloadTrialsSpy.calls.count()).toEqual(2);
+          expect(downloadTrialsSpy.calls.argsFor(0)).toEqual([['NCT00000001', 'NCT00000002']]);
+          expect(downloadTrialsSpy.calls.argsFor(1)).toEqual([['NCT00000003', 'NCT00000004']]);
         })
       ).toBeResolved();
     });
