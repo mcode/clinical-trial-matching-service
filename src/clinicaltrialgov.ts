@@ -198,7 +198,6 @@ export class ClinicalTrialGovService {
    * Internal value to track temporary file names.
    */
   private tempId = 0;
-  //
 
   /**
    * Log used to log debug information. Either passed in at creation time or created via the Node.js util.debuglog
@@ -206,6 +205,26 @@ export class ClinicalTrialGovService {
    * in a comma separated list of debugging modules to include).
    */
   private log: Logger;
+
+  private _maxTrialsPerRequest = 128;
+  /**
+   * The maximum number of trials to attempt to download in a single request. Each NCT ID increases the URI size by
+   * effectively 15 bytes: essentially each NCT ID becomes '+OR+NCT12345678'. The request path "counts" as a header and
+   * has to be smaller than maxHeaderSize given to the client. By default, this uses the default client, so the client
+   * should be the default HTTPS client. In theory this would support around 500 per request, instead this defaults to
+   * 128 which is a nice round number. (In binary, at least.)
+   */
+  get maxTrialsPerRequest(): number {
+    return this._maxTrialsPerRequest;
+  }
+
+  set maxTrialsPerRequest(newValue: number) {
+    // Basically, just make sure the new value is positive and an integer. Positive infinity is fine and remains
+    // positive infinity: it means never split.
+    if (newValue > 1) {
+      this._maxTrialsPerRequest = Math.floor(newValue);
+    }
+  }
 
   /**
    * Creates a new instance. This does NOT check that the data directory exists,
@@ -273,38 +292,53 @@ export class ClinicalTrialGovService {
       // Nothing to do
       return Promise.resolve(studies);
     } else {
-      return this.downloadTrials(Array.from(nctIdMap.keys())).then((tempDir) => {
-        // Array of Promises.
-        const promises: Promise<void>[] = [];
-        // Go through the NCT numbers we found and updated all matching trials
-        for (const entry of nctIdMap.entries()) {
-          const [nctId, study] = entry;
-          promises.push(this.getDownloadedTrial(tempDir, nctId).then((clinicalStudy) => {
-            if (clinicalStudy === null) {
-              // If the study is null, it is missing, and we have nothing to do
-              return;
-            }
-            // Update whatever trials we have
-            if (Array.isArray(study)) {
-              for (const s of study) {
-                this.updateResearchStudy(s, clinicalStudy);
+      // Split the request at this point - it's easier to do it here than later.
+      const nctIds = Array.from(nctIdMap.keys());
+      // For now, just queue up all the requests at once.
+      const chunkPromises: Promise<void>[] = [];
+      for (let start = 0; start < nctIds.length; start += this._maxTrialsPerRequest) {
+        // For logging purposes, capture the start index of this chunk within the current block
+        // (start will continue to be updated throughout the for statement)
+        const chunkStart = start;
+        const end = Math.min(start + this._maxTrialsPerRequest, nctIds.length);
+        this.log('Creating request for chunk %d-%d', start, end);
+        chunkPromises.push(this.downloadTrials(nctIds.slice(start, end)).then((tempDir) => {
+          this.log('Resolving chunk %d-%d in %s', chunkStart, end, tempDir);
+          const promises: Promise<void>[] = [];
+          // Go through the NCT numbers we found and updated all matching trials
+          for (const entry of nctIdMap.entries()) {
+            const [nctId, study] = entry;
+            promises.push(this.getDownloadedTrial(tempDir, nctId).then((clinicalStudy): void => {
+              if (clinicalStudy === null) {
+                // If the study is null, it is missing, and we have nothing to do
+                return;
               }
-            } else {
-              this.updateResearchStudy(study, clinicalStudy);
-            }
-          }));
-        }
-        return Promise.all(promises).then(() => {
-          // At this point we can clean up
-          fs.rmdir(tempDir, { recursive: true }, (error) => {
-            if (error) {
-              console.error(`Unable to clean up temp directory ${tempDir}:`);
-              console.error(error);
-            }
+              // Update whatever trials we have
+              if (Array.isArray(study)) {
+                for (const s of study) {
+                  this.updateResearchStudy(s, clinicalStudy);
+                }
+              } else {
+                this.updateResearchStudy(study, clinicalStudy);
+              }
+            }));
+          }
+          return Promise.all(promises).then(() => {
+            this.log('Cleaning up chunk %d-%d in %s', chunkStart, end, tempDir);
+            // At this point we can clean up
+            fs.rmdir(tempDir, { recursive: true }, (error) => {
+              if (error) {
+                console.error(`Unable to clean up temp directory ${tempDir}:`);
+                console.error(error);
+              }
+            });
           });
-          // And return the original studies so we resolve properly
-          return studies;
-        });
+        }));
+      }
+      return Promise.all(chunkPromises).then(() => {
+        // Currently all the cleanup is done within the chunk promises
+        // Return the original studies so we resolve properly
+        return studies;
       });
     }
   }
