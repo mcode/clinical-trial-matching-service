@@ -22,6 +22,38 @@ export interface Configuration {
    * http.Server#listen.
    */
   host?: string;
+  /**
+   * If defined, a prefix which will be prepended to each mapped URL. If this
+   * is not specified by the PASSENGER_BASE_URI is defined in the process
+   * environment, then PASSENGER_BASE_URI will be used as the prefix. (To
+   * prevent that, you can set the prefix explicitly to '/' which will prevent
+   * any prefix from being used.)
+   */
+  urlPrefix?: string;
+}
+
+function isConfiguration(o: unknown): o is Configuration {
+  if (typeof o !== 'object' || o === null)
+    return false;
+  // For now, an object is a configuration object if every key is a string or number
+  const obj = o as Record<string | number | symbol, unknown>;
+  for (const k in obj) {
+    const t = typeof obj[k];
+    if (t !== 'string' && t !== 'number' && t !== 'undefined')
+      return false;
+  }
+  return true;
+}
+
+/**
+ * Server options - configuration options that are more involved that simple
+ * strings.
+ */
+export interface ServerOptions {
+  /**
+   * If given, use the given Express engine rather than creating a new one.
+   */
+  appEngine?: express.Application;
 }
 
 /**
@@ -46,9 +78,20 @@ export class ClinicalTrialMatchingService {
    * @param matcher the matcher function
    * @param configuration the server configuration
    */
-  constructor(public matcher: ClinicalTrialMatcher, configuration?: Configuration) {
-    this.app = express();
-    this.configuration = configuration ? configuration : {};
+  constructor(matcher: ClinicalTrialMatcher);
+  constructor(matcher: ClinicalTrialMatcher, options: ServerOptions);
+  constructor(matcher: ClinicalTrialMatcher, configuration: Configuration, options?: ServerOptions);
+  constructor(public matcher: ClinicalTrialMatcher, configurationOrOptions?: Configuration | ServerOptions, options?: ServerOptions) {
+    if (isConfiguration(configurationOrOptions)) {
+      this.configuration = configurationOrOptions;
+    } else {
+      // If here, no configuration was given so use whatever options we have
+      options = configurationOrOptions;
+      this.configuration = {};
+    }
+    // if called with only options, options will have been moved to the options variable
+    this.app = options && options.appEngine ? options.appEngine : express();
+
     this.app.use(
       bodyParser.json({
         // Need to increase the payload limit to receive patient bundles
@@ -73,12 +116,31 @@ export class ClinicalTrialMatchingService {
       next();
     });
 
+    let prefix: string;
+    if (this.configuration.urlPrefix) {
+      prefix = this.configuration.urlPrefix;
+    } else if (process.env['PASSENGER_BASE_URI']) {
+      prefix = process.env['PASSENGER_BASE_URI'];
+    } else {
+      prefix = '/';
+    }
+    // Make sure the prefix is of the form /path without a trailing slash and
+    // with a leading slash
+    if (!prefix.startsWith('/')) {
+      prefix = '/' + prefix;
+    }
+    // Remove the trailing slash - note that this means a prefix of '/' becomes
+    // the empty string, WHICH IS EXPECTED
+    if (prefix.endsWith('/')) {
+      prefix = prefix.substr(0, prefix.length - 1);
+    }
+
     // Default callback
-    this.app.get('/', function (_req, res) {
+    this.app.get(prefix.length > 0 ? prefix : '/', (_req, res) => {
       res.status(200).send('Hello from the Clinical Trial Matching Service');
     });
 
-    this.app.post('/getClinicalTrial', (request, response) => {
+    this.app.post(prefix + '/getClinicalTrial', (request, response) => {
       this.getClinicalTrial(request, response);
     });
   }

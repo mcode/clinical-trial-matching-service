@@ -35,12 +35,15 @@ service.listen().catch(err => {
 
 ## Configuring the service
 
-The `ClinicalTrialMatchingService` can optionally take a `Configuration` object that describes the server's configuration. At present, it has two fields, that are both handed off to the underlying `net.Server#listen` directly:
+The `ClinicalTrialMatchingService` can optionally take a `Configuration` object that describes the server's configuration.
 
  * `port` - the port to listen on, must be in the range 0-65535. If 0, a default open port is used.
  * `host` - the host address to bind to
+ * `urlPrefix` - if given, the prefix to use for all configured request paths (note that it's normalized: `"/prefix"` and `"prefix/"` both cause the application to generate paths that begin with `"/prefix/"`.)
 
-For more information about how these are used, read the [Node.js `net.Server#listen` documentation](https://nodejs.org/dist/latest-v12.x/docs/api/net.html#net_server_listen_port_host_backlog_callback).
+For more information about how `port` and `host` are used, read the [Node.js `net.Server#listen` documentation](https://nodejs.org/dist/latest-v12.x/docs/api/net.html#net_server_listen_port_host_backlog_callback).
+
+Note: If the `PASSENGER_BASE_URI` environment variable is set, this is used as the value for `urlPrefix`. This is to provide compatibility when running within Passenger with a base URI set via Passenger's configuration.
 
 The `configFromEnv()` helper function can be used to pull in all environment variables (or all environment variables starting with a given prefix) into a configuration object that can be passed to the `ClinicalTrialMatchingService` constructor. The function will remove the prefix (if one is given) and lowercase the key for all environment variables in the final configuration (meaning `PORT` and `port` both specify a value for `port`). The function has the following overloads:
 
