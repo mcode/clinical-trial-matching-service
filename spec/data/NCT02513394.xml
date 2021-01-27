@@ -1,0 +1,2775 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<clinical_study rank="1">
+  <!-- This xml conforms to an XML Schema at:
+    https://clinicaltrials.gov/ct2/html/images/info/public.xsd -->
+  <required_header>
+    <download_date>ClinicalTrials.gov processed this data on August 18, 2020</download_date>
+    <link_text>Link to the current ClinicalTrials.gov record.</link_text>
+    <url>https://clinicaltrials.gov/show/NCT02513394</url>
+  </required_header>
+  <id_info>
+    <org_study_id>AFT-05</org_study_id>
+    <secondary_id>ABCSG 42</secondary_id>
+    <secondary_id>BIG 14-03</secondary_id>
+    <secondary_id>2014-005181-30</secondary_id>
+    <nct_id>NCT02513394</nct_id>
+  </id_info>
+  <brief_title>PALbociclib CoLlaborative Adjuvant Study</brief_title>
+  <acronym>PALLAS</acronym>
+  <official_title>PALbociclib CoLlaborative Adjuvant Study: A Randomized Phase III Trial of Palbociclib With Standard Adjuvant Endocrine Therapy Versus Standard Adjuvant Endocrine Therapy Alone for Hormone Receptor Positive (HR+) / Human Epidermal Growth Factor Receptor 2 (HER2)-Negative Early Breast Cancer</official_title>
+  <sponsors>
+    <lead_sponsor>
+      <agency>Alliance Foundation Trials, LLC.</agency>
+      <agency_class>Other</agency_class>
+    </lead_sponsor>
+    <collaborator>
+      <agency>Austrian Breast &amp; Colorectal Cancer Study Group</agency>
+      <agency_class>Other</agency_class>
+    </collaborator>
+    <collaborator>
+      <agency>NSABP Foundation Inc</agency>
+      <agency_class>Other</agency_class>
+    </collaborator>
+    <collaborator>
+      <agency>PrECOG, LLC.</agency>
+      <agency_class>Other</agency_class>
+    </collaborator>
+    <collaborator>
+      <agency>Breast International Group</agency>
+      <agency_class>Other</agency_class>
+    </collaborator>
+    <collaborator>
+      <agency>Pfizer</agency>
+      <agency_class>Industry</agency_class>
+    </collaborator>
+  </sponsors>
+  <source>Alliance Foundation Trials, LLC.</source>
+  <oversight_info>
+    <has_dmc>Yes</has_dmc>
+  </oversight_info>
+  <brief_summary>
+    <textblock>
+      This is a prospective, two arm, international, multicenter, randomized, open-label Phase III
+      study evaluating the addition of 2 years of palbociclib to standard adjuvant endocrine
+      therapy for patients with HR+ / HER2- early breast cancer (EBC).
+
+      The purpose of the PALLAS study is to determine whether the addition of palbociclib to
+      adjuvant endocrine therapy will improve outcomes over endocrine therapy alone for HR+/HER2-
+      early breast cancer. Assessment of a variety of correlative analysis, including evaluation of
+      the effect of palbociclib in genomically defined tumor subgroups, is planned.
+    </textblock>
+  </brief_summary>
+  <overall_status>Active, not recruiting</overall_status>
+  <start_date>August 2015</start_date>
+  <completion_date type="Anticipated">September 2025</completion_date>
+  <primary_completion_date type="Anticipated">September 2020</primary_completion_date>
+  <phase>Phase 3</phase>
+  <study_type>Interventional</study_type>
+  <has_expanded_access>No</has_expanded_access>
+  <study_design_info>
+    <allocation>Randomized</allocation>
+    <intervention_model>Parallel Assignment</intervention_model>
+    <primary_purpose>Treatment</primary_purpose>
+    <masking>None (Open Label)</masking>
+  </study_design_info>
+  <primary_outcome>
+    <measure>Invasive Disease Free Survival (iDFS)</measure>
+    <time_frame>The expected study duration to primary analysis of iDFS is 5.4 years</time_frame>
+    <description>To compare invasive disease-free survival (iDFS) for the combination of at least 5 years endocrine therapy and 2-year palbociclib treatment versus at least 5 years endocrine therapy alone in patients with histologically confirmed HR+/HER2- invasive early breast cancer (EBC).</description>
+  </primary_outcome>
+  <secondary_outcome>
+    <measure>To compare the safety of 2 years of palbociclib with adjuvant endocrine therapy versus adjuvant endocrine therapy alone. (distant recurrence-free survival (DRFS), locoregional recurrences-free survival (LRRFS), and overall survival (OS)</measure>
+    <time_frame>The expected study duration to primary analysis of iDFS is 5.4 years</time_frame>
+    <description>To compare the following endpoints: iDFS excluding second primary cancers of non-breast origin, distant recurrence-free survival (DRFS), locoregional recurrences-free survival (LRRFS), and overall survival (OS).</description>
+  </secondary_outcome>
+  <number_of_arms>2</number_of_arms>
+  <enrollment type="Actual">5796</enrollment>
+  <condition>Breast Cancer</condition>
+  <arm_group>
+    <arm_group_label>Arm A</arm_group_label>
+    <arm_group_type>Experimental</arm_group_type>
+    <description>Palbociclib at a dose of 125 mg orally once daily, Day 1 to Day 21 followed by 7 days off treatment in a 28-day cycle for a total duration of 2 years, in addition to standard adjuvant endocrine therapy for a duration of at least 5 years.</description>
+  </arm_group>
+  <arm_group>
+    <arm_group_label>Arm B</arm_group_label>
+    <arm_group_type>Other</arm_group_type>
+    <description>Standard adjuvant endocrine therapy for a duration of at least 5 years.</description>
+  </arm_group>
+  <intervention>
+    <intervention_type>Drug</intervention_type>
+    <intervention_name>Palbociclib</intervention_name>
+    <arm_group_label>Arm A</arm_group_label>
+  </intervention>
+  <intervention>
+    <intervention_type>Drug</intervention_type>
+    <intervention_name>Standard Adjuvant Endocrine Therapy</intervention_name>
+    <arm_group_label>Arm A</arm_group_label>
+    <arm_group_label>Arm B</arm_group_label>
+  </intervention>
+  <eligibility>
+    <criteria>
+      <textblock>
+        Inclusion Criteria:
+
+          -  Signed informed consent prior to study specific procedures.
+
+          -  Age ≥18 years (or per national guidelines).
+
+          -  Pre- and postmenopausal women or men with Stage II (Stage IIA limited to max. 1000
+             patients) or Stage III early invasive breast cancer
+
+          -  Patients with multicentric and/or multifocal and/or bilateral early invasive breast
+             cancer are eligible if all histopathologically examined tumors meet pathologic
+             criteria for ER+ and/or PR+ and HER2-.
+
+          -  Patients must have histologically confirmed ER+ and/or PR+, HER2-, early invasive
+             breast cancer.
+
+          -  Patients must have undergone adequate (definitive) breast surgery for the current
+             malignancy.
+
+        FFPE tumor tissue block must be confirmed to be received at the central sample repository
+        prior to randomization.
+
+          -  ECOG performance status 0-1.
+
+          -  Patients must be able and willing to swallow and retain oral medication.
+
+          -  Serum or urine pregnancy test must be negative in premenopausal women within 14 days
+             of randomization, or in women with amenorrhea of less than 12 months at time of
+             randomization.
+
+          -  Patients who received neo/adjuvant therapy must be after last dose of chemotherapy
+             and/or biologic therapy and must have sufficient resolution of side effects.
+
+          -  Patients who received breast/axilla/post-mastectomy chest wall radiotherapy must be
+             after last dose of radiotherapy and must have sufficient resolution of side effects.
+
+          -  Patients must have sufficient resolution of any surgical side effects (no active wound
+             healing complications).
+
+        -Patients must either be initiating or have already started adjuvant hormonal treatment. -
+
+          -  Patients who already received neo/adjuvant endocrine therapy are eligible as long as
+             they are enrolled within 12 months of initial histological diagnosis and after
+             completing no more than 6 months of adjuvant endocrine therapy.
+
+          -  Absolute neutrophil count ≥ 1,500/µL
+
+          -  Platelets ≥ 100,000/ mm3
+
+          -  Hemoglobin ≥ 10g/dL
+
+          -  Total serum bilirubin ≤ ULN; or total bilirubin ≤ 3.0 × ULN with direct bilirubin
+             within normal range in patients with documented Gilbert's Syndrome.
+
+          -  Aspartate amino transferase (AST or SGOT) and alanine amino transferase (ALT or SGPT)
+             ≤ 1.5 × institutional ULN.
+
+          -  Serum creatinine below the upper limit of the institutional normal range (ULN) or
+             creatinine clearance ≥ 60 mL/min/1.73 m2 for patients with serum creatinine levels
+             above institutional ULN.
+
+        Exclusion Criteria:
+
+          -  Concurrent therapy with other Investigational Products.
+
+          -  Prior therapy with any CDK inhibitor.
+
+          -  Patients with Stage I or IV breast cancer are not eligible.
+
+          -  History of allergic reactions attributed to compounds of chemical or biologic
+             composition similar to palbociclib.
+
+          -  Patients receiving any medications or substances that are potent inhibitors or
+             inducers of
+
+          -  CYP3A isoenzymes within 7 days of randomization.
+
+          -  Uncontrolled intercurrent illness that would limit compliance with study requirements.
+
+          -  Pregnant women, or women of childbearing potential without a negative pregnancy test
+             within 14 days prior to randomization.
+
+          -  Patients with a history of any malignancy are ineligible
+
+          -  Patients who previously received endocrine therapy within 5 years prior to diagnosis
+             of the current malignancy.
+
+          -  Patients on antiretroviral therapy.
+
+          -  Patients with clinically significant history of any chronic liver disease.
+
+          -  Patients receiving concurrent exogenous hormone therapy (topical vaginal estrogen
+             therapy is allowable).
+      </textblock>
+    </criteria>
+    <gender>All</gender>
+    <minimum_age>18 Years</minimum_age>
+    <maximum_age>N/A</maximum_age>
+    <healthy_volunteers>No</healthy_volunteers>
+  </eligibility>
+  <overall_official>
+    <last_name>Monica Bertagnolli, MD</last_name>
+    <role>Principal Investigator</role>
+    <affiliation>Alliance Foundation Trials, LLC.</affiliation>
+  </overall_official>
+  <overall_official>
+    <last_name>Erica Mayer, MD</last_name>
+    <role>Principal Investigator</role>
+    <affiliation>Dana-Farber Cancer Institute</affiliation>
+  </overall_official>
+  <overall_official>
+    <last_name>Angela DeMichele, MD</last_name>
+    <role>Principal Investigator</role>
+    <affiliation>University of Pennsylvania</affiliation>
+  </overall_official>
+  <overall_official>
+    <last_name>Michael Gnant, MD</last_name>
+    <role>Principal Investigator</role>
+    <affiliation>ABCSG, Medical University Vienna</affiliation>
+  </overall_official>
+  <location>
+    <facility>
+      <name>University of South Alabama Mitchell Cancer Institute</name>
+      <address>
+        <city>Mobile</city>
+        <state>Alabama</state>
+        <zip>36604</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Southern Cancer Center</name>
+      <address>
+        <city>Mobile</city>
+        <state>Alabama</state>
+        <zip>36608</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Katmai Oncology Group</name>
+      <address>
+        <city>Anchorage</city>
+        <state>Alaska</state>
+        <zip>99508</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Providence Alaska Cancer Center</name>
+      <address>
+        <city>Anchorage</city>
+        <state>Alaska</state>
+        <zip>99508</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Mayo Clinic - Arizona</name>
+      <address>
+        <city>Phoenix</city>
+        <state>Arizona</state>
+        <zip>85054</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Marin Cancer Care</name>
+      <address>
+        <city>Greenbrae</city>
+        <state>California</state>
+        <zip>94904</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Marin Cancer Center</name>
+      <address>
+        <city>Greenbrae</city>
+        <state>California</state>
+        <zip>94904</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>UCSD Moores Cancer Center</name>
+      <address>
+        <city>La Jolla</city>
+        <state>California</state>
+        <zip>92093</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Cedars Sinai Medical Center</name>
+      <address>
+        <city>Los Angeles</city>
+        <state>California</state>
+        <zip>90048</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Kaiser Permanente Oakland Medical Center</name>
+      <address>
+        <city>Oakland</city>
+        <state>California</state>
+        <zip>94611</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Palo Alto Medical Foundation</name>
+      <address>
+        <city>Palo Alto</city>
+        <state>California</state>
+        <zip>94301</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Kaiser Permanente Roseville Medical Center</name>
+      <address>
+        <city>Roseville</city>
+        <state>California</state>
+        <zip>95661</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Kaiser Permanente Sacramento Medical Center</name>
+      <address>
+        <city>Sacramento</city>
+        <state>California</state>
+        <zip>95825</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>University of California</name>
+      <address>
+        <city>San Diego</city>
+        <state>California</state>
+        <zip>92093</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Kaiser Permanente Zion Medical Center</name>
+      <address>
+        <city>San Diego</city>
+        <state>California</state>
+        <zip>92120</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Sharp Memorial Hospital</name>
+      <address>
+        <city>San Diego</city>
+        <state>California</state>
+        <zip>92123</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Kaiser Permanente San Francisco Medical Center</name>
+      <address>
+        <city>San Francisco</city>
+        <state>California</state>
+        <zip>94115</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>UCSF Mount Zion</name>
+      <address>
+        <city>San Francisco</city>
+        <state>California</state>
+        <zip>94115</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Kaiser Permanente San Leandro</name>
+      <address>
+        <city>San Leandro</city>
+        <state>California</state>
+        <zip>94577</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Kaiser Permanente Santa Clara Medical Center</name>
+      <address>
+        <city>Santa Clara</city>
+        <state>California</state>
+        <zip>95051</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Kaiser Permanente South San Francisco Medical Center</name>
+      <address>
+        <city>South San Francisco</city>
+        <state>California</state>
+        <zip>94080</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Stanford Hospital and Clinics</name>
+      <address>
+        <city>Stanford</city>
+        <state>California</state>
+        <zip>94305</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Kaiser Permanente Vallejo Medical Center</name>
+      <address>
+        <city>Vallejo</city>
+        <state>California</state>
+        <zip>94589</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Kaiser Permanente Walnut Creek Medical Center</name>
+      <address>
+        <city>Walnut Creek</city>
+        <state>California</state>
+        <zip>94596</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Colorado Cancer Research Program</name>
+      <address>
+        <city>Denver</city>
+        <state>Colorado</state>
+        <zip>80222</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Hartford Hospital</name>
+      <address>
+        <city>Hartford</city>
+        <state>Connecticut</state>
+        <zip>06102</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Memorial Sloan Cancer Center - Hartford Healthcare Center Institute at HOCC</name>
+      <address>
+        <city>New Britain</city>
+        <state>Connecticut</state>
+        <zip>06053</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Christiana Care Health Services</name>
+      <address>
+        <city>Newark</city>
+        <state>Delaware</state>
+        <zip>19718</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>MedStar Georgetown University Hospital</name>
+      <address>
+        <city>Washington</city>
+        <state>District of Columbia</state>
+        <zip>20007</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>George Washington University Medical Center</name>
+      <address>
+        <city>Washington</city>
+        <state>District of Columbia</state>
+        <zip>20037</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Morton Plant Mease</name>
+      <address>
+        <city>Clearwater</city>
+        <state>Florida</state>
+        <zip>33756</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Mayo Clinic-Jacksonville</name>
+      <address>
+        <city>Jacksonville</city>
+        <state>Florida</state>
+        <zip>32224</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Mount Sinai Comprehensive Cancer Center</name>
+      <address>
+        <city>Miami Beach</city>
+        <state>Florida</state>
+        <zip>33140</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>University of Miami Sylvester Comprehensive Cancer Center</name>
+      <address>
+        <city>Miami</city>
+        <state>Florida</state>
+        <zip>33136</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Cancer Institute of Florida</name>
+      <address>
+        <city>Orlando</city>
+        <state>Florida</state>
+        <zip>32804</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Emory University Hospital</name>
+      <address>
+        <city>Atlanta</city>
+        <state>Georgia</state>
+        <zip>30322</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Memorial Health University Medical Center</name>
+      <address>
+        <city>Savannah</city>
+        <state>Georgia</state>
+        <zip>317404</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Rush University Medical Center</name>
+      <address>
+        <city>Chicago</city>
+        <state>Illinois</state>
+        <zip>60612</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>University of Illinois Cancer Center</name>
+      <address>
+        <city>Chicago</city>
+        <state>Illinois</state>
+        <zip>60612</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>University of Chicago Medical Center</name>
+      <address>
+        <city>Chicago</city>
+        <state>Illinois</state>
+        <zip>60637</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Cancer Care Specialist of Central Illinois</name>
+      <address>
+        <city>Decatur</city>
+        <state>Illinois</state>
+        <zip>62526</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Ingalls Memorial Hospital</name>
+      <address>
+        <city>Harvey</city>
+        <state>Illinois</state>
+        <zip>60426</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Joliet Oncology Hematology Associates</name>
+      <address>
+        <city>Joliet</city>
+        <state>Illinois</state>
+        <zip>60435</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Advocate Lutheran General Hospital</name>
+      <address>
+        <city>Park Ridge</city>
+        <state>Illinois</state>
+        <zip>60068</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Illinois CancerCare-Peoria</name>
+      <address>
+        <city>Peoria</city>
+        <state>Illinois</state>
+        <zip>61615</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>OSF Saint Anthony Medical Center</name>
+      <address>
+        <city>Rockford</city>
+        <state>Illinois</state>
+        <zip>61108</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Orchard Healthcare Research Inc.</name>
+      <address>
+        <city>Skokie</city>
+        <state>Illinois</state>
+        <zip>60017</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>NorthShore Hematology Oncology-Libertyville</name>
+      <address>
+        <city>Skokie</city>
+        <state>Illinois</state>
+        <zip>60077</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Carle Cancer Center</name>
+      <address>
+        <city>Urbana</city>
+        <state>Illinois</state>
+        <zip>61801</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Indiana University</name>
+      <address>
+        <city>Indianapolis</city>
+        <state>Indiana</state>
+        <zip>46202</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>IU Health Ball Memorial Hospital</name>
+      <address>
+        <city>Muncie</city>
+        <state>Indiana</state>
+        <zip>47303</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>McFarland Clinic PC-William R Bliss</name>
+      <address>
+        <city>Ames</city>
+        <state>Iowa</state>
+        <zip>50010</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>McFarland Clinic, P.C.</name>
+      <address>
+        <city>Ames</city>
+        <state>Iowa</state>
+        <zip>50010</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Physicians' Clinic of Iowa PC-Hematology and Oncology</name>
+      <address>
+        <city>Cedar Rapids</city>
+        <state>Iowa</state>
+        <zip>52403</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Iowa Oncology Research Assoc</name>
+      <address>
+        <city>Des Moines</city>
+        <state>Iowa</state>
+        <zip>50309</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Covenant Cancer Treatment Center</name>
+      <address>
+        <city>Waterloo</city>
+        <state>Iowa</state>
+        <zip>50702</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>University of Kentucky-Markey Cancer Center</name>
+      <address>
+        <city>Lexington</city>
+        <state>Kentucky</state>
+        <zip>40536</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Norton Cancer Institute</name>
+      <address>
+        <city>Louisville</city>
+        <state>Kentucky</state>
+        <zip>20202</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Ochsner Medical Center Jefferson</name>
+      <address>
+        <city>New Orleans</city>
+        <state>Louisiana</state>
+        <zip>70121</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Eastern Maine Medical Center</name>
+      <address>
+        <city>Bangor</city>
+        <state>Maine</state>
+        <zip>04401</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>New England Cancer Specialists</name>
+      <address>
+        <city>Scarborough</city>
+        <state>Maine</state>
+        <zip>04074</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Anne Arundel Medical Center</name>
+      <address>
+        <city>Annapolis</city>
+        <state>Maryland</state>
+        <zip>21401</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Mercy Medical Center</name>
+      <address>
+        <city>Baltimore</city>
+        <state>Maryland</state>
+        <zip>21202</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Greater Baltimore Medical Center</name>
+      <address>
+        <city>Baltimore</city>
+        <state>Maryland</state>
+        <zip>21204</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>MedStar Franklin Square Medical Center</name>
+      <address>
+        <city>Baltimore</city>
+        <state>Maryland</state>
+        <zip>21237</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Medstar Union Memorial Hospital</name>
+      <address>
+        <city>Baltimore</city>
+        <state>Maryland</state>
+        <zip>21237</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Johns Hopkins University/Sidney Kimmel Cancer Center</name>
+      <address>
+        <city>Baltimore</city>
+        <state>Maryland</state>
+        <zip>21287</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Frederick Memorial Hospital</name>
+      <address>
+        <city>Baltimore</city>
+        <state>Maryland</state>
+        <zip>21701</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Maryland Oncology Hematology PA</name>
+      <address>
+        <city>Bethesda</city>
+        <state>Maryland</state>
+        <zip>20817</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Peninsula Regional Medical Center</name>
+      <address>
+        <city>Salisbury</city>
+        <state>Maryland</state>
+        <zip>21801</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Holy Cross Hospital</name>
+      <address>
+        <city>Silver Spring</city>
+        <state>Maryland</state>
+        <zip>20910</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Tufts Medical Center</name>
+      <address>
+        <city>Boston</city>
+        <state>Massachusetts</state>
+        <zip>02111</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Massachusetts General Hospital</name>
+      <address>
+        <city>Boston</city>
+        <state>Massachusetts</state>
+        <zip>02114</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Dana Farber Cancer Institute</name>
+      <address>
+        <city>Boston</city>
+        <state>Massachusetts</state>
+        <zip>02115</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Beth Israel Deaconess Medical Center</name>
+      <address>
+        <city>Boston</city>
+        <state>Massachusetts</state>
+        <zip>02215</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Lowell General Hospital</name>
+      <address>
+        <city>Lowell</city>
+        <state>Massachusetts</state>
+        <zip>01852</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Beth Israel Deaconess Medical Center PLYMOUTH</name>
+      <address>
+        <city>Plymouth</city>
+        <state>Massachusetts</state>
+        <zip>02360</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Saint Joseph Mercy Health System</name>
+      <address>
+        <city>Ann Arbor</city>
+        <state>Michigan</state>
+        <zip>48106</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Spectrum Health Butterworth Research Pharmacy</name>
+      <address>
+        <city>Grand Rapids</city>
+        <state>Michigan</state>
+        <zip>49503</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Trinity Health Michigan</name>
+      <address>
+        <city>Livonia</city>
+        <state>Michigan</state>
+        <zip>48152</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Essentia Health</name>
+      <address>
+        <city>Duluth</city>
+        <state>Minnesota</state>
+        <zip>55805</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Mayo Clinic-Rochester</name>
+      <address>
+        <city>Rochester</city>
+        <state>Minnesota</state>
+        <zip>55902</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Mayo Clinic</name>
+      <address>
+        <city>Rochester</city>
+        <state>Minnesota</state>
+        <zip>55905</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Coborn Cancer Center</name>
+      <address>
+        <city>Saint Cloud</city>
+        <state>Minnesota</state>
+        <zip>56303</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Metro Minnesota Oncology Research Consortium</name>
+      <address>
+        <city>Saint Louis Park</city>
+        <state>Minnesota</state>
+        <zip>55416</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Metro MN Community Oncology Research Consortium</name>
+      <address>
+        <city>Saint Louis Park</city>
+        <state>Minnesota</state>
+        <zip>55416</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>St. Luke's Hospital</name>
+      <address>
+        <city>Kansas City</city>
+        <state>Missouri</state>
+        <zip>64111</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Phelps Country Regional Medical Center</name>
+      <address>
+        <city>Rolla</city>
+        <state>Missouri</state>
+        <zip>65401</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Washington University School of Medicine</name>
+      <address>
+        <city>Saint Louis</city>
+        <state>Missouri</state>
+        <zip>63110</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Missouri Baptist Cancer Center</name>
+      <address>
+        <city>Saint Louis</city>
+        <state>Missouri</state>
+        <zip>63131</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Mercy Hospital</name>
+      <address>
+        <city>Saint Louis</city>
+        <state>Missouri</state>
+        <zip>63141</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Cancer Research for the Ozarks</name>
+      <address>
+        <city>Springfield</city>
+        <state>Missouri</state>
+        <zip>65807</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Missouri Valley Cancer Consortium</name>
+      <address>
+        <city>Omaha</city>
+        <state>Nebraska</state>
+        <zip>68106</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>New Hampshire Oncology-Hematology PA</name>
+      <address>
+        <city>Concord</city>
+        <state>New Hampshire</state>
+        <zip>03301</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>New Hampshire Oncology-Hematology PA</name>
+      <address>
+        <city>Hooksett</city>
+        <state>New Hampshire</state>
+        <zip>03106</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Dartmouth Hitchcock Medical Center</name>
+      <address>
+        <city>Lebanon</city>
+        <state>New Hampshire</state>
+        <zip>03756</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Norris Cotton Cancer Center</name>
+      <address>
+        <city>Lebanon</city>
+        <state>New Hampshire</state>
+        <zip>03766</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Englewood Hospital and Medical Center</name>
+      <address>
+        <city>Englewood</city>
+        <state>New Jersey</state>
+        <zip>07631</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Hackensack Medical Center</name>
+      <address>
+        <city>Hackensack</city>
+        <state>New Jersey</state>
+        <zip>07601</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>University of New Mexico Comprehensive Cancer Center</name>
+      <address>
+        <city>Albuquerque</city>
+        <state>New Mexico</state>
+        <zip>87131</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>University of New Mexico</name>
+      <address>
+        <city>Albuquerque</city>
+        <state>New Mexico</state>
+        <zip>87131</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Montefiore Medical Center</name>
+      <address>
+        <city>Bronx</city>
+        <state>New York</state>
+        <zip>10461</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Roswell Park Cancer Institute</name>
+      <address>
+        <city>Buffalo</city>
+        <state>New York</state>
+        <zip>14263</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Bassett Healthcare Network</name>
+      <address>
+        <city>Cooperstown</city>
+        <state>New York</state>
+        <zip>11326</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Hematology Oncology Associates of Central New York, PC</name>
+      <address>
+        <city>East Syracuse</city>
+        <state>New York</state>
+        <zip>13057</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Queens Cancer Center of Queens Hospital</name>
+      <address>
+        <city>Jamaica</city>
+        <state>New York</state>
+        <zip>11432</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Monter Cancer Center</name>
+      <address>
+        <city>New Hyde Park</city>
+        <state>New York</state>
+        <zip>11042</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Mount Sinai Beth Israel Comprehensive Cancer Center</name>
+      <address>
+        <city>New York</city>
+        <state>New York</state>
+        <zip>10011</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>New York University Langone Medical Center</name>
+      <address>
+        <city>New York</city>
+        <state>New York</state>
+        <zip>10016</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Memorial Sloan Kettering Cancer Center</name>
+      <address>
+        <city>New York</city>
+        <state>New York</state>
+        <zip>10065</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Oneonta FoxCare Center</name>
+      <address>
+        <city>Oneonta</city>
+        <state>New York</state>
+        <zip>13820</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>SUNY Upstate Medical University</name>
+      <address>
+        <city>Syracuse</city>
+        <state>New York</state>
+        <zip>13210</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>The Charlotte-Mecklenburg Hospital Authority</name>
+      <address>
+        <city>Charlotte</city>
+        <state>North Carolina</state>
+        <zip>28204</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Duke University Medical Center</name>
+      <address>
+        <city>Durham</city>
+        <state>North Carolina</state>
+        <zip>27710</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Cone Health Cancer Center</name>
+      <address>
+        <city>Greensboro</city>
+        <state>North Carolina</state>
+        <zip>27403</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>First Health of the Carolinas</name>
+      <address>
+        <city>Pinehurst</city>
+        <state>North Carolina</state>
+        <zip>28374</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Rapid City Regional Hospital/Regional Cancer Care Institute</name>
+      <address>
+        <city>Rapid City</city>
+        <state>North Dakota</state>
+        <zip>57701</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Cleveland Clinic Cancer Center/Fairview Hospital Moll Pavilion</name>
+      <address>
+        <city>Cleveland</city>
+        <state>Ohio</state>
+        <zip>44111</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Cleveland Clinic</name>
+      <address>
+        <city>Cleveland</city>
+        <state>Ohio</state>
+        <zip>44195</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Ohio State University Comprehensive Cancer Center</name>
+      <address>
+        <city>Columbus</city>
+        <state>Ohio</state>
+        <zip>43210</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Cleveland Clinic Cancer Center/Hillcrest Hospital</name>
+      <address>
+        <city>Mayfield Heights</city>
+        <state>Ohio</state>
+        <zip>44124</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Cancer Centers of Southwest Oklahoma</name>
+      <address>
+        <city>Lawton</city>
+        <state>Oklahoma</state>
+        <zip>73505</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Stephenson Cancer Center</name>
+      <address>
+        <city>Oklahoma City</city>
+        <state>Oklahoma</state>
+        <zip>73104</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>University of Oklahoma Health Sciences Center Stephenson Cancer Center</name>
+      <address>
+        <city>Oklahoma City</city>
+        <state>Oklahoma</state>
+        <zip>73104</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Providence Oncology &amp; Hematology Care Clinic - Eastside</name>
+      <address>
+        <city>Portland</city>
+        <state>Oregon</state>
+        <zip>97213</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Hematology &amp; Oncology Associates of Northeastern PA</name>
+      <address>
+        <city>Dunmore</city>
+        <state>Pennsylvania</state>
+        <zip>18512</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Penn State Milton S Hershey Medical Center</name>
+      <address>
+        <city>Hershey</city>
+        <state>Pennsylvania</state>
+        <zip>17033</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Lancaster General Hospital</name>
+      <address>
+        <city>Lancaster</city>
+        <state>Pennsylvania</state>
+        <zip>17604</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>University of Pennsylvania</name>
+      <address>
+        <city>Philadelphia</city>
+        <state>Pennsylvania</state>
+        <zip>19104</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Pennsylvania Hospital</name>
+      <address>
+        <city>Philadelphia</city>
+        <state>Pennsylvania</state>
+        <zip>19106</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Thomas Jefferson University</name>
+      <address>
+        <city>Philadelphia</city>
+        <state>Pennsylvania</state>
+        <zip>19107</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Fox Chase Cancer Center</name>
+      <address>
+        <city>Philadelphia</city>
+        <state>Pennsylvania</state>
+        <zip>19111</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Allegheny General Hospital</name>
+      <address>
+        <city>Pittsburgh</city>
+        <state>Pennsylvania</state>
+        <zip>15212</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>University of Pittsburgh Cancer Institute- Hillman Cancer Center</name>
+      <address>
+        <city>Pittsburgh</city>
+        <state>Pennsylvania</state>
+        <zip>15232</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Reading Hospital</name>
+      <address>
+        <city>Wyomissing</city>
+        <state>Pennsylvania</state>
+        <zip>19610</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>WellSpan Health-York Hospital</name>
+      <address>
+        <city>York</city>
+        <state>Pennsylvania</state>
+        <zip>17403</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Rhode Island Hospital</name>
+      <address>
+        <city>Providence</city>
+        <state>Rhode Island</state>
+        <zip>02903</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Women &amp; Infants Hospital of Rhode Island</name>
+      <address>
+        <city>Providence</city>
+        <state>Rhode Island</state>
+        <zip>02905</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Lexington Medical Center</name>
+      <address>
+        <city>Columbia</city>
+        <state>South Carolina</state>
+        <zip>29169</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Avera Cancer Institute-Aberdeen</name>
+      <address>
+        <city>Aberdeen</city>
+        <state>South Dakota</state>
+        <zip>57401</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Rapid City Regional Hospital</name>
+      <address>
+        <city>Rapid City</city>
+        <state>South Dakota</state>
+        <zip>57701</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Avera Cancer Institute-Sioux Falls</name>
+      <address>
+        <city>Sioux Falls</city>
+        <state>South Dakota</state>
+        <zip>57105</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Vanderbilt University Medical Center</name>
+      <address>
+        <city>Nashville</city>
+        <state>Tennessee</state>
+        <zip>37204</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Meharry Medical College</name>
+      <address>
+        <city>Nashville</city>
+        <state>Tennessee</state>
+        <zip>37208</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Baylor College of Medicine</name>
+      <address>
+        <city>Houston</city>
+        <state>Texas</state>
+        <zip>77030</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Houston Methodist Hospital</name>
+      <address>
+        <city>Houston</city>
+        <state>Texas</state>
+        <zip>77030</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>University of Texas MD Anderson Cancer Center</name>
+      <address>
+        <city>Houston</city>
+        <state>Texas</state>
+        <zip>77030</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Doctors Hospital of Laredo</name>
+      <address>
+        <city>Laredo</city>
+        <state>Texas</state>
+        <zip>78045</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Huntsman Cancer Institute</name>
+      <address>
+        <city>Salt Lake City</city>
+        <state>Utah</state>
+        <zip>84112</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Inova (Medical Oncology and Hematology of Northern Virginia)</name>
+      <address>
+        <city>Fairfax</city>
+        <state>Virginia</state>
+        <zip>22031</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>VCU Massey Cancer Center Dalton Oncology Clinic</name>
+      <address>
+        <city>Richmond</city>
+        <state>Virginia</state>
+        <zip>23298</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>CAMC Cancer Center</name>
+      <address>
+        <city>Charleston</city>
+        <state>West Virginia</state>
+        <zip>25304</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Fox Valley Hematology and Oncology</name>
+      <address>
+        <city>Appleton</city>
+        <state>Wisconsin</state>
+        <zip>54913</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Saint Vincent Hospital</name>
+      <address>
+        <city>Green Bay</city>
+        <state>Wisconsin</state>
+        <zip>54301</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Gunderson Health System</name>
+      <address>
+        <city>La Crosse</city>
+        <state>Wisconsin</state>
+        <zip>54601</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>University of Wisconsin Hospital</name>
+      <address>
+        <city>Madison</city>
+        <state>Wisconsin</state>
+        <zip>53792</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Wheaton Franciscan Healthcare - St. Joseph</name>
+      <address>
+        <city>Milwaukee</city>
+        <state>Wisconsin</state>
+        <zip>53210</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Columbia St. Mary's</name>
+      <address>
+        <city>Milwaukee</city>
+        <state>Wisconsin</state>
+        <zip>53711</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Wheaton Franciscan Healthcare-All Saints</name>
+      <address>
+        <city>Racine</city>
+        <state>Wisconsin</state>
+        <zip>53405</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Orchard Healthcare Research Inc.</name>
+      <address>
+        <city>Waukesha</city>
+        <state>Wisconsin</state>
+        <zip>53188</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>ProHealth Waukesha</name>
+      <address>
+        <city>Waukesha</city>
+        <state>Wisconsin</state>
+        <zip>53188</zip>
+        <country>United States</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Southern Highlands Cancer Centre</name>
+      <address>
+        <city>Bowral</city>
+        <state>New South Wales</state>
+        <country>Australia</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Coffs Harbour Health Campus - MNCCI</name>
+      <address>
+        <city>Coffs Harbour</city>
+        <state>New South Wales</state>
+        <country>Australia</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>The Breast &amp; Endocrine Centre</name>
+      <address>
+        <city>Gateshead</city>
+        <state>New South Wales</state>
+        <country>Australia</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>CCLHD/Gosford &amp; Wyong Hospitals</name>
+      <address>
+        <city>Gosford</city>
+        <state>New South Wales</state>
+        <country>Australia</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Orange Health Service</name>
+      <address>
+        <city>Orange</city>
+        <state>New South Wales</state>
+        <country>Australia</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Macquarie University Hospital</name>
+      <address>
+        <city>Sydney</city>
+        <state>New South Wales</state>
+        <country>Australia</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Wollongong Hospital</name>
+      <address>
+        <city>Wollongong</city>
+        <state>New South Wales</state>
+        <country>Australia</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Cancer Care Services, Royal Brisbane and Women's Hospital</name>
+      <address>
+        <city>Brisbane</city>
+        <state>Queensland</state>
+        <country>Australia</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Flinders Medical Centre</name>
+      <address>
+        <city>Bedford Park</city>
+        <state>South Australia</state>
+        <country>Australia</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Royal Hobart Hospital</name>
+      <address>
+        <city>Hobart</city>
+        <state>Tasmania</state>
+        <country>Australia</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>The Northern Hospital</name>
+      <address>
+        <city>Epping</city>
+        <state>Victoria</state>
+        <country>Australia</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>St Vincent's Hospital Cancer Centre</name>
+      <address>
+        <city>Fitzroy</city>
+        <state>Victoria</state>
+        <country>Australia</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Barwon Health</name>
+      <address>
+        <city>Geelong</city>
+        <state>Victoria</state>
+        <country>Australia</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Peninsula Health - Frankston Hospital</name>
+      <address>
+        <city>Melbourne</city>
+        <state>Victoria</state>
+        <country>Australia</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Peter MacCallum Cancer Centre</name>
+      <address>
+        <city>Melbourne</city>
+        <state>Victoria</state>
+        <country>Australia</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Western Health, Sunshine Hospital</name>
+      <address>
+        <city>St. Albans</city>
+        <state>Victoria</state>
+        <country>Australia</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>South West Oncology</name>
+      <address>
+        <city>Warrnambool</city>
+        <state>Victoria</state>
+        <country>Australia</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>St John of God Bunbury Hospital</name>
+      <address>
+        <city>Bunbury</city>
+        <state>Western Australia</state>
+        <country>Australia</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Fiona Stanley Hospital</name>
+      <address>
+        <city>Murdoch, Perth</city>
+        <state>Western Australia</state>
+        <country>Australia</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Breast Cancer Research Centre</name>
+      <address>
+        <city>Perth</city>
+        <state>Western Australia</state>
+        <country>Australia</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Tom Baker Cancer Centre</name>
+      <address>
+        <city>Calgary</city>
+        <state>Alberta</state>
+        <zip>T2N4N2</zip>
+        <country>Canada</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>BC Cancer Agency- Abbotsford Centre</name>
+      <address>
+        <city>Abbotsford</city>
+        <state>British Columbia</state>
+        <zip>V2S0C2</zip>
+        <country>Canada</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>BC Cancer Agency - Sindi Ahluwalia Hawkins Centre for the Southern Interior</name>
+      <address>
+        <city>Kelowna</city>
+        <state>British Columbia</state>
+        <zip>V1Y5L3</zip>
+        <country>Canada</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>BC Cancer Agency - Vancouver Centre</name>
+      <address>
+        <city>Vancouver</city>
+        <state>British Columbia</state>
+        <zip>V5Z4E6</zip>
+        <country>Canada</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>CancerCare Manitoba - St. Boniface Hospital</name>
+      <address>
+        <city>Winnipeg</city>
+        <state>Manitoba</state>
+        <zip>R2H2A6</zip>
+        <country>Canada</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>The Vitalite Health Network</name>
+      <address>
+        <city>Moncton</city>
+        <state>New Brunswick</state>
+        <zip>E1C8X3</zip>
+        <country>Canada</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Horizon Health Network - Saint John Regional Hospital</name>
+      <address>
+        <city>Saint John</city>
+        <state>New Brunswick</state>
+        <zip>E2L4L4</zip>
+        <country>Canada</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Queen Elizabeth II Health Sciences Centre</name>
+      <address>
+        <city>Halifax</city>
+        <state>Nova Scotia</state>
+        <zip>B3H2Y9</zip>
+        <country>Canada</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Juravinski Cancer Centre</name>
+      <address>
+        <city>Hamilton</city>
+        <state>Ontario</state>
+        <zip>L8V5C2</zip>
+        <country>Canada</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Kingston General Hospital, Cancer Centre of Southeastern Ontario</name>
+      <address>
+        <city>Kingston</city>
+        <state>Ontario</state>
+        <zip>K7L5P9</zip>
+        <country>Canada</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Grand river regional cancer center, clinical trials</name>
+      <address>
+        <city>Kitchener</city>
+        <state>Ontario</state>
+        <zip>N2G1G3</zip>
+        <country>Canada</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Niagara Health System - St. Catharines</name>
+      <address>
+        <city>St. Catharines</city>
+        <state>Ontario</state>
+        <zip>L2S0A9</zip>
+        <country>Canada</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Sunnybrook Hospital</name>
+      <address>
+        <city>Toronto</city>
+        <state>Ontario</state>
+        <zip>M4N3M</zip>
+        <country>Canada</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Princess Margaret Hospital (PMH), University Health Network (UHN) Princess Margret Cancer Centre</name>
+      <address>
+        <city>Toronto</city>
+        <state>Ontario</state>
+        <zip>M5G1X5</zip>
+        <country>Canada</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Jewish General Hospital</name>
+      <address>
+        <city>Montréal</city>
+        <state>Quebec</state>
+        <zip>H2L4M1</zip>
+        <country>Canada</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>CHUM - Hôtel-Dieu de Montréal</name>
+      <address>
+        <city>Montréal</city>
+        <state>Quebec</state>
+        <zip>H2W1T8</zip>
+        <country>Canada</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>CHU de Québec - Hôpital du St Sacrement</name>
+      <address>
+        <city>Québec</city>
+        <state>Quebec</state>
+        <zip>G1S4L8</zip>
+        <country>Canada</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Allan Blair Canacer Centre</name>
+      <address>
+        <city>Regina</city>
+        <state>Saskatchewan</state>
+        <zip>1190</zip>
+        <country>Canada</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Saskatoon Cancer Center, University of Saskatchewan</name>
+      <address>
+        <city>Saskatoon</city>
+        <state>Saskatchewan</state>
+        <zip>S7N4H4</zip>
+        <country>Canada</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Rabin Medical Center (RMC)</name>
+      <address>
+        <city>Petah Tikva</city>
+        <state>Central</state>
+        <country>Israel</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Sheba Medical Center Tel Hashomer</name>
+      <address>
+        <city>Ramat Gan</city>
+        <state>Tel Aviv</state>
+        <country>Israel</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Sourasky Medical Center</name>
+      <address>
+        <city>Tel Aviv</city>
+        <country>Israel</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Nagoya City University Hospital</name>
+      <address>
+        <city>Nagoya</city>
+        <state>Aichi</state>
+        <zip>467-860</zip>
+        <country>Japan</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>National Hospital Organization Hokkaido Cancer Center</name>
+      <address>
+        <city>Sapporo</city>
+        <state>Hokkaido</state>
+        <zip>003-080</zip>
+        <country>Japan</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>National Cancer Center Hospital East</name>
+      <address>
+        <city>Chiba</city>
+        <zip>260-871</zip>
+        <country>Japan</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Kyoto University Hospital</name>
+      <address>
+        <city>Kyoto</city>
+        <zip>606-850</zip>
+        <country>Japan</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>National Hospital Organization Osaka National Hospital</name>
+      <address>
+        <city>Osaka</city>
+        <zip>540-000</zip>
+        <country>Japan</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Osaka International Cancer Institute</name>
+      <address>
+        <city>Osaka</city>
+        <zip>540-000</zip>
+        <country>Japan</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Yonsei University, Severance Hospital</name>
+      <address>
+        <city>Seoul</city>
+        <zip>03722</zip>
+        <country>Korea, Republic of</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Seoul National Univ. Hospital (SNUH), Cancer Hospital</name>
+      <address>
+        <city>Seoul</city>
+        <zip>110744</zip>
+        <country>Korea, Republic of</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Samsung Medical Centre (SMC)</name>
+      <address>
+        <city>Seoul</city>
+        <zip>135710</zip>
+        <country>Korea, Republic of</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Centro Oncológico Estatal ISSEMyM</name>
+      <address>
+        <city>Toluca de Lerdo</city>
+        <state>Toluca</state>
+        <zip>50180</zip>
+        <country>Mexico</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>National Cancer Institute Mexico (Instituto Nacional de Cancerología)</name>
+      <address>
+        <city>Mexico</city>
+        <zip>14080</zip>
+        <country>Mexico</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Centro Médico Zambrano Hellion</name>
+      <address>
+        <city>Nuevo León</city>
+        <zip>66278</zip>
+        <country>Mexico</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Kantonspital Baden</name>
+      <address>
+        <city>Baden</city>
+        <state>Aargau</state>
+        <zip>5404</zip>
+        <country>Switzerland</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Spital STS AG, Onkologiezentrum Thun-Berner Oberland</name>
+      <address>
+        <city>Thun</city>
+        <state>Bern</state>
+        <country>Switzerland</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Hôpitaux Universitaires de Genève</name>
+      <address>
+        <city>Genève</city>
+        <state>Geneva</state>
+        <country>Switzerland</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Kantonsspital Graubünden</name>
+      <address>
+        <city>Chur</city>
+        <state>Graubünden</state>
+        <country>Switzerland</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Ospedale San Giovanni-Bellinzona, IOSI-Breast Cancer Unit</name>
+      <address>
+        <city>Bellinzona</city>
+        <state>Tessin</state>
+        <country>Switzerland</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Fondazione Oncologia Lago Maggiore</name>
+      <address>
+        <city>Locarno</city>
+        <state>Tessin</state>
+        <zip>6600</zip>
+        <country>Switzerland</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>University Hospital</name>
+      <address>
+        <city>Basel</city>
+        <country>Switzerland</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>HFR Fribourg</name>
+      <address>
+        <city>Fribourg</city>
+        <zip>1708</zip>
+        <country>Switzerland</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Klinik St. Anna</name>
+      <address>
+        <city>Luzern</city>
+        <zip>6006</zip>
+        <country>Switzerland</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Luzerner Kantonsspital</name>
+      <address>
+        <city>Luzern</city>
+        <country>Switzerland</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Kantonsspital St.Gallen</name>
+      <address>
+        <city>St.Gallen</city>
+        <country>Switzerland</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Universitätsspital Zürich</name>
+      <address>
+        <city>Zurich</city>
+        <zip>8091</zip>
+        <country>Switzerland</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Brust-Zentrum Zürich</name>
+      <address>
+        <city>Zurich</city>
+        <country>Switzerland</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Changhua Christian Hospital</name>
+      <address>
+        <city>Changhua</city>
+        <state>Changhua County</state>
+        <zip>500</zip>
+        <country>Taiwan</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Kaohsiung Medical University Hospital</name>
+      <address>
+        <city>Kaohsiung</city>
+        <zip>807</zip>
+        <country>Taiwan</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>National Cheng Kung University Hospital</name>
+      <address>
+        <city>Tainan</city>
+        <country>Taiwan</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>National Taiwan University Hospital</name>
+      <address>
+        <city>Taipei</city>
+        <zip>100</zip>
+        <country>Taiwan</country>
+      </address>
+    </facility>
+  </location>
+  <location>
+    <facility>
+      <name>Taipei Veterans General Hospital</name>
+      <address>
+        <city>Taipei</city>
+        <zip>112</zip>
+        <country>Taiwan</country>
+      </address>
+    </facility>
+  </location>
+  <location_countries>
+    <country>Australia</country>
+    <country>Canada</country>
+    <country>Israel</country>
+    <country>Japan</country>
+    <country>Korea, Republic of</country>
+    <country>Mexico</country>
+    <country>Switzerland</country>
+    <country>Taiwan</country>
+    <country>United States</country>
+  </location_countries>
+  <verification_date>December 2019</verification_date>
+  <study_first_submitted>July 29, 2015</study_first_submitted>
+  <study_first_submitted_qc>July 30, 2015</study_first_submitted_qc>
+  <study_first_posted type="Estimate">July 31, 2015</study_first_posted>
+  <last_update_submitted>March 6, 2020</last_update_submitted>
+  <last_update_submitted_qc>March 6, 2020</last_update_submitted_qc>
+  <last_update_posted type="Actual">March 9, 2020</last_update_posted>
+  <responsible_party>
+    <responsible_party_type>Sponsor</responsible_party_type>
+  </responsible_party>
+  <keyword>HR+/HER2- breast cancer</keyword>
+  <keyword>Palbociclib</keyword>
+  <condition_browse>
+    <!-- CAUTION:  The following MeSH terms are assigned with an imperfect algorithm            -->
+    <mesh_term>Breast Neoplasms</mesh_term>
+  </condition_browse>
+  <intervention_browse>
+    <!-- CAUTION:  The following MeSH terms are assigned with an imperfect algorithm            -->
+    <mesh_term>Palbociclib</mesh_term>
+  </intervention_browse>
+  <!-- Results have not yet been posted for this study                                          -->
+</clinical_study>
+

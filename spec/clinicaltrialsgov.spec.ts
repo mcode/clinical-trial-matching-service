@@ -1,9 +1,11 @@
-import { getContainedResource, ResearchStudy as ResearchStudyObj } from './../src/research-study';
+// Important: mockfs has to be imported first
+import mockfs from 'mock-fs';
+
+import { getContainedResource, ResearchStudy as ResearchStudyObj } from '../src/research-study';
 import { Address, Location, ResearchStudy, ContainedResource } from '../src/fhir-types';
-import * as ctg from '../src/clinicaltrialgov';
+import * as ctg from '../src/clinicaltrialsgov';
 import fs from 'fs';
 import stream from 'stream';
-import os from 'os';
 import path from 'path';
 import nock from 'nock';
 // Trial missing summary, inclusion/exclusion criteria, phase and study type
@@ -129,29 +131,44 @@ describe('parseClinicalTrialXML', () => {
   });
 });
 
-describe('ClinicalTrialGovService', () => {
-  const study: ResearchStudy = trialMissing.entry[0].resource as ResearchStudy;
-  const nctID = ctg.findNCTNumber(study);
-  if (nctID === null) {
-    // This indicates a failure in test cases
-    throw new Error('ResearchStudy has no NCT number');
-  }
-  const nctIds = [nctID];
-  const tempDataDirPath = path.join(os.tmpdir(), 'clinicaltrialgov_test');
+describe('ClinicalTrialsGovService', () => {
+  // The data dir path
+  const dataDirPath = './ctg-cache';
+  let study: ResearchStudy, nctID: ctg.NCTNumber, nctIds: ctg.NCTNumber[];
+  beforeAll(() => {
+    study = trialMissing.entry[0].resource as ResearchStudy;
+    const maybeNctID = ctg.findNCTNumber(study);
+    if (maybeNctID === null) {
+      // This indicates a failure in test cases
+      throw new Error('ResearchStudy has no NCT number');
+    } else {
+      nctID = maybeNctID;
+    }
+    // Create our mock FS
+    mockfs({
+      'ctg-cache/xml/NCT02513394.xml': mockfs.load(specFilePath('NCT02513394.xml')),
+      'existing-file': 'Existing stub',
+      'ctg-cache-empty': { /* An empty virtual directory */ }
+    });
+  });
+
+  afterAll(() => {
+    mockfs.restore();
+  });
 
   it('can set a custom logger', () => {
     const customLogger = (): void => {
       // Do nothing
     };
-    const instance = new ctg.ClinicalTrialGovService(tempDataDirPath, customLogger);
+    const instance = new ctg.ClinicalTrialsGovService(dataDirPath, { log: customLogger });
     expect(instance['log']).toEqual(customLogger);
   });
 
   describe('#maxTrialsPerRequest', () => {
-    let service: ctg.ClinicalTrialGovService;
+    let service: ctg.ClinicalTrialsGovService;
     beforeEach(() => {
       // The service is never initialized so the temp directory isn't created
-      service = new ctg.ClinicalTrialGovService(tempDataDirPath);
+      service = new ctg.ClinicalTrialsGovService(dataDirPath);
     });
     it('does not allow values less than 1 to be set', () => {
       // First, set it to a known value - this also makes sure get works
@@ -171,33 +188,21 @@ describe('ClinicalTrialGovService', () => {
   });
 
   describe('#init', () => {
-    let downloader: ctg.ClinicalTrialGovService;
+    let downloader: ctg.ClinicalTrialsGovService;
     beforeEach(() => {
-      downloader = new ctg.ClinicalTrialGovService(tempDataDirPath);
+      downloader = new ctg.ClinicalTrialsGovService(dataDirPath);
     });
 
-    it('handles the directory already existing', () => {
-      const dirSpy = jasmine.createSpyObj('fs.dir', ['close']);
-      dirSpy.close.and.callFake((callback: () => void) => {
-        callback();
+    it('restores cache entries in an existing directory', () => {
+      return expectAsync(downloader.init()).toBeResolved().then(async () => {
+        // Make sure the virtual cache entry exists
+        expect(downloader['cache'].has(nctID)).toBeTrue();
       });
-      // because we don't override promisify, we need to "delete" the type data
-      (spyOn(fs, 'opendir') as jasmine.Spy).and.callFake((path, callback) => {
-        expect(path).toEqual(tempDataDirPath);
-        callback(undefined, dirSpy);
-      });
-      return expectAsync(downloader.init()).toBeResolved();
     });
 
     it('handles the directory already existing but not being a directory', () => {
-      // because we don't override promisify, we need to "delete" the type data
-      (spyOn(fs, 'opendir') as jasmine.Spy).and.callFake((path, callback) => {
-        expect(path).toEqual(tempDataDirPath);
-        const err: NodeJS.ErrnoException = new Error('Simulated does not exist');
-        err.code = 'ENOTDIR';
-        callback(err);
-      });
-      return expectAsync(downloader.init()).toBeRejected();
+      const testService = new ctg.ClinicalTrialsGovService('existing-file');
+      return expectAsync(testService.init()).toBeRejected();
     });
 
     it('handles the directory close failing', () => {
@@ -207,7 +212,7 @@ describe('ClinicalTrialGovService', () => {
       });
       // because we don't override promisify, we need to "delete" the type data
       (spyOn(fs, 'opendir') as jasmine.Spy).and.callFake((path, callback) => {
-        expect(path).toEqual(tempDataDirPath);
+        expect(path).toEqual(dataDirPath);
         callback(undefined, dirSpy);
       });
       // Should resolve anyway
@@ -215,31 +220,26 @@ describe('ClinicalTrialGovService', () => {
     });
 
     it("creates the directory if it doesn't exist", () => {
-      // because we don't override promisify, we need to "delete" the type data
-      (spyOn(fs, 'opendir') as jasmine.Spy).and.callFake((path, callback) => {
-        expect(path).toEqual(tempDataDirPath);
-        const err: NodeJS.ErrnoException = new Error('Simulated does not exist');
-        err.code = 'ENOENT';
-        callback(err);
+      const testService = new ctg.ClinicalTrialsGovService('new-ctg-cache');
+      return expectAsync(testService.init()).toBeResolved().then(() => {
+        // Make sure the mocked directory exists - because this is being mocked,
+        // just use sync fs functions
+        expect(() => {
+          fs.readdirSync('new-ctg-cache');
+        }).not.toThrow();
       });
-      (spyOn(fs, 'mkdir') as jasmine.Spy).and.callFake((path, options, callback) => {
-        expect(path).toEqual(tempDataDirPath);
-        expect(options.recursive).toEqual(true);
-        callback();
-      });
-      return expectAsync(downloader.init()).toBeResolved();
     });
 
     it('handles the directory creation failing', () => {
       // because we don't override promisify, we need to "delete" the type data
       (spyOn(fs, 'opendir') as jasmine.Spy).and.callFake((path, callback) => {
-        expect(path).toEqual(tempDataDirPath);
+        expect(path).toEqual(dataDirPath);
         const err: NodeJS.ErrnoException = new Error('Simulated does not exist');
         err.code = 'ENOENT';
         callback(err);
       });
       (spyOn(fs, 'mkdir') as jasmine.Spy).and.callFake((path, options, callback) => {
-        expect(path).toEqual(tempDataDirPath);
+        expect(path).toEqual(dataDirPath);
         expect(options.recursive).toEqual(true);
         callback(new Error('Simulated error'));
       });
@@ -248,14 +248,14 @@ describe('ClinicalTrialGovService', () => {
   });
 
   describe('#updateResearchStudies', () => {
-    let service: ctg.ClinicalTrialGovService;
+    let service: ctg.ClinicalTrialsGovService;
     let downloadTrialsSpy: jasmine.Spy;
     // We need to spy on rmdir because it'll try and delete the temporary directory which we don't actually create
     let rmdirSpy: jasmine.Spy;
 
     beforeEach(() => {
       // The service is never initialized
-      service = new ctg.ClinicalTrialGovService(tempDataDirPath);
+      service = new ctg.ClinicalTrialsGovService(dataDirPath);
       // TypeScript won't allow us to install spies the "proper" way on private methods
       service['downloadTrials'] = downloadTrialsSpy = jasmine.createSpy('downloadTrials').and.callFake(() => {
         return Promise.resolve('ignored');
@@ -279,13 +279,10 @@ describe('ClinicalTrialGovService', () => {
       ];
       const testStudy = createClinicalStudy();
       const updateSpy = spyOn(service, 'updateResearchStudy').and.returnValue();
-      const getTrialSpy = jasmine.createSpy('getDownloadedTrial').and.callFake((_ignored: string, nctId: string) => {
+      const getTrialSpy = jasmine.createSpy('getCachedClinicalStudy').and.callFake((nctId: string) => {
         return Promise.resolve(nctId === 'NCT00000002' ? null : testStudy);
       });
-      // Have to force the getDownloadedTrial spy onto the service as the method is private
-      // (This also lets us ignore that the type returned from the spy is technically wrong. It doesn't matter, because
-      // its only ever sent to our own spies.)
-      service['getDownloadedTrial'] = getTrialSpy;
+      service.getCachedClinicalStudy = getTrialSpy;
       return expectAsync(
         service.updateResearchStudies(testStudies).then(() => {
           expect(downloadTrialsSpy).toHaveBeenCalledOnceWith(['NCT00000001', 'NCT00000002', 'NCT00000003']);
@@ -329,11 +326,10 @@ describe('ClinicalTrialGovService', () => {
       ];
       const testStudy = createClinicalStudy();
       spyOn(service, 'updateResearchStudy').and.returnValue();
-      const getTrialSpy = jasmine.createSpy('getDownloadedTrial').and.callFake(() => {
+      const getTrialSpy = jasmine.createSpy('getCachedClinicalStudy').and.callFake(() => {
         return Promise.resolve(testStudy);
       });
-      // Have to force the getDownloadedTrial spy onto the service as the method is private
-      service['getDownloadedTrial'] = getTrialSpy;
+      service.getCachedClinicalStudy = getTrialSpy;
       return expectAsync(
         service.updateResearchStudies(testStudies).then(() => {
           expect(downloadTrialsSpy.calls.count()).toEqual(2);
@@ -345,9 +341,9 @@ describe('ClinicalTrialGovService', () => {
   });
 
   describe('#downloadTrials', () => {
-    let downloader: ctg.ClinicalTrialGovService;
+    let downloader: ctg.ClinicalTrialsGovService;
     beforeEach(() => {
-      return ctg.createClinicalTrialGovService(tempDataDirPath).then((service) => {
+      return ctg.createClinicalTrialsGovService(dataDirPath).then((service) => {
         downloader = service;
       });
     });
@@ -385,9 +381,9 @@ describe('ClinicalTrialGovService', () => {
   });
 
   describe('#extractResults', () => {
-    let downloader: ctg.ClinicalTrialGovService;
+    let downloader: ctg.ClinicalTrialsGovService;
     beforeEach(() => {
-      return ctg.createClinicalTrialGovService(tempDataDirPath).then((service) => {
+      return ctg.createClinicalTrialsGovService(dataDirPath).then((service) => {
         downloader = service;
       });
     });
@@ -395,13 +391,13 @@ describe('ClinicalTrialGovService', () => {
     it('handles the extract failing', () => {
       // For now, just give it a file that does not exist
       return expectAsync(
-        downloader.extractResults(fs.createReadStream(specFilePath('does_not_exists.file')))
+        downloader['extractResults'](fs.createReadStream(specFilePath('does_not_exists.file')))
       ).toBeRejected();
     });
 
     it('handles an invalid ZIP', () => {
       // For now, give it a JSON file to extract
-      return expectAsync(downloader.extractResults(fs.createReadStream(specFilePath('resource.json')))).toBeRejected();
+      return expectAsync(downloader['extractResults'](fs.createReadStream(specFilePath('resource.json')))).toBeRejected();
     });
 
     it('handles deleting the temporary ZIP failing', () => {
@@ -413,20 +409,20 @@ describe('ClinicalTrialGovService', () => {
       downloader['extractZip'] = jasmine.createSpy('extractZip').and.callFake(() => {
         return Promise.resolve();
       });
-      return expectAsync(downloader.extractResults(stream.Readable.from('Test'))).toBeResolved();
+      return expectAsync(downloader['extractResults'](stream.Readable.from('Test'))).toBeResolved();
     });
   });
 
-  describe('#getDownloadedTrial', () => {
-    let downloader: ctg.ClinicalTrialGovService;
+  describe('#getCachedClinicalStudy', () => {
+    let downloader: ctg.ClinicalTrialsGovService;
     beforeEach(() => {
-      return ctg.createClinicalTrialGovService(tempDataDirPath).then((service) => {
+      return ctg.createClinicalTrialsGovService(dataDirPath).then((service) => {
         downloader = service;
       });
     });
     it('handles a file that does not exist', () => {
       // Intentionally call private method (this is a test after all)
-      return expectAsync(downloader['getDownloadedTrial']('ignored', 'this is an invalid id')).toBeResolvedTo(null);
+      return expectAsync(downloader.getCachedClinicalStudy('this is an invalid id')).toBeResolvedTo(null);
     });
     it('handles a file read failing', () => {
       (spyOn(fs, 'readFile') as jasmine.Spy).and.callFake(
@@ -434,13 +430,13 @@ describe('ClinicalTrialGovService', () => {
           callback(new Error('Simulated error'), '');
         }
       );
-      return expectAsync(downloader['getDownloadedTrial']('ignored', 'invalid')).toBeRejected();
+      return expectAsync(downloader.getCachedClinicalStudy('invalid')).toBeRejected();
     });
   });
 
   describe('#updateResearchStudy', () => {
     it('forwards to updateResearchStudyWithClinicalStudy', () => {
-      const service = new ctg.ClinicalTrialGovService(tempDataDirPath);
+      const service = new ctg.ClinicalTrialsGovService(dataDirPath);
       const testResearchStudy = createResearchStudy('test');
       const testClinicalStudy = createClinicalStudy();
       service.updateResearchStudy(testResearchStudy, testClinicalStudy);
@@ -450,15 +446,15 @@ describe('ClinicalTrialGovService', () => {
 
   describe('filling out a partial trial', () => {
     // Downloader is still required because the test data is within the test zip
-    let downloader: ctg.ClinicalTrialGovService;
+    let downloader: ctg.ClinicalTrialsGovService;
     let updatedTrial: ResearchStudy;
     let clinicalStudy: ClinicalStudy;
     beforeAll(async function () {
-      downloader = new ctg.ClinicalTrialGovService(tempDataDirPath);
+      downloader = new ctg.ClinicalTrialsGovService(dataDirPath);
       await downloader.init();
       // "Import" the trial
-      const tempDir = await downloader.extractResults(fs.createReadStream(specFilePath('search_result.zip')));
-      const maybeStudy = await downloader['getDownloadedTrial'](tempDir, nctID);
+      await downloader['extractResults'](fs.createReadStream(specFilePath('search_result.zip')));
+      const maybeStudy = await downloader.getCachedClinicalStudy(nctID);
       if (maybeStudy === null) {
         throw new Error('Unable to open study');
       } else {
@@ -725,15 +721,5 @@ describe('ClinicalTrialGovService', () => {
       });
       expectEmptyResearchStudy(researchStudy);
     });
-  });
-
-  afterAll(function (done) {
-    // Clean up temp directory
-    fs.rmdir(tempDataDirPath, { recursive: true }, (err) => {
-      if (err) {
-        console.log(err);
-      }
-    });
-    done();
   });
 });
