@@ -180,9 +180,11 @@ function convertArrayToCodeableConcept(trialConditions: string[]): CodeableConce
  * A cache entry. Cache entries basically operate in two modes: an entry that is pending being written based on a ZIP
  * file, and a file that has a backing file ready to be loaded.
  *
- * The pending state is kind of weird
+ * The pending state is kind of weird because an entry is pending once a download has been requested for it, but cannot
+ * be properly fulfilled until the file data has been saved. There's no really good way to wrap that in a Promise so
+ * instead the resolve method is stored until the pending state can be resolved.
  */
-class CacheEntry {
+export class CacheEntry {
   // Dates are, sadly, mutable via set methods. This makes it impractical to attempt to make them immutable.
   private _createdAt: Date;
   private _lastAccess: Date;
@@ -212,25 +214,30 @@ class CacheEntry {
       });
     }
   }
-  get createdAt() {
+  get createdAt(): Date {
     return new Date(this._createdAt);
   }
-  get lastAccess() {
+  get lastAccess(): Date {
     return new Date(this._lastAccess);
   }
-  get pending() {
+  get pending(): boolean {
     return this._pending !== undefined;
   }
   lastAccessedBefore(date: Date): boolean {
     return this._lastAccess < date;
   }
-  ready() {
+
+  /**
+   * Resolves the pending state (if the entry was pending), otherwise does nothing.
+   */
+  ready(): void {
     if (this._resolvePending) {
       this._resolvePending();
     }
     this._pending = undefined;
     this._resolvePending = undefined;
   }
+
   /**
    * Loads the underlying file. If the entry is still pending, then the file is read once the entry is ready.
    */
@@ -285,41 +292,27 @@ class CacheEntry {
 }
 
 /**
- * Create a directory if it does not already exist, checking to make sure that the given path is in fact a directory
- * before resolving the Promise. This is exported to allow unit testing, it is not public API.
- * @param path the path to ensure is a directory
+ * Create a directory if it does not already exist. If it does exist (or some other file exists in its place), this
+ * still resolves rather than raising an error. This used to check if the paths were really directories, but since the
+ * final step is now reading the file entries from the directory anyway, that check ensures everything is a directory
+ * anyway.
+ *
+ * @param path the path to create (will be created recursively)
  * @return a Promise that resolves as true if the directory was newly created or false if it existed
  */
 export function mkdir(path: string): Promise<boolean> {
   return new Promise<boolean>((resolve, reject) => {
-    fs.opendir(path, (err, dir) => {
+    fs.mkdir(path, (err) => {
       if (err) {
-        // Check to see if the err is ENOENT - this is OK and means we should
-        // create the directory
-        if (err.code === 'ENOENT') {
-          fs.mkdir(path, { recursive: true }, (err) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(true);
-            }
-          });
+        if (err.code === 'EEXIST') {
+          // This is fine - resolve false. We'll only get this if the final part of the path exists (although it will be
+          // EEXIST regardless of if it's a directory or a regular file)
+          resolve(false);
         } else {
-          // Otherwise, this error can't be handled
           reject(err);
         }
       } else {
-        // If we successfully opened the directory, we want to check for
-        // existing cache data
-        dir.close((err) => {
-          if (err) {
-            // FIXME: Currently always logs to the default log
-            // It's unclear how to best fix this
-            debuglog('ctgovservice')('Error closing data directory: %o', err);
-            // Fall through and resolve anyway, it probably doesn't matter
-          }
-          resolve(false);
-        });
+        resolve(true);
       }
     });
   });
@@ -418,22 +411,24 @@ export class ClinicalTrialsGovService {
   private cache = new Map<NCTNumber, CacheEntry>();
 
   /**
-   * Creates a new instance. This does NOT check that the data directory exists,
-   * use init() for that.
+   * Creates a new instance. This will not initialize the cache or load anything, this merely creates the object. Use
+   * the #init() method to initialize the service and load existing data. (Or use createClinicalTrialsGovService() do
+   * construct and initialize at the same time.)
    *
-   * @param dataDir the data directory to use
+   * @param dataDir the directory to use for cache data
    * @param log an optional function to receive debug log messages. By default this uses util.debuglog('ctgovservice')
    *     meaning that the log can be activated by setting NODE_DEBUG to "ctgovservice"
    */
-  constructor(public dataDir: string, options?: ClinicalTrialsGovServiceOptions) {
-    this.cacheDataDir = path.join(dataDir, 'xml');
+  constructor(public readonly dataDir: string, options?: ClinicalTrialsGovServiceOptions) {
+    this.cacheDataDir = path.join(dataDir, 'data');
     const log = options ? options.log : null;
     // If no log was given, create it
     this.log = log ?? debuglog('ctgovservice');
   }
 
   /**
-   * Creates the data directory if necessary.
+   * Creates the necessary directories if they do not exist, and loads any existing data into the cache. Parent
+   * directories of the cache will not be created automatically, they must already exist.
    */
   async init(): Promise<void> {
     this.log('Using %s as cache dir for clinicaltrials.gov data', this.dataDir);
@@ -444,6 +439,8 @@ export class ClinicalTrialsGovService {
       // If both directories existed, it's necessary to restore the cache directory
       await this.restoreCacheFromFS();
       this.log('Restored existing cache data.');
+    } else {
+      this.log(baseDirExisted ? 'Created XML directory for storing result' : 'Created new cache directory');
     }
   }
 
@@ -615,7 +612,7 @@ export class ClinicalTrialsGovService {
         this.cache.set(id, new CacheEntry(this.pathForNctNumber(id), { pending: true }));
       }
     }
-    return new Promise<void>((resolve, reject) => {
+    const result = new Promise<void>((resolve, reject) => {
       this.log('Fetching [%s]', url);
       this.getURL(url, (response) => {
         if (response.statusCode !== 200) {
@@ -631,10 +628,20 @@ export class ClinicalTrialsGovService {
         this.log('Error fetching [%s]: %o', url, error);
         reject(error);
       });
-    }).catch(() => {
+    })
+    // Add a catch handler
+    result.catch(() => {
       // If an error occurred within this promise, every cache entry we just loaded may be invalid.
       this.log('Invalidating cache entry IDs for: %s', ids);
+      for (const id of ids) {
+        const entry = this.cache.get(id);
+        if (entry && entry.pending) {
+          this.cache.delete(id);
+        }
+      }
     });
+    // But return the root promise (otherwise we chain off the result handler)
+    return result;
   }
 
   /**
@@ -817,19 +824,34 @@ export class ClinicalTrialsGovService {
   updateResearchStudy(researchStudy: ResearchStudy, clinicalStudy: ClinicalStudy): void {
     updateResearchStudyWithClinicalStudy(researchStudy, clinicalStudy);
   }
+
+  /**
+   * Creates and initializes a new service for retrieving data from http://clinicaltrials.gov/. This will automatically
+   * invoke the init method to create the directory if it doesn't exist and load any existing data if it does. Note that
+   * the init method will not create missing parent directories - the path to the cache directory must already exist
+   * minus the cache directory itself. If the cache directory cannot be created the Promise will be rejected with the
+   * error preventing it from being created.
+   *
+   * @param dataDir the data directory
+   * @param options additional options that can be set to further configure the trial service
+   * @returns a Promise that resolves when the service is ready
+   */
+  static create(dataDir: string, options?: ClinicalTrialsGovServiceOptions): Promise<ClinicalTrialsGovService> {
+    const result = new ClinicalTrialsGovService(dataDir, options);
+    return result.init().then(() => result);
+  }
 }
 
 /**
- * Creates and initializes a new service for retrieving data from http://clinicaltrials.gov/.
+ * Creates and initializes a new service for retrieving data from http://clinicaltrials.gov/. This is the same as
+ * ClinicalTrialsGovService.create, see that method for details.
  *
- * This is effectively the same as new ClinicalTrialsGovService(dataDir).init().
  * @param dataDir the data directory
  * @param options additional options that can be set to further configure the trial service
  * @returns a Promise that resolves when the service is ready
  */
 export function createClinicalTrialsGovService(dataDir: string, options?: ClinicalTrialsGovServiceOptions): Promise<ClinicalTrialsGovService> {
-  const result = new ClinicalTrialsGovService(dataDir, options);
-  return result.init().then(() => result);
+  return ClinicalTrialsGovService.create(dataDir, options);
 }
 
 /**
