@@ -259,7 +259,7 @@ export class CacheEntry {
   /**
    * Always attempt to read the file, regardless of whether or not the entry is pending.
    */
-  private readFile(): Promise<ClinicalStudy> {
+  readFile(): Promise<ClinicalStudy> {
     return new Promise((resolve, reject) => {
       fs.readFile(this.filename, { encoding: 'utf8' }, (err, data) => {
         if (err) {
@@ -779,21 +779,30 @@ export class ClinicalTrialsGovService {
     // The cache entry should already exist
     const filename = path.join(this.cacheDataDir, nctNumber + '.xml');
     const promise = new Promise<void>((resolve, reject) => {
+      // This indicates whether no error was raised - close can get called anyway, and it's slightly cleaner to just
+      // mark that an error happened and ignore the close handler if it did.
+      // (This also potentially allows us to do additional cleanup on close if an error happened.)
+      let success = true;
       dataStream.pipe(fs.createWriteStream(filename)).on('error', (err) => {
-          // If the cache entry exists in pending mode, delete it - we failed to create this entry
-          const entry = this.cache.get(nctNumber);
-          if (entry && entry.pending) {
-            this.cache.delete(nctNumber);
-          }
-          reject(err);
-        }).on('close', () => {
+        // If the cache entry exists in pending mode, delete it - we failed to create this entry
+        // TODO: Does this failure destroy the existing cache entry?
+        const entry = this.cache.get(nctNumber);
+        if (entry && entry.pending) {
+          this.cache.delete(nctNumber);
+        }
+        // TODO: Do we also need to delete the file? Or will the error prevent the file from existing?
+        success = false;
+        reject(err);
+      }).on('close', () => {
+        if (success) {
           // Once saved, resolve both the pending entry and this promise
           const entry = this.cache.get(nctNumber);
           if (entry && entry.pending) {
             entry.ready();
           }
           resolve();
-        });
+        }
+      });
     });
     return promise;
   }

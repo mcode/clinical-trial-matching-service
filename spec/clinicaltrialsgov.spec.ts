@@ -7,6 +7,8 @@ import * as ctg from '../src/clinicaltrialsgov';
 import fs from 'fs';
 import stream from 'stream';
 import path from 'path';
+import { EventEmitter } from 'events';
+import yauzl from 'yauzl';
 import nock from 'nock';
 // Trial missing summary, inclusion/exclusion criteria, phase and study type
 import trialMissing from './data/resource.json';
@@ -128,6 +130,101 @@ describe('parseClinicalTrialXML', () => {
     return expectAsync(ctg.parseClinicalTrialXML('<?xml version="1.0"?><root><child/></root>')).toBeRejectedWithError(
       'Unable to parse trial as valid clinical study XML'
     );
+  });
+});
+
+describe('CacheEntry', () => {
+  // Constant start time
+  const startTime = new Date(2021, 0, 21, 12, 0, 0, 0);
+  describe('createdAt', () => {
+    beforeAll(() => {
+      jasmine.clock().install();
+      jasmine.clock().mockDate(startTime);
+    });
+    afterAll(() => {
+      jasmine.clock().uninstall();
+    });
+    it('sets the created at time', () => {
+      const entry = new ctg.CacheEntry('test', {});
+      expect(entry.createdAt).toEqual(startTime);
+    });
+    it('clones the created at time', () => {
+      const entry = new ctg.CacheEntry('test', {});
+      entry.createdAt.setMonth(5);
+      expect(entry.createdAt).toEqual(startTime);
+    });
+  });
+  describe('lastAccess', () => {
+    beforeAll(() => {
+      jasmine.clock().install();
+    });
+    beforeEach(() => {
+      // Reset the clock
+      jasmine.clock().mockDate(startTime);
+    });
+    afterAll(() => {
+      jasmine.clock().uninstall();
+    });
+    it('sets the last access time', () => {
+      const entry = new ctg.CacheEntry('test', {});
+      expect(entry.lastAccess).toEqual(startTime);
+    });
+    it('clones the last access time', () => {
+      const entry = new ctg.CacheEntry('test', {});
+      entry.lastAccess.setMonth(5);
+      expect(entry.lastAccess).toEqual(startTime);
+    });
+    it('updates the last access time if accessed', () => {
+      const entry = new ctg.CacheEntry('test', {});
+      // This spy exists to prevent an attempt from actually reading the file
+      spyOn(entry, 'readFile').and.callFake(() => {
+        return Promise.resolve(createClinicalStudy());
+      });
+      // Move forward a minute
+      jasmine.clock().tick(60000);
+      const promise = entry.load();
+      // Last access should now be a minute after the start time
+      expect(entry.lastAccess).toEqual(new Date(2021, 0, 21, 12, 1, 0, 0));
+      return expectAsync(promise).toBeResolved();
+    });
+    describe('#lastAccessBefore', () => {
+      it('determines if a date is before the last access time', () => {
+        const entry = new ctg.CacheEntry('test', {});
+        expect(entry.lastAccessedBefore(new Date(2021, 0, 21, 11, 59, 59, 999))).toBeFalse();
+        // Exactly the same time is not before
+        expect(entry.lastAccessedBefore(startTime)).toBeFalse();
+        expect(entry.lastAccessedBefore(new Date(2021, 0, 21, 12, 0, 0, 1))).toBeTrue();
+      });
+    });
+  });
+  describe('pending', () => {
+    it('resolves a load once pending resolves', () => {
+      // This test is kind of weird, but first, create an entry in the pending state:
+      const entry = new ctg.CacheEntry('pending', { pending: true });
+      const spy = spyOn(entry, 'readFile').and.callFake(() => Promise.resolve(createClinicalStudy()));
+      // Now, attempt to load it. This should do nothing as the entry is pending.
+      let shouldBeResolved = false;
+      const promise = entry.load();
+      promise.then(() => {
+        // Check if we should be resolved at this point
+        expect(shouldBeResolved).toBeTrue();
+        if (shouldBeResolved) {
+          // If it should be resolved, it should have called readFile
+          expect(spy).toHaveBeenCalledOnceWith();
+        }
+      });
+      // Set a timeout to happen "on next event loop" that marks the cache entry as ready
+      setTimeout(() => {
+        // Make sure the spy has not been called - yet.
+        expect(spy).not.toHaveBeenCalled();
+        // Set the resolved flag to true
+        shouldBeResolved = true;
+        // And mark the entry ready, which should trigger the promise resolving
+        entry.ready();
+      }, 0);
+      // And now return that original Promise, expecting it to eventually resolve successfully
+      return expectAsync(promise).toBeResolved();
+    });
   });
 });
 
@@ -402,6 +499,169 @@ describe('ClinicalTrialsGovService', () => {
         // Make sure the spy was called once (with no arguments)
         expect(spy).toHaveBeenCalledOnceWith();
       });
+    });
+  });
+
+  describe('#extractZip', () => {
+    // For this set of tests, we don't want to *really* do any unzipping, so we set up a bunch of mocks on Yauzl to
+    // simulate the process.
+    let openSpy: jasmine.Spy<{
+      (path: string, options: yauzl.Options, callback?: (err?: Error, zipfile?: yauzl.ZipFile) => void): void
+    }>;
+    let service: ctg.ClinicalTrialsGovService;
+    beforeEach(() => {
+      openSpy = spyOn(yauzl, 'open');
+      service = new ctg.ClinicalTrialsGovService(dataDirPath);
+    });
+
+    it('rejects on error', () => {
+      openSpy.and.callFake((path, options, callback) => {
+        if (callback)
+          callback(new Error('Simulated error'));
+      });
+      return expectAsync(service['extractZip']('test.zip')).toBeRejectedWithError('Simulated error');
+    });
+
+    it('rejects if called with nothing', () => {
+      // This should never really happen, but make sure it's handled if it does
+      openSpy.and.callFake((path, options, callback) => {
+        if (callback)
+          callback();
+      });
+      return expectAsync(service['extractZip']('test.zip')).toBeRejected();
+    });
+
+    describe('with a ZIP', () => {
+      // This sub-group of tasks requires a mock ZIP file
+      let mockZipFile: yauzl.ZipFile;
+      beforeEach(() => {
+        const mockObj = new EventEmitter();
+        // We currently never use any other methods other than the events, so force it in
+        mockZipFile = mockObj as unknown as yauzl.ZipFile;
+      });
+
+      it('rejects on error', () => {
+        openSpy.and.callFake((path, options, callback) => {
+          if (callback) {
+            callback(undefined, mockZipFile);
+            // Once the callback has been invoked, we can do the simulated events
+            mockZipFile.emit('error', new Error('Simulated error'));
+          }
+        });
+        return expectAsync(service['extractZip']('test.zip')).toBeRejectedWithError('Simulated error');
+      });
+    });
+  });
+
+  describe('#addCacheEntry', () => {
+    // addCacheEntry is responsible for taking a stream of data and writing it to a single file.
+    let service: ctg.ClinicalTrialsGovService;
+    let mockEntryStream: stream.Readable;
+    let mockFileStream: stream.Writable;
+    const mockNctNumber: ctg.NCTNumber = 'NCT12345678';
+
+    beforeEach(() => {
+      service = new ctg.ClinicalTrialsGovService(dataDirPath);
+      // The mock entry stream is a "real" stream
+      // It has to be capable of reading a single chunk
+      let chunk: Buffer | null = Buffer.from('Test', 'utf-8');
+      mockEntryStream = new stream.Readable({
+        // Note that this cannot be an arrow function because this must be the stream
+        read: function() {
+          this.push(chunk);
+          // Pushing null indicates end of stream - so set the chunk to null so the next read ends the stream
+          chunk = null;
+        }
+      });
+      mockFileStream = new stream.Writable({
+        write: function(chunk, encoding, callback) {
+          // Must invoke the callback or things will freeze
+          callback();
+        },
+        final: function(callback) {
+          callback();
+        }
+      });
+      spyOn(fs, 'createWriteStream').and.callFake(() => {
+        // Pretend this is a file stream for TypeScript - it doesn't really matter
+        return mockFileStream as unknown as fs.WriteStream;
+      });
+    });
+
+    // There is a matrix of three entry states (existing pending, exists non-pending, does not exist) and two stream
+    // cases (succeeds, fails) that needs to be handled.
+
+    // So to deal with that, create a function that creates the tests, and a flag indicating which test was running
+    let errorTest = false;
+
+    const makeTests = function() {
+      it('handles an error', () => {
+        errorTest = true;
+        // Replace the write method with one that will throw a mock error
+        mockFileStream._write = (chunk, encoding, callback) => {
+          callback(new Error('Simulated I/O error'));
+        };
+        return expectAsync(service['addCacheEntry'](mockNctNumber, mockEntryStream)).toBeRejected();
+      });
+
+      it('handles writing the entry', () => {
+        errorTest = false;
+        return expectAsync(service['addCacheEntry'](mockNctNumber, mockEntryStream)).toBeResolved();
+      });
+    };
+
+    describe('with no entry', () => {
+      // Nothing to do here
+      makeTests();
+    });
+
+    describe('with an existing pending entry', () => {
+      let entry: ctg.CacheEntry;
+      let readySpy: jasmine.Spy;
+      beforeEach(() => {
+        entry = new ctg.CacheEntry(mockNctNumber + '.xml', { pending: true });
+        // Add the entry
+        service['cache'].set(mockNctNumber, entry);
+        // We want to see if ready is invoked but also have it work as expected
+        readySpy = spyOn(entry, 'ready').and.callThrough();
+      });
+      afterEach(() => {
+        if (errorTest) {
+          // Expect the cache entry to have been removed
+          expect(service['cache'].has(mockNctNumber)).toBeFalse();
+          // Ready should not have been called in this case
+          expect(readySpy).not.toHaveBeenCalled();
+        } else {
+          // Otherwise, expect the entry to be ready
+          expect(readySpy).toHaveBeenCalled();
+        }
+      });
+
+      // And make the tests
+      makeTests();
+    });
+
+    describe('with an existing non-pending entry', () => {
+      let entry: ctg.CacheEntry;
+      let readySpy: jasmine.Spy;
+      beforeEach(() => {
+        entry = new ctg.CacheEntry(mockNctNumber + '.xml', { });
+        // Add the entry
+        service['cache'].set(mockNctNumber, entry);
+        // In this case we just want to know if ready was not invoked as it shouldn't be
+        readySpy = spyOn(entry, 'ready').and.callThrough();
+      });
+      afterEach(() => {
+        if (errorTest) {
+          // Expect the cache entry to remain - it's assumed the existing entry is still OK (this may be false?)
+          expect(service['cache'].has(mockNctNumber)).toBeTrue();
+        }
+        // In either case, ready should not have been called
+        expect(readySpy).not.toHaveBeenCalled();
+      });
+
+      // And make the tests
+      makeTests();
     });
   });
 
