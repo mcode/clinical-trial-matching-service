@@ -550,6 +550,90 @@ describe('ClinicalTrialsGovService', () => {
         });
         return expectAsync(service['extractZip']('test.zip')).toBeRejectedWithError('Simulated error');
       });
+
+      describe('with an entry', () => {
+        let entry: yauzl.Entry;
+        // To make the test easier, this is the method called with the callback
+        let openReadStream: (callback: (err?: Error, stream?: stream.Readable) => void) => void;
+        const mockNctNumber: ctg.NCTNumber = 'NCT12345678';
+
+        beforeEach(() => {
+          // Each test requires a test entry although the exact details vary
+          // This is an intentionally incomplete entry.
+          const mockEntry = {
+            comment: '',
+            compressedSize: 4,
+            fileName: mockNctNumber + '.xml',
+            fileNameLength: mockNctNumber.length + 4,
+            uncompressedSize: 4,
+          };
+
+          // This is intentionally not a full mock implementation
+          entry = mockEntry as unknown as yauzl.Entry;
+          // Also need to install a fake openReadStream
+          mockZipFile.openReadStream = (entry: yauzl.Entry, callbackOrOptions: (yauzl.ZipFileOptions | ((err?: Error, stream?: stream.Readable) => void)), callbackOrNothing?: ((err?: Error, stream?: stream.Readable) => void)) => {
+            // Don't actually care about the options
+            let callback: (err?: Error, stream?: stream.Readable) => void;
+            if (callbackOrNothing) {
+              callback = callbackOrNothing;
+            } else if (typeof callbackOrOptions === 'function') {
+              callback = callbackOrOptions;
+            } else {
+              // invalid, unclear how this is handled, but throw an error
+              throw new Error('missing callback');
+            }
+            openReadStream(callback);
+          };
+          // By default, make it so that openReadStream returns a stream that reads the string "test"
+          openReadStream = (callback) => {
+            console.log('default open stream');
+            callback(undefined, new stream.Readable({
+              read: function() {
+                this.push(Buffer.from('test', 'utf-8'));
+              }
+            }));
+          };
+
+          // All these require an openSpy that forwards our mock ZIP file
+          openSpy.and.callFake((path, options, callback) => {
+            if (callback) {
+              callback(undefined, mockZipFile);
+              // Once the callback has been returned, we can pump through our entry
+              mockZipFile.emit('entry', entry);
+            }
+          });
+        });
+
+        it('skips excessively large entry', () => {
+          entry.uncompressedSize = service.maxAllowedEntrySize + 1;
+          const spy = spyOn(mockZipFile, 'openReadStream');
+          return expectAsync(service['extractZip']('test.zip')).toBeResolved().then(() => {
+            expect(spy).not.toHaveBeenCalled();
+          });
+        });
+
+        it('extracts the entry', () => {
+          // Allow the any here so we can install the spy on a private method - there's no other way around this without
+          // really messy code
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const extractSpy = spyOn<any>(service, 'addCacheEntry').and.callFake(() => {
+            // We need to return a promise that resolves or the entire thing won't resolve
+            return Promise.resolve();
+          });
+          return expectAsync(service['extractZip']('test.zip')).toBeResolved().then(() => {
+            expect(extractSpy).toHaveBeenCalled();
+            // Make sure it was called with the correct NCT ID
+            expect(extractSpy.calls.first().args[0]).toEqual(mockNctNumber);
+          });
+        });
+
+        it('handles an entry failing to extract', () => {
+          openReadStream = (callback) => {
+            callback(new Error('Simulated error'));
+          };
+          return expectAsync(service['extractZip']('test.zip')).toBeResolved();
+        });
+      });
     });
   });
 

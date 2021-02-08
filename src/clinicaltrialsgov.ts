@@ -400,7 +400,7 @@ export class ClinicalTrialsGovService {
    * The maximum allowed entry size before it is rejected. Default is 128MB, which is hopefully well more than necessary
    * for any reasonable clinical trial XML.
    */
-  private maxAllowedEntrySize = 128 * 1024 * 1024;
+  maxAllowedEntrySize = 128 * 1024 * 1024;
 
   private cacheDataDir: string;
 
