@@ -221,6 +221,8 @@ describe('CacheEntry', () => {
         shouldBeResolved = true;
         // And mark the entry ready, which should trigger the promise resolving
         entry.ready();
+        // And then mark it as ready again, which should NOT trigger a second resolve
+        entry.ready();
       }, 0);
       // And now return that original Promise, expecting it to eventually resolve successfully
       return expectAsync(promise).toBeResolved();
@@ -231,7 +233,7 @@ describe('CacheEntry', () => {
 describe('ClinicalTrialsGovService', () => {
   // The data dir path
   const dataDirPath = 'ctg-cache';
-  let study: ResearchStudy, nctID: ctg.NCTNumber, nctIds: ctg.NCTNumber[];
+  let study: ResearchStudy, nctID: ctg.NCTNumber;
   beforeAll(() => {
     study = trialMissing.entry[0].resource as ResearchStudy;
     const maybeNctID = ctg.findNCTNumber(study);
@@ -240,11 +242,14 @@ describe('ClinicalTrialsGovService', () => {
       throw new Error('ResearchStudy has no NCT number');
     } else {
       nctID = maybeNctID;
-      nctIds = [ nctID ];
     }
     // Create our mock FS
     mockfs({
-      'ctg-cache/data/NCT02513394.xml': mockfs.load(specFilePath('NCT02513394.xml')),
+      'ctg-cache/data': {
+        '.xml': 'Ignore this file',
+        'NCT02513394.xml': mockfs.load(specFilePath('NCT02513394.xml')),
+        'invalid.xml': 'Ignore this file as well'
+      },
       'existing-file': 'Existing stub',
       'ctg-cache-empty': { /* An empty virtual directory */ }
     });
@@ -288,15 +293,27 @@ describe('ClinicalTrialsGovService', () => {
   describe('#init', () => {
     it('restores cache entries in an existing directory', () => {
       const testService = new ctg.ClinicalTrialsGovService(dataDirPath);
-      return expectAsync(testService.init()).toBeResolved().then(async () => {
-        // Make sure the virtual cache entry exists
-        expect(testService['cache'].has(nctID)).toBeTrue();
+      return expectAsync(testService.init()).toBeResolved().then(() => {
+        // Restored cache should have only one key in it as it should have
+        // ignored the two invalid file names
+        expect(Array.from(testService['cache'].keys())).toEqual([nctID]);
       });
     });
 
     it('handles the directory already existing but not being a directory', () => {
       const testService = new ctg.ClinicalTrialsGovService('existing-file');
       return expectAsync(testService.init()).toBeRejected();
+    });
+
+    it('creates the data directory if the cache directory exists but is empty', () => {
+      const testService = new ctg.ClinicalTrialsGovService('ctg-cache-empty');
+      return expectAsync(testService.init()).toBeResolved().then(() => {
+        // Make sure the mocked directory exists - because this is being mocked,
+        // just use sync fs functions
+        expect(() => {
+          fs.readdirSync('ctg-cache-empty/data');
+        }).not.toThrow();
+      });
     });
 
     it("creates the directory if it doesn't exist", () => {
@@ -396,44 +413,70 @@ describe('ClinicalTrialsGovService', () => {
   });
 
   describe('#downloadTrials', () => {
+    let scope: nock.Scope;
+    let interceptor: nock.Interceptor;
     let downloader: ctg.ClinicalTrialsGovService;
+    const nctIDs = [ 'NCT00000001', 'NCT00000002', 'NCT00000003' ];
     beforeEach(() => {
+      scope = nock('https://clinicaltrials.gov');
+      interceptor = scope.get('/ct2/download_studies?term=' + nctIDs.join('+OR+'));
       return ctg.createClinicalTrialsGovService(dataDirPath).then((service) => {
         downloader = service;
       });
     });
 
     it('handles failures from https.get', () => {
-      nock('https://clinicaltrials.gov')
-        .get('/ct2/download_studies?term=' + nctIds.join('+OR+'))
-        .replyWithError('Test error');
-      return expectAsync(downloader['downloadTrials'](nctIds)).toBeRejectedWithError('Test error');
+      interceptor.replyWithError('Test error');
+      return expectAsync(downloader['downloadTrials'](nctIDs)).toBeRejectedWithError('Test error');
     });
 
     it('handles failure responses from the server', () => {
-      const scope = nock('https://clinicaltrials.gov')
-        .get('/ct2/download_studies?term=' + nctIds.join('+OR+'))
-        .reply(404, 'Unknown');
+      interceptor.reply(404, 'Unknown');
+      // Pretend the middle entry exists
+      downloader['cache'].set(nctIDs[1], new ctg.CacheEntry(nctIDs[1] + '.xml', { }));
       return expectAsync(
-        downloader['downloadTrials'](nctIds).finally(() => {
+        downloader['downloadTrials'](nctIDs).finally(() => {
           expect(scope.isDone()).toBeTrue();
         })
-      ).toBeRejected();
+      ).toBeRejected().then(() => {
+        // Check to make sure the new cache entries do not still exist - the failure should remove them, but not the
+        // non-pending one
+        expect(downloader['cache'].has(nctIDs[0])).toBeFalse();
+        expect(downloader['cache'].has(nctIDs[2])).toBeFalse();
+      });
+    });
+
+    it('creates cache entries', () => {
+      interceptor.reply(200, 'Unimportant', { 'Content-type': 'application/zip' });
+      // For this test, create an existing cache entry for one of the IDs
+      downloader['cache'].set(nctIDs[1], new ctg.CacheEntry(nctIDs[1] + '.xml', { }));
+      // Also mock the extraction process so it thinks everything is fine
+      downloader['extractResults'] = () => {
+        // Just pretend everything is fine
+        return Promise.resolve();
+      };
+      return expectAsync(downloader['downloadTrials'](nctIDs)).toBeResolved().then(() => {
+        // Should have created the two missing items which should still be pending as we mocked the extract process
+        let entry = downloader['cache'].get(nctIDs[0]);
+        expect(entry && entry.pending).toBeTrue();
+        entry = downloader['cache'].get(nctIDs[1]);
+        expect(entry && (!entry.pending)).toBeTrue();
+        entry = downloader['cache'].get(nctIDs[2]);
+        expect(entry && entry.pending).toBeTrue();
+      });
     });
 
     it('extracts a ZIP', () => {
-      const scope = nock('https://clinicaltrials.gov')
-        .get('/ct2/download_studies?term=' + nctIds.join('+OR+'))
-        .reply(200, 'Unimportant', {
-          'Content-type': 'application/zip'
-        });
+      interceptor.reply(200, 'Unimportant', {
+        'Content-type': 'application/zip'
+      });
       const spy = jasmine.createSpy('extractResults').and.callFake((): Promise<void> => {
         return Promise.resolve();
       });
       // Jam the spy in (method is protected, that's why it can't be created directly)
       downloader['extractResults'] = spy;
       return expectAsync(
-        downloader['downloadTrials'](nctIds).finally(() => {
+        downloader['downloadTrials'](nctIDs).finally(() => {
           // Just check that it was called
           expect(spy).toHaveBeenCalledTimes(1);
           expect(scope.isDone()).toBeTrue();
