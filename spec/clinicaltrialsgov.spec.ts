@@ -292,7 +292,7 @@ describe('ClinicalTrialsGovService', () => {
 
   describe('#init', () => {
     it('restores cache entries in an existing directory', () => {
-      const testService = new ctg.ClinicalTrialsGovService(dataDirPath);
+      const testService = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 0 });
       return expectAsync(testService.init()).toBeResolved().then(() => {
         // Restored cache should have only one key in it as it should have
         // ignored the two invalid file names
@@ -301,12 +301,12 @@ describe('ClinicalTrialsGovService', () => {
     });
 
     it('handles the directory already existing but not being a directory', () => {
-      const testService = new ctg.ClinicalTrialsGovService('existing-file');
+      const testService = new ctg.ClinicalTrialsGovService('existing-file', { cleanInterval: 0 });
       return expectAsync(testService.init()).toBeRejected();
     });
 
     it('creates the data directory if the cache directory exists but is empty', () => {
-      const testService = new ctg.ClinicalTrialsGovService('ctg-cache-empty');
+      const testService = new ctg.ClinicalTrialsGovService('ctg-cache-empty', { cleanInterval: 0 });
       return expectAsync(testService.init()).toBeResolved().then(() => {
         // Make sure the mocked directory exists - because this is being mocked,
         // just use sync fs functions
@@ -317,7 +317,7 @@ describe('ClinicalTrialsGovService', () => {
     });
 
     it("creates the directory if it doesn't exist", () => {
-      const testService = new ctg.ClinicalTrialsGovService('new-ctg-cache');
+      const testService = new ctg.ClinicalTrialsGovService('new-ctg-cache', { cleanInterval: 0 });
       return expectAsync(testService.init()).toBeResolved().then(() => {
         // Make sure the mocked directory exists - because this is being mocked,
         // just use sync fs functions
@@ -329,12 +329,50 @@ describe('ClinicalTrialsGovService', () => {
 
     it('handles the directory creation failing', () => {
       // because we don't override promisify, we need to "delete" the type data
-      const testService = new ctg.ClinicalTrialsGovService(dataDirPath);
+      const testService = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 0 });
       (spyOn(fs, 'mkdir') as jasmine.Spy).and.callFake((path, callback) => {
         expect(path).toEqual(dataDirPath);
         callback(new Error('Simulated error'));
       });
       return expectAsync(testService.init()).toBeRejected();
+    });
+
+    describe('starts a timer', () => {
+      const realTimeout = setTimeout;
+      beforeEach(() => {
+        jasmine.clock().install();
+      });
+      afterEach(() => {
+        jasmine.clock().uninstall();
+      });
+
+      it('that resets itself', () => {
+        const testService = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 60000 });
+        const removeExpiredCacheEntries = spyOn(testService, 'removeExpiredCacheEntries').and.callFake(() => {
+          return Promise.resolve();
+        });
+        return expectAsync(testService.init()).toBeResolved().then(() => {
+          expect(removeExpiredCacheEntries).not.toHaveBeenCalled();
+          // Fake the clock moving forward
+          jasmine.clock().tick(60000);
+          expect(removeExpiredCacheEntries).toHaveBeenCalledTimes(1);
+          // We need to let the event loop tick to process the Promise
+          return new Promise<void>((resolve) => {
+            realTimeout(() => {
+              jasmine.clock().tick(60000);
+              expect(removeExpiredCacheEntries).toHaveBeenCalledTimes(2);
+              resolve();
+            }, 0);
+          });
+        });
+      });
+    });
+
+    it('does not start a timer if the interval is set to 0', async () => {
+      const testService = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 0 });
+      const spy = jasmine.createSpy('setCleanupTimeout');
+      await testService.init();
+      expect(spy).not.toHaveBeenCalled();
     });
   });
 
@@ -344,7 +382,7 @@ describe('ClinicalTrialsGovService', () => {
 
     beforeEach(() => {
       // The service is never initialized
-      service = new ctg.ClinicalTrialsGovService(dataDirPath);
+      service = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 0 });
       // TypeScript won't allow us to install spies the "proper" way on private methods
       service['downloadTrials'] = downloadTrialsSpy = jasmine.createSpy('downloadTrials').and.callFake(() => {
         return Promise.resolve('ignored');
@@ -420,7 +458,7 @@ describe('ClinicalTrialsGovService', () => {
     beforeEach(() => {
       scope = nock('https://clinicaltrials.gov');
       interceptor = scope.get('/ct2/download_studies?term=' + nctIDs.join('+OR+'));
-      return ctg.createClinicalTrialsGovService(dataDirPath).then((service) => {
+      return ctg.createClinicalTrialsGovService(dataDirPath, { cleanInterval: 0 }).then((service) => {
         downloader = service;
       });
     });
@@ -488,7 +526,7 @@ describe('ClinicalTrialsGovService', () => {
   describe('#extractResults', () => {
     let downloader: ctg.ClinicalTrialsGovService;
     beforeEach(() => {
-      return ctg.createClinicalTrialsGovService(dataDirPath).then((service) => {
+      return ctg.createClinicalTrialsGovService(dataDirPath, { cleanInterval: 0 }).then((service) => {
         downloader = service;
       });
     });
@@ -521,7 +559,7 @@ describe('ClinicalTrialsGovService', () => {
   describe('#getCachedClinicalStudy', () => {
     let downloader: ctg.ClinicalTrialsGovService;
     beforeEach(() => {
-      return ctg.createClinicalTrialsGovService(dataDirPath).then((service) => {
+      return ctg.createClinicalTrialsGovService(dataDirPath, { cleanInterval: 0 }).then((service) => {
         downloader = service;
       });
     });
@@ -554,7 +592,7 @@ describe('ClinicalTrialsGovService', () => {
     let service: ctg.ClinicalTrialsGovService;
     beforeEach(() => {
       openSpy = spyOn(yauzl, 'open');
-      service = new ctg.ClinicalTrialsGovService(dataDirPath);
+      service = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 0 });
     });
 
     it('rejects on error', () => {
@@ -688,7 +726,7 @@ describe('ClinicalTrialsGovService', () => {
     const mockNctNumber: ctg.NCTNumber = 'NCT12345678';
 
     beforeEach(() => {
-      service = new ctg.ClinicalTrialsGovService(dataDirPath);
+      service = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 0 });
       // The mock entry stream is a "real" stream
       // It has to be capable of reading a single chunk
       let chunk: Buffer | null = Buffer.from('Test', 'utf-8');
@@ -794,7 +832,7 @@ describe('ClinicalTrialsGovService', () => {
 
   describe('#updateResearchStudy', () => {
     it('forwards to updateResearchStudyWithClinicalStudy', () => {
-      const service = new ctg.ClinicalTrialsGovService(dataDirPath);
+      const service = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 0 });
       const testResearchStudy = createResearchStudy('test');
       const testClinicalStudy = createClinicalStudy();
       service.updateResearchStudy(testResearchStudy, testClinicalStudy);
@@ -808,7 +846,7 @@ describe('ClinicalTrialsGovService', () => {
     let updatedTrial: ResearchStudy;
     let clinicalStudy: ClinicalStudy;
     beforeAll(async function () {
-      downloader = new ctg.ClinicalTrialsGovService(dataDirPath);
+      downloader = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 0 });
       await downloader.init();
       // Cache should have been restored on init
       const maybeStudy = await downloader.getCachedClinicalStudy(nctID);

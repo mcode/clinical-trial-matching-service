@@ -319,13 +319,17 @@ export function mkdir(path: string): Promise<boolean> {
 }
 
 export interface ClinicalTrialsGovServiceOptions {
+  /**
+   * The logging function to use to log debug information. If not set the default is `debuglog('ctgovservice')` from
+   * the `util` module in Node.js.
+   */
   log?: Logger;
   /**
    * Time in milliseconds to expire files after.
    */
   expireAfter?: number;
   /**
-   * Interval in milliseconds to run periodic cache clean-ups.
+   * Interval in milliseconds to run periodic cache clean-ups. If set to 0 or infinity, never run cleanups.
    */
   cleanInterval?: number;
 }
@@ -396,6 +400,29 @@ export class ClinicalTrialsGovService {
     return this._expirationTimeout;
   }
 
+  set expirationTimeout(value: number) {
+    // Ensure it's at least 1000ms
+    this._expirationTimeout = Math.max(value, 1000);
+  }
+
+  private _cleanupIntervalMillis = 60 * 60 * 1000;
+
+  /**
+   * The interval between cleanup sweeps. Set to 0 or Infinity to disable periodic cleanup. Note that the value is
+   * limited to the range 60000 (a minute)-2147483647 (the maximum value of a signed 32-bit integer) as that maximum
+   * value is the maximum allowed timeout for a timer within Node.js.
+   */
+  get cleanupInterval(): number {
+    return this._cleanupIntervalMillis;
+  }
+
+  set cleanupInterval(value: number) {
+    // Clamp it to 0 (special value for "never") or at least 60000 - also clamp the maximum to a 32-bit signed integer
+    // which is the maximum allowed timeout within Node.js. (Exceeding that value changes the timeout to 1ms. Surprise!
+    // I mean, sure, that's documented, but...)
+    this._cleanupIntervalMillis = value <= 0 ? 0 : (value === Infinity ? 0 : Math.min(Math.max(Math.floor(value), 60000), 0x7FFFFFFF));
+  }
+
   /**
    * The maximum allowed entry size before it is rejected. Default is 128MB, which is hopefully well more than necessary
    * for any reasonable clinical trial XML.
@@ -409,6 +436,8 @@ export class ClinicalTrialsGovService {
    * (The NCT ID is in the form that returns true from isValidNCTNumber, so NCTnnnnnnnn where n are digits.)
    */
   private cache = new Map<NCTNumber, CacheEntry>();
+
+  private cleanupTimeout: NodeJS.Timeout | null = null;
 
   /**
    * Creates a new instance. This will not initialize the cache or load anything, this merely creates the object. Use
@@ -424,6 +453,8 @@ export class ClinicalTrialsGovService {
     const log = options ? options.log : null;
     // If no log was given, create it
     this.log = log ?? debuglog('ctgovservice');
+    // Default to an hour
+    this.cleanupInterval = options?.cleanInterval ?? 60 * 60 * 1000;
   }
 
   /**
@@ -442,6 +473,37 @@ export class ClinicalTrialsGovService {
     } else {
       this.log(baseDirExisted ? 'Created XML directory for storing result' : 'Created new cache directory');
     }
+    // Once started, run the cache cleanup every _cleanupIntervalMillis
+    this.setCleanupTimeout();
+  }
+
+  /**
+   * Sets the timeout interval assuming it was set.
+   */
+  private setCleanupTimeout(): void {
+    // If set to infinity we internally set it to 0
+    if (this._cleanupIntervalMillis > 0) {
+      this.cleanupTimeout = setTimeout(() => {
+        this.removeExpiredCacheEntries().then(() => {
+          // Set up to do this again when that's done
+          this.setCleanupTimeout();
+        }, (error) => {
+          this.log('Error cleaning expired cache entries: %o', error);
+        });
+      }, this._cleanupIntervalMillis);
+    }
+  }
+
+  /**
+   * Shuts down the service, doing any final necessary cleanup. At present this stops any running timers. The Promise
+   * returned currently resolves immediately, but in the future, it may resolve asynchronously when the service has been
+   * cleanly shut down.
+   */
+  destroy(): Promise<void> {
+    if (this.cleanupTimeout !== null) {
+      clearTimeout(this.cleanupTimeout);
+    }
+    return Promise.resolve();
   }
 
   /**
@@ -464,6 +526,9 @@ export class ClinicalTrialsGovService {
               // Skip "bad" files
               continue;
             }
+            // FIXME: This is probably a bad idea. Right now the file name serves as the "master" name for files. It's
+            // probably possible to load the file and pull the NCT ID out that way, as well as clear out files that
+            // can't be parsed.
             const baseName = file.substring(0, dotIdx);
             const extension = file.substring(dotIdx + 1);
             if (isValidNCTNumber(baseName) && extension === 'xml') {
@@ -558,6 +623,10 @@ export class ClinicalTrialsGovService {
     for (const key of expiredIds) {
       this.cache.delete(key);
     }
+    // FIXME: It's unclear whether or not this creates a race condition where it may be possible for another request
+    // for an entry we just expired to be deleted before the new entry is ready. This is somewhat unlikely, but it's
+    // something that could probably be fixed by ensuring that each time we create a cache entry we use a unique
+    // filename.
     for (const entry of expiredEntries) {
       expiredPromises.push(entry.remove());
     }
@@ -680,6 +749,8 @@ export class ClinicalTrialsGovService {
    * @param nctNumber the NCT number
    */
   private pathForNctNumber(nctNumber: NCTNumber): string {
+    // FIXME: It's probably best not to use the NCT number as the sole part of the filename. See
+    // removeExpiredCacheEntries for details.
     return path.join(this.cacheDataDir, nctNumber + '.xml');
   }
 
