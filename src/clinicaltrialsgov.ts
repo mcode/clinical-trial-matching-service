@@ -201,8 +201,8 @@ export class CacheEntry {
     if (options.stats) {
       // Default to using the metadata from the fs.Stats object
       this._createdAt = options.stats.ctime;
-      // Use whichever is newest: atime or mtime
-      this._lastAccess = options.stats.atime > options.stats.mtime ? options.stats.atime : options.stats.mtime;
+      // Assume the last modified time was when the cache entry was fetched (it's close enough anyway)
+      this._lastAccess = options.stats.mtime;
     } else {
       // Otherwise, default to now
       this._createdAt = new Date();
@@ -453,7 +453,9 @@ export class ClinicalTrialsGovService {
     const log = options ? options.log : null;
     // If no log was given, create it
     this.log = log ?? debuglog('ctgovservice');
-    // Default to an hour
+    // Default expiration timeout to an hour
+    this.expirationTimeout = options?.expireAfter ?? 60 * 60 * 1000;
+    // Default cleanup interval to an hour
     this.cleanupInterval = options?.cleanInterval ?? 60 * 60 * 1000;
   }
 

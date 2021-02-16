@@ -233,6 +233,10 @@ describe('CacheEntry', () => {
 describe('ClinicalTrialsGovService', () => {
   // The data dir path
   const dataDirPath = 'ctg-cache';
+  // Virtual directory that has more than one entry (with known times)
+  const multipleEntriesDataDir = 'ctg-cache-multi';
+  // The date used for when the cache was first created, 2021-02-01T12:00:00.000 (picked arbitrarily)
+  const cacheStartTime = new Date(2021, 1, 1, 12, 0, 0, 0);
   let study: ResearchStudy, nctID: ctg.NCTNumber;
   beforeAll(() => {
     study = trialMissing.entry[0].resource as ResearchStudy;
@@ -246,12 +250,22 @@ describe('ClinicalTrialsGovService', () => {
     // Create our mock FS
     mockfs({
       'ctg-cache/data': {
-        '.xml': 'Ignore this file',
-        'NCT02513394.xml': mockfs.load(specFilePath('NCT02513394.xml')),
-        'invalid.xml': 'Ignore this file as well'
+        'NCT02513394.xml': mockfs.load(specFilePath('NCT02513394.xml'))
       },
       'existing-file': 'Existing stub',
-      'ctg-cache-empty': { /* An empty virtual directory */ }
+      'ctg-cache-empty': { /* An empty virtual directory */ },
+      'ctg-cache-multi/data': {
+        // Mock file that was created 1 minute after cache was created
+        'NCT00000001.xml': mockfs.file({ mtime: new Date(cacheStartTime.getTime() + (60 * 1000)), content: 'Test File 1'}),
+        // Mock file that was created 1.5 minutes after cache was created
+        'NCT00000002.xml': mockfs.file({ mtime: new Date(cacheStartTime.getTime() + (90 * 1000)), content: 'Test File 2'}),
+        // Mock file that was created 2 minutes after cache was created
+        'NCT00000003.xml': mockfs.file({ mtime: new Date(cacheStartTime.getTime() + (2 * 60 * 1000)), content: 'Test File 3'}),
+        // Junk files: files that should be skipped on init
+        '.xml': 'not really an XML file, but a dot file called "xml"',
+        'invalid.xml': 'not an NCT',
+        'NCT1.xml': 'not a valid NCT'
+      }
     });
   });
 
@@ -292,11 +306,25 @@ describe('ClinicalTrialsGovService', () => {
 
   describe('#init', () => {
     it('restores cache entries in an existing directory', () => {
-      const testService = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 0 });
+      const testService = new ctg.ClinicalTrialsGovService(multipleEntriesDataDir, { cleanInterval: 0 });
       return expectAsync(testService.init()).toBeResolved().then(() => {
         // Restored cache should have only one key in it as it should have
         // ignored the two invalid file names
-        expect(Array.from(testService['cache'].keys())).toEqual([nctID]);
+        expect(Array.from(testService['cache'].keys()).sort()).toEqual([
+          'NCT00000001', 'NCT00000002', 'NCT00000003'
+        ]);
+        // Make sure the cache entries were created properly with the stats
+        function expectDate(key: string, date: Date): void {
+          const entry = testService['cache'].get(key);
+          expect(entry).toBeDefined();
+          if (entry) {
+            // Must have the entry to check it
+            expect(entry.lastAccess).toEqual(date);
+          }
+        }
+        expectDate('NCT00000001', new Date(2021, 1, 1, 12, 1, 0, 0));
+        expectDate('NCT00000002', new Date(2021, 1, 1, 12, 1, 30, 0));
+        expectDate('NCT00000003', new Date(2021, 1, 1, 12, 2, 0, 0));
       });
     });
 
@@ -447,6 +475,77 @@ describe('ClinicalTrialsGovService', () => {
           expect(downloadTrialsSpy.calls.argsFor(1)).toEqual([['NCT00000003', 'NCT00000004']]);
         })
       ).toBeResolved();
+    });
+  });
+
+  describe('#removeExpiredCacheEntries', () => {
+    let service: ctg.ClinicalTrialsGovService;
+    let entry1: ctg.CacheEntry, entry2: ctg.CacheEntry, entry3: ctg.CacheEntry;
+    beforeEach(() => {
+      // These tests all involve mucking with time.
+      jasmine.clock().install();
+      // Set the start date to the cache start time
+      jasmine.clock().mockDate(cacheStartTime);
+      console.log(`Mocked time is ${new Date()}`);
+      return ctg.createClinicalTrialsGovService(multipleEntriesDataDir, { expireAfter: 60000 }).then(newService => {
+        service = newService;
+        // "Steal" the cache to grab entries for spying purposes
+        const cache = service['cache'];
+        function safeGet(key: string): ctg.CacheEntry {
+          const result = cache.get(key);
+          if (result) {
+            return result;
+          } else {
+            throw new Error('Missing cache entry for ' + key + ' (bailing before tests will fail)');
+          }
+        }
+        entry1 = safeGet('NCT00000001');
+        entry2 = safeGet('NCT00000002');
+        entry3 = safeGet('NCT00000003');
+      });
+    });
+    afterEach(() => {
+      // Stop playing with time
+      jasmine.clock().uninstall();
+    });
+
+    function spyOnRemove(entry: ctg.CacheEntry): jasmine.Spy<() => Promise<void>> {
+      // Need to include a default implementation or this will never work
+      const spy = spyOn(entry, 'remove').and.callFake(() => Promise.resolve());
+      spy.and.identity = entry.filename + '.remove';
+      return spy;
+    }
+
+    it('removes entries when they expire', async () => {
+      // Create the spies on the remove methods
+      const removeSpy1 = spyOnRemove(entry1),
+        removeSpy2 = spyOnRemove(entry2),
+        removeSpy3 = spyOnRemove(entry3);
+      const cache = service['cache'];
+      await service.removeExpiredCacheEntries();
+      // None of the spies should have been removed (technically we're "back in time" before the entires were created)
+      expect(removeSpy1).not.toHaveBeenCalled();
+      expect(removeSpy2).not.toHaveBeenCalled();
+      expect(removeSpy3).not.toHaveBeenCalled();
+      // Advance to the point where the first entry should be removed
+      jasmine.clock().tick(2 * 60 * 1000 + 1);
+      await service.removeExpiredCacheEntries();
+      expect(removeSpy1).toHaveBeenCalledTimes(1);
+      expect(removeSpy2).not.toHaveBeenCalled();
+      expect(removeSpy3).not.toHaveBeenCalled();
+      // Make sure the entry was actually removed
+      expect(cache.has('NCT00000001')).toBeFalse();
+      // And that the others weren't
+      expect(cache.has('NCT00000002')).toBeTrue();
+      expect(cache.has('NCT00000003')).toBeTrue();
+      // And tick forward to where everything should be cleared
+      jasmine.clock().tick(5 * 60 * 1000);
+      await service.removeExpiredCacheEntries();
+      expect(removeSpy1).toHaveBeenCalledTimes(1);
+      expect(removeSpy2).toHaveBeenCalledTimes(1);
+      expect(removeSpy3).toHaveBeenCalledTimes(1);
+      // Cache should now be empty
+      expect(cache.size).toEqual(0);
     });
   });
 
