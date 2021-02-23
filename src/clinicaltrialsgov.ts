@@ -831,12 +831,14 @@ export class ClinicalTrialsGovService {
                       zipFile.openReadStream(entry, (err, entryStream) => {
                         if (err) {
                           this.log('Error reading entry %s: skipping!', entry.fileName);
-                          // Resolve the Promise anyway
-                          resolve();
                         } else if (entryStream) {
                           // Resolve with the Promise that actually finishes the thing
                           resolve(this.addCacheEntry(nctNumber, entryStream));
+                          return;
                         }
+                        // If we're here, there was an error or somehow the entryStream wasn't given. In either case,
+                        // just resolve the Promise anyway and let this entry be skipped.
+                        resolve();
                       });
                     }));
                   }

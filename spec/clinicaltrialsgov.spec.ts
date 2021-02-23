@@ -812,6 +812,20 @@ describe('ClinicalTrialsGovService', () => {
       ).toBeRejected();
     });
 
+    it('deletes the temporary ZIP failing', () => {
+      // Spy on the unlink method
+      const unlink = (spyOn(fs, 'unlink') as jasmine.Spy).and.callFake((_path: string, callback: fs.NoParamCallback) => {
+        callback(null);
+      });
+      // Don't actually do anything
+      downloader['extractZip'] = jasmine.createSpy('extractZip').and.callFake(() => {
+        return Promise.resolve();
+      });
+      return expectAsync(downloader['extractResults'](stream.Readable.from('Test'))).toBeResolved().then(() => {
+        expect(unlink).toHaveBeenCalledTimes(1);
+      });
+    });
+
     it('handles deleting the temporary ZIP failing', () => {
       // Spy on the unlink method
       (spyOn(fs, 'unlink') as jasmine.Spy).and.callFake((_path: string, callback: fs.NoParamCallback) => {
@@ -999,14 +1013,49 @@ describe('ClinicalTrialsGovService', () => {
           });
         });
 
-        it('skips excessively large entry', () => {
-          entry.uncompressedSize = service.maxAllowedEntrySize + 1;
-          const spy = spyOn(mockZipFile, 'openReadStream');
-          return expectAsync(service['extractZip']('test.zip'))
-            .toBeResolved()
-            .then(() => {
-              expect(spy).not.toHaveBeenCalled();
-            });
+        describe('skips entries with', () => {
+          let openReadStreamSpy: jasmine.Spy<{
+            (entry: yauzl.Entry, options: yauzl.ZipFileOptions, callback: (err?: Error, stream?: stream.Readable) => void): void;
+            (entry: yauzl.Entry, callback: (err?: Error, stream?: stream.Readable) => void): void;
+        }>;
+          beforeEach(() => {
+            openReadStreamSpy = spyOn(mockZipFile, 'openReadStream');
+            // Should this somehow be called, have it invoke the already stubbed test method to ensure that the tests don't hang
+            openReadStreamSpy.and.callThrough();
+          });
+
+          function expectEntrySkipped(): PromiseLike<void> {
+            return expectAsync(service['extractZip']('test.zip'))
+              .toBeResolved()
+              .then(() => {
+                expect(openReadStreamSpy).not.toHaveBeenCalled();
+              });
+          }
+
+          it('excessively large entry', () => {
+            entry.uncompressedSize = service.maxAllowedEntrySize + 1;
+            return expectEntrySkipped();
+          });
+
+          it('no extension', () => {
+            entry.fileName = 'invalid';
+            return expectEntrySkipped();
+          });
+
+          it('an invalid extension', () => {
+            entry.fileName = 'NCT12345678.txt';
+            return expectEntrySkipped();
+          });
+
+          it('the filename ".xml"', () => {
+            entry.fileName = '.xml';
+            return expectEntrySkipped();
+          });
+
+          it('an invalid NCT number', () => {
+            entry.fileName = 'NCT incorrect.xml';
+            return expectEntrySkipped();
+          });
         });
 
         it('extracts the entry', () => {
@@ -1032,6 +1081,14 @@ describe('ClinicalTrialsGovService', () => {
           };
           return expectAsync(service['extractZip']('test.zip')).toBeResolved();
         });
+
+        it('handles the callback being invoked incorrectly', () => {
+          // Invoking the callback with nothing should never happen, but if it does, expect it to resolve anyway
+          openReadStream = (callback) => {
+            callback();
+          };
+          return expectAsync(service['extractZip']('test.zip')).toBeResolved();
+        })
       });
     });
   });
