@@ -408,9 +408,10 @@ export class ClinicalTrialsGovService {
   private _cleanupIntervalMillis = 60 * 60 * 1000;
 
   /**
-   * The interval between cleanup sweeps. Set to 0 or Infinity to disable periodic cleanup. Note that the value is
-   * limited to the range 60000 (a minute)-2147483647 (the maximum value of a signed 32-bit integer) as that maximum
-   * value is the maximum allowed timeout for a timer within Node.js.
+   * The interval between cleanup sweeps. Set to 0 (or any negative value) or Infinity to disable periodic cleanup. Note
+   * that the value is limited to the range 60000 (a minute)-2147483647 (the maximum value of a signed 32-bit integer)
+   * as that maximum value is the maximum allowed timeout for a timer within Node.js. If the value is set to a negative
+   * number or Infinity, the retrieved value will be 0, to indicate that the interval will not be set.
    */
   get cleanupInterval(): number {
     return this._cleanupIntervalMillis;
@@ -491,6 +492,8 @@ export class ClinicalTrialsGovService {
           this.setCleanupTimeout();
         }, (error) => {
           this.log('Error cleaning expired cache entries: %o', error);
+          // Even though this attempt failed, try again later
+          this.setCleanupTimeout();
         });
       }, this._cleanupIntervalMillis);
     }
@@ -504,6 +507,8 @@ export class ClinicalTrialsGovService {
   destroy(): Promise<void> {
     if (this.cleanupTimeout !== null) {
       clearTimeout(this.cleanupTimeout);
+      // And blank it
+      this.cleanupTimeout = null;
     }
     return Promise.resolve();
   }
@@ -537,7 +542,7 @@ export class ClinicalTrialsGovService {
               promises.push(this.createCacheEntry(baseName, path.join(this.cacheDataDir, file)));
             }
           }
-          Promise.all(promises).then(() => { resolve(); });
+          Promise.all(promises).then(() => { resolve(); }, reject);
         }
       });
     });
@@ -548,6 +553,8 @@ export class ClinicalTrialsGovService {
     return new Promise((resolve, reject) => {
       fs.stat(filename, (err, stats) => {
         if (err) {
+          // TODO (maybe): Instead of rejecting, just log - rejecting will caused Promise.all to immediately reject and
+          // ignore the rest of the Promises. However, stat failing is probably a "real" error.
           reject(err);
         } else {
           this.cache.set(id, new CacheEntry(filename, { stats: stats }));

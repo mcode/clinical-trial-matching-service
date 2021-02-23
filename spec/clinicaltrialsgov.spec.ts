@@ -228,6 +228,49 @@ describe('CacheEntry', () => {
       return expectAsync(promise).toBeResolved();
     });
   });
+  describe('#readFile()', () => {
+    it('rejects with an error if it fails', () => {
+      const readFileSpy = (spyOn(fs, 'readFile') as unknown) as jasmine.Spy<
+        (path: string, options: { encoding?: string }, callback: (err?: Error, data?: Buffer) => void) => void
+      >;
+      readFileSpy.and.callFake((path, options, callback) => {
+        callback(new Error('Simulated error'));
+      });
+      const testEntry = new ctg.CacheEntry('test', {});
+      return expectAsync(testEntry.readFile()).toBeRejectedWithError('Simulated error');
+    });
+  });
+  describe('#remove()', () => {
+    let entry: ctg.CacheEntry;
+    let unlinkSpy: jasmine.Spy<(path: string, callback: (err?: Error) => void) => void>;
+    beforeEach(() => {
+      entry = new ctg.CacheEntry('NCT12345678.xml', {});
+      unlinkSpy = (spyOn(fs, 'unlink') as unknown) as jasmine.Spy<
+        (path: string, callback: (err?: Error) => void) => void
+      >;
+    });
+
+    it('deletes the underlying file', () => {
+      unlinkSpy.and.callFake((path, callback) => {
+        // Immediately invoke the callback
+        callback();
+      });
+      return expectAsync(entry.remove())
+        .toBeResolved()
+        .then(() => {
+          expect(unlinkSpy).toHaveBeenCalledTimes(1);
+          expect(unlinkSpy.calls.first().args[0]).toEqual('NCT12345678.xml');
+        });
+    });
+
+    it('rejects if an error occurs', () => {
+      unlinkSpy.and.callFake((path, callback) => {
+        // Immediately invoke the callback
+        callback(new Error('Simulated unlink error'));
+      });
+      return expectAsync(entry.remove()).toBeRejectedWithError('Simulated unlink error');
+    });
+  });
 });
 
 describe('ClinicalTrialsGovService', () => {
@@ -253,14 +296,25 @@ describe('ClinicalTrialsGovService', () => {
         'NCT02513394.xml': mockfs.load(specFilePath('NCT02513394.xml'))
       },
       'existing-file': 'Existing stub',
-      'ctg-cache-empty': { /* An empty virtual directory */ },
+      'ctg-cache-empty': {
+        /* An empty virtual directory */
+      },
       'ctg-cache-multi/data': {
         // Mock file that was created 1 minute after cache was created
-        'NCT00000001.xml': mockfs.file({ mtime: new Date(cacheStartTime.getTime() + (60 * 1000)), content: 'Test File 1'}),
+        'NCT00000001.xml': mockfs.file({
+          mtime: new Date(cacheStartTime.getTime() + 60 * 1000),
+          content: 'Test File 1'
+        }),
         // Mock file that was created 1.5 minutes after cache was created
-        'NCT00000002.xml': mockfs.file({ mtime: new Date(cacheStartTime.getTime() + (90 * 1000)), content: 'Test File 2'}),
+        'NCT00000002.xml': mockfs.file({
+          mtime: new Date(cacheStartTime.getTime() + 90 * 1000),
+          content: 'Test File 2'
+        }),
         // Mock file that was created 2 minutes after cache was created
-        'NCT00000003.xml': mockfs.file({ mtime: new Date(cacheStartTime.getTime() + (2 * 60 * 1000)), content: 'Test File 3'}),
+        'NCT00000003.xml': mockfs.file({
+          mtime: new Date(cacheStartTime.getTime() + 2 * 60 * 1000),
+          content: 'Test File 3'
+        }),
         // Junk files: files that should be skipped on init
         '.xml': 'not really an XML file, but a dot file called "xml"',
         'invalid.xml': 'not an NCT',
@@ -304,28 +358,69 @@ describe('ClinicalTrialsGovService', () => {
     });
   });
 
+  describe('#expirationTimeout', () => {
+    let service: ctg.ClinicalTrialsGovService;
+    beforeEach(() => {
+      service = new ctg.ClinicalTrialsGovService(dataDirPath);
+    });
+    it('ensures the value is at least 1000', () => {
+      service.expirationTimeout = 5;
+      expect(service.expirationTimeout).toEqual(1000);
+      service.expirationTimeout = -100;
+      expect(service.expirationTimeout).toEqual(1000);
+      service.expirationTimeout = 1500;
+      expect(service.expirationTimeout).toEqual(1500);
+    });
+  });
+
+  describe('#cleanupInterval', () => {
+    let service: ctg.ClinicalTrialsGovService;
+    beforeEach(() => {
+      service = new ctg.ClinicalTrialsGovService(dataDirPath);
+    });
+    it('caps the value to 2^31', () => {
+      // This is too large: it exceeds 2^31
+      service.cleanupInterval = 3000000000;
+      expect(service.cleanupInterval).toEqual(0x7fffffff);
+    });
+    it('treats Infinity as 0', () => {
+      service.cleanupInterval = Infinity;
+      expect(service.cleanupInterval).toEqual(0);
+    });
+    it('ensures a minimum of 60000', () => {
+      service.cleanupInterval = 5;
+      expect(service.cleanupInterval).toEqual(60000);
+      // Unless explicitly 0 which means "disable"
+      service.cleanupInterval = 0;
+      expect(service.cleanupInterval).toEqual(0);
+      // Negative is clamped to 0
+      service.cleanupInterval = -100;
+      expect(service.cleanupInterval).toEqual(0);
+    });
+  });
+
   describe('#init', () => {
     it('restores cache entries in an existing directory', () => {
       const testService = new ctg.ClinicalTrialsGovService(multipleEntriesDataDir, { cleanInterval: 0 });
-      return expectAsync(testService.init()).toBeResolved().then(() => {
-        // Restored cache should have only one key in it as it should have
-        // ignored the two invalid file names
-        expect(Array.from(testService['cache'].keys()).sort()).toEqual([
-          'NCT00000001', 'NCT00000002', 'NCT00000003'
-        ]);
-        // Make sure the cache entries were created properly with the stats
-        function expectDate(key: string, date: Date): void {
-          const entry = testService['cache'].get(key);
-          expect(entry).toBeDefined();
-          if (entry) {
-            // Must have the entry to check it
-            expect(entry.lastAccess).toEqual(date);
+      return expectAsync(testService.init())
+        .toBeResolved()
+        .then(() => {
+          // Restored cache should have only one key in it as it should have
+          // ignored the two invalid file names
+          expect(Array.from(testService['cache'].keys()).sort()).toEqual(['NCT00000001', 'NCT00000002', 'NCT00000003']);
+          // Make sure the cache entries were created properly with the stats
+          function expectDate(key: string, date: Date): void {
+            const entry = testService['cache'].get(key);
+            expect(entry).toBeDefined();
+            if (entry) {
+              // Must have the entry to check it
+              expect(entry.lastAccess).toEqual(date);
+            }
           }
-        }
-        expectDate('NCT00000001', new Date(2021, 1, 1, 12, 1, 0, 0));
-        expectDate('NCT00000002', new Date(2021, 1, 1, 12, 1, 30, 0));
-        expectDate('NCT00000003', new Date(2021, 1, 1, 12, 2, 0, 0));
-      });
+          expectDate('NCT00000001', new Date(2021, 1, 1, 12, 1, 0, 0));
+          expectDate('NCT00000002', new Date(2021, 1, 1, 12, 1, 30, 0));
+          expectDate('NCT00000003', new Date(2021, 1, 1, 12, 2, 0, 0));
+        });
     });
 
     it('handles the directory already existing but not being a directory', () => {
@@ -335,24 +430,28 @@ describe('ClinicalTrialsGovService', () => {
 
     it('creates the data directory if the cache directory exists but is empty', () => {
       const testService = new ctg.ClinicalTrialsGovService('ctg-cache-empty', { cleanInterval: 0 });
-      return expectAsync(testService.init()).toBeResolved().then(() => {
-        // Make sure the mocked directory exists - because this is being mocked,
-        // just use sync fs functions
-        expect(() => {
-          fs.readdirSync('ctg-cache-empty/data');
-        }).not.toThrow();
-      });
+      return expectAsync(testService.init())
+        .toBeResolved()
+        .then(() => {
+          // Make sure the mocked directory exists - because this is being mocked,
+          // just use sync fs functions
+          expect(() => {
+            fs.readdirSync('ctg-cache-empty/data');
+          }).not.toThrow();
+        });
     });
 
     it("creates the directory if it doesn't exist", () => {
       const testService = new ctg.ClinicalTrialsGovService('new-ctg-cache', { cleanInterval: 0 });
-      return expectAsync(testService.init()).toBeResolved().then(() => {
-        // Make sure the mocked directory exists - because this is being mocked,
-        // just use sync fs functions
-        expect(() => {
-          fs.readdirSync('new-ctg-cache');
-        }).not.toThrow();
-      });
+      return expectAsync(testService.init())
+        .toBeResolved()
+        .then(() => {
+          // Make sure the mocked directory exists - because this is being mocked,
+          // just use sync fs functions
+          expect(() => {
+            fs.readdirSync('new-ctg-cache');
+          }).not.toThrow();
+        });
     });
 
     it('handles the directory creation failing', () => {
@@ -362,37 +461,73 @@ describe('ClinicalTrialsGovService', () => {
         expect(path).toEqual(dataDirPath);
         callback(new Error('Simulated error'));
       });
-      return expectAsync(testService.init()).toBeRejected();
+      return expectAsync(testService.init()).toBeRejectedWithError('Simulated error');
+    });
+
+    it('rejects if the directory cannot be read', () => {
+      const testService = new ctg.ClinicalTrialsGovService(dataDirPath);
+      (spyOn(fs, 'readdir') as jasmine.Spy).and.callFake((path, callback) => {
+        callback(new Error('Simulated error'));
+      });
+      return expectAsync(testService.init()).toBeRejectedWithError('Simulated error');
+    });
+
+    it('rejects if a single file load fails', () => {
+      // FIXME (maybe): it's unclear to me if this is correct behavior - maybe the file should be skipped?
+      (spyOn(fs, 'stat') as jasmine.Spy).and.callFake((filename, callback: (err?: Error, stats?: fs.Stats) => void) => {
+        callback(new Error('Simulated error'));
+      });
+      const testService = new ctg.ClinicalTrialsGovService(dataDirPath);
+      return expectAsync(testService.init()).toBeRejectedWithError('Simulated error');
     });
 
     describe('starts a timer', () => {
       const realTimeout = setTimeout;
+      let testService: ctg.ClinicalTrialsGovService;
+      let removeExpiredCacheEntries: jasmine.Spy<() => Promise<void>>;
       beforeEach(() => {
         jasmine.clock().install();
+        testService = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 60000 });
+        removeExpiredCacheEntries = spyOn(testService, 'removeExpiredCacheEntries');
       });
       afterEach(() => {
         jasmine.clock().uninstall();
       });
 
+      // The body of the two tests are identical, the only difference is if the underlying Promise resolves or rejects
+      function expectAsyncTimerToBeRecreated(): PromiseLike<void> {
+        return expectAsync(testService.init())
+          .toBeResolved()
+          .then(() => {
+            expect(removeExpiredCacheEntries).not.toHaveBeenCalled();
+            // Fake the clock moving forward
+            jasmine.clock().tick(60000);
+            expect(removeExpiredCacheEntries).toHaveBeenCalledTimes(1);
+            // We need to let the event loop tick to process the Promise
+            return new Promise<void>((resolve) => {
+              realTimeout(() => {
+                jasmine.clock().tick(60000);
+                expect(removeExpiredCacheEntries).toHaveBeenCalledTimes(2);
+                resolve();
+              }, 0);
+            });
+          });
+      }
+
       it('that resets itself', () => {
-        const testService = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 60000 });
-        const removeExpiredCacheEntries = spyOn(testService, 'removeExpiredCacheEntries').and.callFake(() => {
+        // For this test, resolve
+        removeExpiredCacheEntries.and.callFake(() => {
           return Promise.resolve();
         });
-        return expectAsync(testService.init()).toBeResolved().then(() => {
-          expect(removeExpiredCacheEntries).not.toHaveBeenCalled();
-          // Fake the clock moving forward
-          jasmine.clock().tick(60000);
-          expect(removeExpiredCacheEntries).toHaveBeenCalledTimes(1);
-          // We need to let the event loop tick to process the Promise
-          return new Promise<void>((resolve) => {
-            realTimeout(() => {
-              jasmine.clock().tick(60000);
-              expect(removeExpiredCacheEntries).toHaveBeenCalledTimes(2);
-              resolve();
-            }, 0);
-          });
+        return expectAsyncTimerToBeRecreated();
+      });
+
+      it('that resets itself even if the expiration fails', () => {
+        // For this test, always reject
+        removeExpiredCacheEntries.and.callFake(() => {
+          return Promise.reject(new Error('Simulated error'));
         });
+        return expectAsyncTimerToBeRecreated();
       });
     });
 
@@ -401,6 +536,34 @@ describe('ClinicalTrialsGovService', () => {
       const spy = jasmine.createSpy('setCleanupTimeout');
       await testService.init();
       expect(spy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('#destroy', () => {
+    beforeEach(() => {
+      jasmine.clock().install();
+    });
+    afterEach(() => {
+      jasmine.clock().uninstall();
+    });
+
+    it('stops the timer', async () => {
+      const testService = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 60000 });
+      // This spy should never be invoked but provide the fake implementation so that if it is, the tests won't hang
+      const removeExpiredCacheEntries = spyOn(testService, 'removeExpiredCacheEntries').and.callFake(() => {
+        return Promise.resolve();
+      });
+      await testService.init();
+      // The timer should now be set
+      expect(testService['cleanupTimeout']).not.toEqual(null);
+      await testService.destroy();
+      expect(removeExpiredCacheEntries).not.toHaveBeenCalled();
+      expect(testService['cleanupTimeout']).toEqual(null);
+    });
+
+    it('does nothing if never started', () => {
+      const testService = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 60000 });
+      return expectAsync(testService.destroy()).toBeResolved();
     });
   });
 
@@ -486,8 +649,7 @@ describe('ClinicalTrialsGovService', () => {
       jasmine.clock().install();
       // Set the start date to the cache start time
       jasmine.clock().mockDate(cacheStartTime);
-      console.log(`Mocked time is ${new Date()}`);
-      return ctg.createClinicalTrialsGovService(multipleEntriesDataDir, { expireAfter: 60000 }).then(newService => {
+      return ctg.createClinicalTrialsGovService(multipleEntriesDataDir, { expireAfter: 60000 }).then((newService) => {
         service = newService;
         // "Steal" the cache to grab entries for spying purposes
         const cache = service['cache'];
@@ -553,7 +715,7 @@ describe('ClinicalTrialsGovService', () => {
     let scope: nock.Scope;
     let interceptor: nock.Interceptor;
     let downloader: ctg.ClinicalTrialsGovService;
-    const nctIDs = [ 'NCT00000001', 'NCT00000002', 'NCT00000003' ];
+    const nctIDs = ['NCT00000001', 'NCT00000002', 'NCT00000003'];
     beforeEach(() => {
       scope = nock('https://clinicaltrials.gov');
       interceptor = scope.get('/ct2/download_studies?term=' + nctIDs.join('+OR+'));
@@ -570,46 +732,52 @@ describe('ClinicalTrialsGovService', () => {
     it('handles failure responses from the server', () => {
       interceptor.reply(404, 'Unknown');
       // Pretend the middle entry exists
-      downloader['cache'].set(nctIDs[1], new ctg.CacheEntry(nctIDs[1] + '.xml', { }));
+      downloader['cache'].set(nctIDs[1], new ctg.CacheEntry(nctIDs[1] + '.xml', {}));
       return expectAsync(
         downloader['downloadTrials'](nctIDs).finally(() => {
           expect(scope.isDone()).toBeTrue();
         })
-      ).toBeRejected().then(() => {
-        // Check to make sure the new cache entries do not still exist - the failure should remove them, but not the
-        // non-pending one
-        expect(downloader['cache'].has(nctIDs[0])).toBeFalse();
-        expect(downloader['cache'].has(nctIDs[2])).toBeFalse();
-      });
+      )
+        .toBeRejected()
+        .then(() => {
+          // Check to make sure the new cache entries do not still exist - the failure should remove them, but not the
+          // non-pending one
+          expect(downloader['cache'].has(nctIDs[0])).toBeFalse();
+          expect(downloader['cache'].has(nctIDs[2])).toBeFalse();
+        });
     });
 
     it('creates cache entries', () => {
       interceptor.reply(200, 'Unimportant', { 'Content-type': 'application/zip' });
       // For this test, create an existing cache entry for one of the IDs
-      downloader['cache'].set(nctIDs[1], new ctg.CacheEntry(nctIDs[1] + '.xml', { }));
+      downloader['cache'].set(nctIDs[1], new ctg.CacheEntry(nctIDs[1] + '.xml', {}));
       // Also mock the extraction process so it thinks everything is fine
       downloader['extractResults'] = () => {
         // Just pretend everything is fine
         return Promise.resolve();
       };
-      return expectAsync(downloader['downloadTrials'](nctIDs)).toBeResolved().then(() => {
-        // Should have created the two missing items which should still be pending as we mocked the extract process
-        let entry = downloader['cache'].get(nctIDs[0]);
-        expect(entry && entry.pending).toBeTrue();
-        entry = downloader['cache'].get(nctIDs[1]);
-        expect(entry && (!entry.pending)).toBeTrue();
-        entry = downloader['cache'].get(nctIDs[2]);
-        expect(entry && entry.pending).toBeTrue();
-      });
+      return expectAsync(downloader['downloadTrials'](nctIDs))
+        .toBeResolved()
+        .then(() => {
+          // Should have created the two missing items which should still be pending as we mocked the extract process
+          let entry = downloader['cache'].get(nctIDs[0]);
+          expect(entry && entry.pending).toBeTrue();
+          entry = downloader['cache'].get(nctIDs[1]);
+          expect(entry && !entry.pending).toBeTrue();
+          entry = downloader['cache'].get(nctIDs[2]);
+          expect(entry && entry.pending).toBeTrue();
+        });
     });
 
     it('extracts a ZIP', () => {
       interceptor.reply(200, 'Unimportant', {
         'Content-type': 'application/zip'
       });
-      const spy = jasmine.createSpy('extractResults').and.callFake((): Promise<void> => {
-        return Promise.resolve();
-      });
+      const spy = jasmine.createSpy('extractResults').and.callFake(
+        (): Promise<void> => {
+          return Promise.resolve();
+        }
+      );
       // Jam the spy in (method is protected, that's why it can't be created directly)
       downloader['extractResults'] = spy;
       return expectAsync(
@@ -639,7 +807,9 @@ describe('ClinicalTrialsGovService', () => {
 
     it('handles an invalid ZIP', () => {
       // For now, give it a JSON file to extract
-      return expectAsync(downloader['extractResults'](fs.createReadStream(specFilePath('resource.json')))).toBeRejected();
+      return expectAsync(
+        downloader['extractResults'](fs.createReadStream(specFilePath('resource.json')))
+      ).toBeRejected();
     });
 
     it('handles deleting the temporary ZIP failing', () => {
@@ -675,10 +845,51 @@ describe('ClinicalTrialsGovService', () => {
         return Promise.resolve(study);
       });
       downloader['cache'].set('test', entry);
-      return expectAsync(downloader.getCachedClinicalStudy('test')).toBeResolvedTo(study).then(() => {
-        // Make sure the spy was called once (with no arguments)
-        expect(spy).toHaveBeenCalledOnceWith();
-      });
+      return expectAsync(downloader.getCachedClinicalStudy('test'))
+        .toBeResolvedTo(study)
+        .then(() => {
+          // Make sure the spy was called once (with no arguments)
+          expect(spy).toHaveBeenCalledOnceWith();
+        });
+    });
+  });
+
+  describe('#ensureTrialsAvailable()', () => {
+    // Most of these tests just pass through to downloadTrials
+    let service: ctg.ClinicalTrialsGovService;
+    let downloadTrials: jasmine.Spy<(ids: string[]) => Promise<void>>;
+    beforeEach(() => {
+      service = new ctg.ClinicalTrialsGovService(dataDirPath);
+      // Can't directly spy on within TypeScript because downloadTrials is protected
+      const spy = jasmine.createSpy<(ids: string[]) => Promise<void>>('downloadTrials');
+      // Jam it in
+      service['downloadTrials'] = spy;
+      downloadTrials = spy;
+      downloadTrials.and.callFake(() => Promise.resolve());
+    });
+
+    it('excludes invalid NCT numbers in an array of strings', () => {
+      return expectAsync(
+        service.ensureTrialsAvailable(['NCT00000001', 'NCT00000012', 'invalid', 'NCT01234567'])
+      )
+        .toBeResolved()
+        .then(() => {
+          expect(downloadTrials).toHaveBeenCalledOnceWith(['NCT00000001', 'NCT00000012', 'NCT01234567']);
+        });
+    });
+
+    it('pulls NCT numbers out of given ResearchStudy objects', () => {
+      return expectAsync(
+        service.ensureTrialsAvailable([
+          createResearchStudy('test1', 'NCT00000001'),
+          createResearchStudy('test2', 'NCT12345678'),
+          createResearchStudy('no-nct')
+        ])
+      )
+        .toBeResolved()
+        .then(() => {
+          expect(downloadTrials).toHaveBeenCalledOnceWith(['NCT00000001', 'NCT12345678']);
+        });
     });
   });
 
@@ -686,7 +897,7 @@ describe('ClinicalTrialsGovService', () => {
     // For this set of tests, we don't want to *really* do any unzipping, so we set up a bunch of mocks on Yauzl to
     // simulate the process.
     let openSpy: jasmine.Spy<{
-      (path: string, options: yauzl.Options, callback?: (err?: Error, zipfile?: yauzl.ZipFile) => void): void
+      (path: string, options: yauzl.Options, callback?: (err?: Error, zipfile?: yauzl.ZipFile) => void): void;
     }>;
     let service: ctg.ClinicalTrialsGovService;
     beforeEach(() => {
@@ -696,8 +907,7 @@ describe('ClinicalTrialsGovService', () => {
 
     it('rejects on error', () => {
       openSpy.and.callFake((path, options, callback) => {
-        if (callback)
-          callback(new Error('Simulated error'));
+        if (callback) callback(new Error('Simulated error'));
       });
       return expectAsync(service['extractZip']('test.zip')).toBeRejectedWithError('Simulated error');
     });
@@ -705,8 +915,7 @@ describe('ClinicalTrialsGovService', () => {
     it('rejects if called with nothing', () => {
       // This should never really happen, but make sure it's handled if it does
       openSpy.and.callFake((path, options, callback) => {
-        if (callback)
-          callback();
+        if (callback) callback();
       });
       return expectAsync(service['extractZip']('test.zip')).toBeRejected();
     });
@@ -717,7 +926,7 @@ describe('ClinicalTrialsGovService', () => {
       beforeEach(() => {
         const mockObj = new EventEmitter();
         // We currently never use any other methods other than the events, so force it in
-        mockZipFile = mockObj as unknown as yauzl.ZipFile;
+        mockZipFile = (mockObj as unknown) as yauzl.ZipFile;
       });
 
       it('rejects on error', () => {
@@ -745,13 +954,17 @@ describe('ClinicalTrialsGovService', () => {
             compressedSize: 4,
             fileName: mockNctNumber + '.xml',
             fileNameLength: mockNctNumber.length + 4,
-            uncompressedSize: 4,
+            uncompressedSize: 4
           };
 
           // This is intentionally not a full mock implementation
-          entry = mockEntry as unknown as yauzl.Entry;
+          entry = (mockEntry as unknown) as yauzl.Entry;
           // Also need to install a fake openReadStream
-          mockZipFile.openReadStream = (entry: yauzl.Entry, callbackOrOptions: (yauzl.ZipFileOptions | ((err?: Error, stream?: stream.Readable) => void)), callbackOrNothing?: ((err?: Error, stream?: stream.Readable) => void)) => {
+          mockZipFile.openReadStream = (
+            entry: yauzl.Entry,
+            callbackOrOptions: yauzl.ZipFileOptions | ((err?: Error, stream?: stream.Readable) => void),
+            callbackOrNothing?: (err?: Error, stream?: stream.Readable) => void
+          ) => {
             // Don't actually care about the options
             let callback: (err?: Error, stream?: stream.Readable) => void;
             if (callbackOrNothing) {
@@ -766,12 +979,14 @@ describe('ClinicalTrialsGovService', () => {
           };
           // By default, make it so that openReadStream returns a stream that reads the string "test"
           openReadStream = (callback) => {
-            console.log('default open stream');
-            callback(undefined, new stream.Readable({
-              read: function() {
-                this.push(Buffer.from('test', 'utf-8'));
-              }
-            }));
+            callback(
+              undefined,
+              new stream.Readable({
+                read: function () {
+                  this.push(Buffer.from('test', 'utf-8'));
+                }
+              })
+            );
           };
 
           // All these require an openSpy that forwards our mock ZIP file
@@ -787,9 +1002,11 @@ describe('ClinicalTrialsGovService', () => {
         it('skips excessively large entry', () => {
           entry.uncompressedSize = service.maxAllowedEntrySize + 1;
           const spy = spyOn(mockZipFile, 'openReadStream');
-          return expectAsync(service['extractZip']('test.zip')).toBeResolved().then(() => {
-            expect(spy).not.toHaveBeenCalled();
-          });
+          return expectAsync(service['extractZip']('test.zip'))
+            .toBeResolved()
+            .then(() => {
+              expect(spy).not.toHaveBeenCalled();
+            });
         });
 
         it('extracts the entry', () => {
@@ -800,11 +1017,13 @@ describe('ClinicalTrialsGovService', () => {
             // We need to return a promise that resolves or the entire thing won't resolve
             return Promise.resolve();
           });
-          return expectAsync(service['extractZip']('test.zip')).toBeResolved().then(() => {
-            expect(extractSpy).toHaveBeenCalled();
-            // Make sure it was called with the correct NCT ID
-            expect(extractSpy.calls.first().args[0]).toEqual(mockNctNumber);
-          });
+          return expectAsync(service['extractZip']('test.zip'))
+            .toBeResolved()
+            .then(() => {
+              expect(extractSpy).toHaveBeenCalled();
+              // Make sure it was called with the correct NCT ID
+              expect(extractSpy.calls.first().args[0]).toEqual(mockNctNumber);
+            });
         });
 
         it('handles an entry failing to extract', () => {
@@ -831,24 +1050,24 @@ describe('ClinicalTrialsGovService', () => {
       let chunk: Buffer | null = Buffer.from('Test', 'utf-8');
       mockEntryStream = new stream.Readable({
         // Note that this cannot be an arrow function because this must be the stream
-        read: function() {
+        read: function () {
           this.push(chunk);
           // Pushing null indicates end of stream - so set the chunk to null so the next read ends the stream
           chunk = null;
         }
       });
       mockFileStream = new stream.Writable({
-        write: function(chunk, encoding, callback) {
+        write: function (chunk, encoding, callback) {
           // Must invoke the callback or things will freeze
           callback();
         },
-        final: function(callback) {
+        final: function (callback) {
           callback();
         }
       });
       spyOn(fs, 'createWriteStream').and.callFake(() => {
         // Pretend this is a file stream for TypeScript - it doesn't really matter
-        return mockFileStream as unknown as fs.WriteStream;
+        return (mockFileStream as unknown) as fs.WriteStream;
       });
     });
 
@@ -858,7 +1077,7 @@ describe('ClinicalTrialsGovService', () => {
     // So to deal with that, create a function that creates the tests, and a flag indicating which test was running
     let errorTest = false;
 
-    const makeTests = function() {
+    const makeTests = function () {
       it('handles an error', () => {
         errorTest = true;
         // Replace the write method with one that will throw a mock error
@@ -909,7 +1128,7 @@ describe('ClinicalTrialsGovService', () => {
       let entry: ctg.CacheEntry;
       let readySpy: jasmine.Spy;
       beforeEach(() => {
-        entry = new ctg.CacheEntry(mockNctNumber + '.xml', { });
+        entry = new ctg.CacheEntry(mockNctNumber + '.xml', {});
         // Add the entry
         service['cache'].set(mockNctNumber, entry);
         // In this case we just want to know if ready was not invoked as it shouldn't be
