@@ -1,4 +1,4 @@
-import { CLINICAL_TRIAL_IDENTIFIER_CODING_SYSTEM_URL } from '../../src/clinicaltrialgov';
+import { CLINICAL_TRIAL_IDENTIFIER_CODING_SYSTEM_URL } from '../../src/clinicaltrialsgov';
 import { ResearchStudy as IResearchStudy } from '../../src/fhir-types';
 import { ResearchStudy } from '../../src/research-study';
 
