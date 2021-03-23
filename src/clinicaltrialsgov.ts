@@ -239,9 +239,10 @@ export class CacheEntry {
   }
 
   /**
-   * Loads the underlying file. If the entry is still pending, then the file is read once the entry is ready.
+   * Loads the underlying file. If the entry is still pending, then the file is read once the entry is ready. This may
+   * resolve to null if the clinical study does not exist (in which case an empty file will be cached).
    */
-  load(): Promise<ClinicalStudy> {
+  load(): Promise<ClinicalStudy | null> {
     // Move last access to now
     this._lastAccess = new Date();
     // If we're still pending, we have to wait for that to finish before we can
@@ -259,7 +260,7 @@ export class CacheEntry {
   /**
    * Always attempt to read the file, regardless of whether or not the entry is pending.
    */
-  readFile(): Promise<ClinicalStudy> {
+  readFile(): Promise<ClinicalStudy | null> {
     return new Promise((resolve, reject) => {
       fs.readFile(this.filename, { encoding: 'utf8' }, (err, data) => {
         if (err) {
@@ -267,8 +268,13 @@ export class CacheEntry {
         } else {
           // Again bump last access to now since the access has completed
           this._lastAccess = new Date();
-          // Resolving with a Promise essentially "chains" that Promise
-          resolve(parseClinicalTrialXML(data));
+          if (data.length === 0) {
+            // If empty, we cached a "missing" response
+            resolve(null);
+          } else {
+            // Resolving with a Promise essentially "chains" that Promise
+            resolve(parseClinicalTrialXML(data));
+          }
         }
       });
     });
@@ -733,7 +739,8 @@ export class ClinicalTrialsGovService {
   }
 
   /**
-   * Internal method to create a temporary file within the data directory. Temporary files created via this method
+   * Internal method to create a temporary file within the data directory. Temporary files created via this method are
+   * not automatically deleted and need to be cleaned up by the caller.
    */
   private createTemporaryFileName(): string {
     // For now, temporary files are always "temp-[DATE]-[PID]-[TEMPID]" where [TEMPID] is an incrementing internal ID.
