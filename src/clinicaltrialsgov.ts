@@ -133,12 +133,23 @@ export function findNCTNumbers(studies: ResearchStudy[]): Map<NCTNumber, Researc
   return result;
 }
 
-export function parseClinicalTrialXML(fileContents: string): Promise<ClinicalStudy> {
+/**
+ * Attempts to parse the given string as XML and into a ClinicalStudy object. If the XML parsing succeeds but the XML
+ * is not recognized as a valid ClinicalStudy, this returns null. If the XML parsing fails, the Promise will be rejected.
+ * @param fileContents the contents of the file as a string
+ * @param log an optional logger
+ * @returns a promise that resolves to the parsed object or null
+ */
+export function parseClinicalTrialXML(fileContents: string, log?: Logger): Promise<ClinicalStudy | null> {
   const parser = new xml2js.Parser();
   return parser.parseStringPromise(fileContents).then((result) => {
     if (isTrialBackup(result)) {
       return result.clinical_study;
     } else {
+      if (log) {
+        log('Invalid XML result, XML parsing succeeded, but resulting object is not valid.');
+        log('XML parsed as: %j', result);
+      }
       throw new Error('Unable to parse trial as valid clinical study XML');
     }
   });
@@ -242,25 +253,25 @@ export class CacheEntry {
    * Loads the underlying file. If the entry is still pending, then the file is read once the entry is ready. This may
    * resolve to null if the clinical study does not exist (in which case an empty file will be cached).
    */
-  load(): Promise<ClinicalStudy | null> {
+  load(log: Logger): Promise<ClinicalStudy | null> {
     // Move last access to now
     this._lastAccess = new Date();
     // If we're still pending, we have to wait for that to finish before we can
     // read the underlying file.
     if (this._pending) {
       return this._pending.then(() => {
-        return this.readFile();
+        return this.readFile(log);
       });
     } else {
       // Otherwise we can just return immediately
-      return this.readFile();
+      return this.readFile(log);
     }
   }
 
   /**
    * Always attempt to read the file, regardless of whether or not the entry is pending.
    */
-  readFile(): Promise<ClinicalStudy | null> {
+  readFile(log: Logger): Promise<ClinicalStudy | null> {
     return new Promise((resolve, reject) => {
       fs.readFile(this.filename, { encoding: 'utf8' }, (err, data) => {
         if (err) {
@@ -273,7 +284,7 @@ export class CacheEntry {
             resolve(null);
           } else {
             // Resolving with a Promise essentially "chains" that Promise
-            resolve(parseClinicalTrialXML(data));
+            resolve(parseClinicalTrialXML(data, log));
           }
         }
       });
@@ -905,7 +916,7 @@ export class ClinicalTrialsGovService {
   getCachedClinicalStudy(nctNumber: NCTNumber): Promise<ClinicalStudy | null> {
     const entry = this.cache.get(nctNumber);
     if (entry) {
-      return entry.load();
+      return entry.load(this.log);
     } else {
       return Promise.resolve(null);
     }
