@@ -8,6 +8,7 @@ import fs from 'fs';
 import stream from 'stream';
 import path from 'path';
 import { EventEmitter } from 'events';
+import { debuglog } from 'util';
 import yauzl from 'yauzl';
 import nock from 'nock';
 // Trial missing summary, inclusion/exclusion criteria, phase and study type
@@ -136,6 +137,7 @@ describe('parseClinicalTrialXML', () => {
 describe('CacheEntry', () => {
   // Constant start time
   const startTime = new Date(2021, 0, 21, 12, 0, 0, 0);
+  const log = debuglog('ctgovservice');
   describe('createdAt', () => {
     beforeAll(() => {
       jasmine.clock().install();
@@ -182,7 +184,7 @@ describe('CacheEntry', () => {
       });
       // Move forward a minute
       jasmine.clock().tick(60000);
-      const promise = entry.load();
+      const promise = entry.load(log);
       // Last access should now be a minute after the start time
       expect(entry.lastAccess).toEqual(new Date(2021, 0, 21, 12, 1, 0, 0));
       return expectAsync(promise).toBeResolved();
@@ -204,13 +206,13 @@ describe('CacheEntry', () => {
       const spy = spyOn(entry, 'readFile').and.callFake(() => Promise.resolve(createClinicalStudy()));
       // Now, attempt to load it. This should do nothing as the entry is pending.
       let shouldBeResolved = false;
-      const promise = entry.load();
+      const promise = entry.load(log);
       promise.then(() => {
         // Check if we should be resolved at this point
         expect(shouldBeResolved).toBeTrue();
         if (shouldBeResolved) {
           // If it should be resolved, it should have called readFile
-          expect(spy).toHaveBeenCalledOnceWith();
+          expect(spy).toHaveBeenCalledOnceWith(log);
         }
       });
       // Set a timeout to happen "on next event loop" that marks the cache entry as ready
@@ -237,7 +239,7 @@ describe('CacheEntry', () => {
         callback(new Error('Simulated error'));
       });
       const testEntry = new ctg.CacheEntry('test', {});
-      return expectAsync(testEntry.readFile()).toBeRejectedWithError('Simulated error');
+      return expectAsync(testEntry.readFile(log)).toBeRejectedWithError('Simulated error');
     });
   });
   describe('#remove()', () => {
@@ -862,8 +864,10 @@ describe('ClinicalTrialsGovService', () => {
       return expectAsync(downloader.getCachedClinicalStudy('test'))
         .toBeResolvedTo(study)
         .then(() => {
-          // Make sure the spy was called once (with no arguments)
-          expect(spy).toHaveBeenCalledOnceWith();
+          // Make sure the spy was called once (with just the logger as its arguments)
+          expect(spy.calls.count()).toEqual(1);
+          expect(spy.calls.first().args.length).toEqual(1);
+          expect(typeof spy.calls.first().args[0]).toEqual('function');
         });
     });
   });
