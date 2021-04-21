@@ -823,11 +823,11 @@ export class ClinicalTrialsGovService {
   private extractZip(zipPath: string): Promise<void> {
     this.log('Extracting [%s]...', zipPath);
     return new Promise<void>((resolve, reject) => {
-      yauzl.open(zipPath, { }, (err, zipFile) => {
+      yauzl.open(zipPath, { autoClose: false, lazyEntries: true }, (err, zipFile): void => {
         if (err) {
+          this.log('Could not open [%s]: %o', zipPath, err);
           reject(err);
         } else if (zipFile) {
-          const pendingPromises: Promise<void>[] = [];
           // Now that we have the file, it's time to add some events to it
           zipFile.once('error', (err) => {
             reject(err);
@@ -844,30 +844,36 @@ export class ClinicalTrialsGovService {
                   if (entry.uncompressedSize > this.maxAllowedEntrySize) {
                     this.log('Skipping entry %s: uncompressed size %d is larger than maximum allowed!', entry.fileName, entry.uncompressedSize);
                   } else {
-                    // In this case, add it to the cache
-                    pendingPromises.push(new Promise<void>((resolve) => {
-                      zipFile.openReadStream(entry, (err, entryStream) => {
-                        if (err) {
-                          this.log('Error reading entry %s: skipping!', entry.fileName);
-                        } else if (entryStream) {
-                          // Resolve with the Promise that actually finishes the thing
-                          resolve(this.addCacheEntry(nctNumber, entryStream));
-                          return;
-                        }
-                        // If we're here, there was an error or somehow the entryStream wasn't given. In either case,
-                        // just resolve the Promise anyway and let this entry be skipped.
-                        resolve();
-                      });
-                    }));
+                    this.log('Extract [%s]...', entry.fileName);
+                    zipFile.openReadStream(entry, (err, entryStream) => {
+                      if (err) {
+                        this.log('Error reading entry %s: skipping!', entry.fileName);
+                      } else if (entryStream) {
+                        this.addCacheEntry(nctNumber, entryStream).then(() => {
+                          zipFile.readEntry();
+                        }, (err) => {
+                          this.log('Error extracting %s: %o', entry.fileName, err);
+                          zipFile.readEntry();
+                        });
+                        return;
+                      }
+                    });
                   }
+                } else {
+                  this.log('Skipping invalid entry [%s]: not a valid NCT number/file name', entry.fileName);
                 }
               }
             }
+            // If we're here, the entry was skipped for some reason. In any case, move on to the next entry.
+            zipFile.readEntry();
           });
-          Promise.all(pendingPromises).then(() => {
-            // Once all the pending promises from the entries (if any) are done, we can resolve
+          zipFile.once('end', () => {
+            // Now that we've read everything, resolve the Promise and close the ZIP file
             resolve();
+            zipFile.close();
           });
+          // Now that we've set up our event handlers, start
+          zipFile.readEntry();
         } else {
           reject(new Error('Invalid state: no error or zip file given.'));
         }
@@ -884,7 +890,7 @@ export class ClinicalTrialsGovService {
       // (This also potentially allows us to do additional cleanup on close if an error happened.)
       let success = true;
       dataStream.pipe(fs.createWriteStream(filename)).on('error', (err) => {
-        this.log(`Unable to create file [%s]: %o`, filename, err);
+        this.log('Unable to create file [%s]: %o', filename, err);
         // If the cache entry exists in pending mode, delete it - we failed to create this entry
         // TODO: Does this failure destroy the existing cache entry?
         const entry = this.cache.get(nctNumber);

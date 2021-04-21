@@ -943,16 +943,19 @@ describe('ClinicalTrialsGovService', () => {
       let mockZipFile: yauzl.ZipFile;
       beforeEach(() => {
         const mockObj = new EventEmitter();
-        // We currently never use any other methods other than the events, so force it in
+        // This is a partial implementation to avoid actual file system access
         mockZipFile = (mockObj as unknown) as yauzl.ZipFile;
+        mockZipFile.close = () => { /* no-op */ };
       });
 
       it('rejects on error', () => {
+        // Simulate error on first readEntry
+        mockZipFile.readEntry = () => {
+          mockZipFile.emit('error', new Error('Simulated error'));
+        };
         openSpy.and.callFake((path, options, callback) => {
           if (callback) {
             callback(undefined, mockZipFile);
-            // Once the callback has been invoked, we can do the simulated events
-            mockZipFile.emit('error', new Error('Simulated error'));
           }
         });
         return expectAsync(service['extractZip']('test.zip')).toBeRejectedWithError('Simulated error');
@@ -960,6 +963,8 @@ describe('ClinicalTrialsGovService', () => {
 
       describe('with an entry', () => {
         let entry: yauzl.Entry;
+        let entries: yauzl.Entry[];
+        let currentIndex: number;
         // To make the test easier, this is the method called with the callback
         let openReadStream: (callback: (err?: Error, stream?: stream.Readable) => void) => void;
         const mockNctNumber: ctg.NCTNumber = 'NCT12345678';
@@ -977,6 +982,8 @@ describe('ClinicalTrialsGovService', () => {
 
           // This is intentionally not a full mock implementation
           entry = (mockEntry as unknown) as yauzl.Entry;
+          entries = [ entry ];
+          currentIndex = 0;
           // Also need to install a fake openReadStream
           mockZipFile.openReadStream = (
             entry: yauzl.Entry,
@@ -1011,10 +1018,19 @@ describe('ClinicalTrialsGovService', () => {
           openSpy.and.callFake((path, options, callback) => {
             if (callback) {
               callback(undefined, mockZipFile);
-              // Once the callback has been returned, we can pump through our entry
-              mockZipFile.emit('entry', entry);
             }
           });
+
+          // Fake read entry implementation
+          mockZipFile.readEntry = () => {
+            if (currentIndex < entries.length) {
+              const e = entries[currentIndex];
+              currentIndex++;
+              mockZipFile.emit('entry', e);
+            } else {
+              mockZipFile.emit('end');
+            }
+          };
         });
 
         describe('skips entries with', () => {
