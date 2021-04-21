@@ -884,6 +884,7 @@ export class ClinicalTrialsGovService {
       // (This also potentially allows us to do additional cleanup on close if an error happened.)
       let success = true;
       dataStream.pipe(fs.createWriteStream(filename)).on('error', (err) => {
+        this.log(`Unable to create file [%s]: %o`, filename, err);
         // If the cache entry exists in pending mode, delete it - we failed to create this entry
         // TODO: Does this failure destroy the existing cache entry?
         const entry = this.cache.get(nctNumber);
