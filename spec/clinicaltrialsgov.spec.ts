@@ -137,6 +137,7 @@ describe('parseClinicalTrialXML', () => {
 describe('CacheEntry', () => {
   // Constant start time
   const startTime = new Date(2021, 0, 21, 12, 0, 0, 0);
+  // Use the same log that the service would use for invoking stubs
   const log = debuglog('ctgovservice');
   describe('createdAt', () => {
     beforeAll(() => {

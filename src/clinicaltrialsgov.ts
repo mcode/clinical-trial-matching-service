@@ -251,7 +251,7 @@ export class CacheEntry {
 
   /**
    * Loads the underlying file. If the entry is still pending, then the file is read once the entry is ready. This may
-   * resolve to null if the clinical study does not exist (in which case an empty file will be cached).
+   * resolve to null if the clinical study does not exist in the results.
    */
   load(log: Logger): Promise<ClinicalStudy | null> {
     // Move last access to now
@@ -280,7 +280,9 @@ export class CacheEntry {
           // Again bump last access to now since the access has completed
           this._lastAccess = new Date();
           if (data.length === 0) {
-            // If empty, we cached a "missing" response
+            // Sometimes files end up empty - this appears to be a bug?
+            // It's unclear what causes this to happen
+            log('Warning: %s is empty on read', this.filename);
             resolve(null);
           } else {
             // Resolving with a Promise essentially "chains" that Promise
