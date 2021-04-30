@@ -832,6 +832,7 @@ export class ClinicalTrialsGovService {
         } else if (zipFile) {
           // Now that we have the file, it's time to add some events to it
           zipFile.once('error', (err) => {
+            this.log('Error reading ZIP file: %o', err);
             reject(err);
           });
           zipFile.on('entry', (entry: yauzl.Entry) => {
@@ -850,6 +851,7 @@ export class ClinicalTrialsGovService {
                     zipFile.openReadStream(entry, (err, entryStream) => {
                       if (err) {
                         this.log('Error reading entry %s: skipping!', entry.fileName);
+                        zipFile.readEntry();
                       } else if (entryStream) {
                         this.addCacheEntry(nctNumber, entryStream).then(() => {
                           zipFile.readEntry();
@@ -857,9 +859,9 @@ export class ClinicalTrialsGovService {
                           this.log('Error extracting %s: %o', entry.fileName, err);
                           zipFile.readEntry();
                         });
-                        return;
                       }
                     });
+                    return;
                   }
                 } else {
                   this.log('Skipping invalid entry [%s]: not a valid NCT number/file name', entry.fileName);
