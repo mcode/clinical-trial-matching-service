@@ -133,12 +133,23 @@ export function findNCTNumbers(studies: ResearchStudy[]): Map<NCTNumber, Researc
   return result;
 }
 
-export function parseClinicalTrialXML(fileContents: string): Promise<ClinicalStudy> {
+/**
+ * Attempts to parse the given string as XML and into a ClinicalStudy object. If the XML parsing succeeds but the XML
+ * is not recognized as a valid ClinicalStudy, this returns null. If the XML parsing fails, the Promise will be rejected.
+ * @param fileContents the contents of the file as a string
+ * @param log an optional logger
+ * @returns a promise that resolves to the parsed object or null
+ */
+export function parseClinicalTrialXML(fileContents: string, log?: Logger): Promise<ClinicalStudy | null> {
   const parser = new xml2js.Parser();
   return parser.parseStringPromise(fileContents).then((result) => {
     if (isTrialBackup(result)) {
       return result.clinical_study;
     } else {
+      if (log) {
+        log('Invalid XML result, XML parsing succeeded, but resulting object is not valid.');
+        log('XML parsed as: %j', result);
+      }
       throw new Error('Unable to parse trial as valid clinical study XML');
     }
   });
@@ -239,27 +250,28 @@ export class CacheEntry {
   }
 
   /**
-   * Loads the underlying file. If the entry is still pending, then the file is read once the entry is ready.
+   * Loads the underlying file. If the entry is still pending, then the file is read once the entry is ready. This may
+   * resolve to null if the clinical study does not exist in the results.
    */
-  load(): Promise<ClinicalStudy> {
+  load(log: Logger): Promise<ClinicalStudy | null> {
     // Move last access to now
     this._lastAccess = new Date();
     // If we're still pending, we have to wait for that to finish before we can
     // read the underlying file.
     if (this._pending) {
       return this._pending.then(() => {
-        return this.readFile();
+        return this.readFile(log);
       });
     } else {
       // Otherwise we can just return immediately
-      return this.readFile();
+      return this.readFile(log);
     }
   }
 
   /**
    * Always attempt to read the file, regardless of whether or not the entry is pending.
    */
-  readFile(): Promise<ClinicalStudy> {
+  readFile(log: Logger): Promise<ClinicalStudy | null> {
     return new Promise((resolve, reject) => {
       fs.readFile(this.filename, { encoding: 'utf8' }, (err, data) => {
         if (err) {
@@ -267,8 +279,15 @@ export class CacheEntry {
         } else {
           // Again bump last access to now since the access has completed
           this._lastAccess = new Date();
-          // Resolving with a Promise essentially "chains" that Promise
-          resolve(parseClinicalTrialXML(data));
+          if (data.length === 0) {
+            // Sometimes files end up empty - this appears to be a bug?
+            // It's unclear what causes this to happen
+            log('Warning: %s is empty on read', this.filename);
+            resolve(null);
+          } else {
+            // Resolving with a Promise essentially "chains" that Promise
+            resolve(parseClinicalTrialXML(data, log));
+          }
         }
       });
     });
@@ -733,7 +752,8 @@ export class ClinicalTrialsGovService {
   }
 
   /**
-   * Internal method to create a temporary file within the data directory. Temporary files created via this method
+   * Internal method to create a temporary file within the data directory. Temporary files created via this method are
+   * not automatically deleted and need to be cleaned up by the caller.
    */
   private createTemporaryFileName(): string {
     // For now, temporary files are always "temp-[DATE]-[PID]-[TEMPID]" where [TEMPID] is an incrementing internal ID.
@@ -805,11 +825,11 @@ export class ClinicalTrialsGovService {
   private extractZip(zipPath: string): Promise<void> {
     this.log('Extracting [%s]...', zipPath);
     return new Promise<void>((resolve, reject) => {
-      yauzl.open(zipPath, { }, (err, zipFile) => {
+      yauzl.open(zipPath, { autoClose: false, lazyEntries: true }, (err, zipFile): void => {
         if (err) {
+          this.log('Could not open [%s]: %o', zipPath, err);
           reject(err);
         } else if (zipFile) {
-          const pendingPromises: Promise<void>[] = [];
           // Now that we have the file, it's time to add some events to it
           zipFile.once('error', (err) => {
             reject(err);
@@ -826,30 +846,36 @@ export class ClinicalTrialsGovService {
                   if (entry.uncompressedSize > this.maxAllowedEntrySize) {
                     this.log('Skipping entry %s: uncompressed size %d is larger than maximum allowed!', entry.fileName, entry.uncompressedSize);
                   } else {
-                    // In this case, add it to the cache
-                    pendingPromises.push(new Promise<void>((resolve) => {
-                      zipFile.openReadStream(entry, (err, entryStream) => {
-                        if (err) {
-                          this.log('Error reading entry %s: skipping!', entry.fileName);
-                        } else if (entryStream) {
-                          // Resolve with the Promise that actually finishes the thing
-                          resolve(this.addCacheEntry(nctNumber, entryStream));
-                          return;
-                        }
-                        // If we're here, there was an error or somehow the entryStream wasn't given. In either case,
-                        // just resolve the Promise anyway and let this entry be skipped.
-                        resolve();
-                      });
-                    }));
+                    this.log('Extract [%s]...', entry.fileName);
+                    zipFile.openReadStream(entry, (err, entryStream) => {
+                      if (err) {
+                        this.log('Error reading entry %s: skipping!', entry.fileName);
+                      } else if (entryStream) {
+                        this.addCacheEntry(nctNumber, entryStream).then(() => {
+                          zipFile.readEntry();
+                        }, (err) => {
+                          this.log('Error extracting %s: %o', entry.fileName, err);
+                          zipFile.readEntry();
+                        });
+                        return;
+                      }
+                    });
                   }
+                } else {
+                  this.log('Skipping invalid entry [%s]: not a valid NCT number/file name', entry.fileName);
                 }
               }
             }
+            // If we're here, the entry was skipped for some reason. In any case, move on to the next entry.
+            zipFile.readEntry();
           });
-          Promise.all(pendingPromises).then(() => {
-            // Once all the pending promises from the entries (if any) are done, we can resolve
+          zipFile.once('end', () => {
+            // Now that we've read everything, resolve the Promise and close the ZIP file
             resolve();
+            zipFile.close();
           });
+          // Now that we've set up our event handlers, start
+          zipFile.readEntry();
         } else {
           reject(new Error('Invalid state: no error or zip file given.'));
         }
@@ -866,6 +892,7 @@ export class ClinicalTrialsGovService {
       // (This also potentially allows us to do additional cleanup on close if an error happened.)
       let success = true;
       dataStream.pipe(fs.createWriteStream(filename)).on('error', (err) => {
+        this.log('Unable to create file [%s]: %o', filename, err);
         // If the cache entry exists in pending mode, delete it - we failed to create this entry
         // TODO: Does this failure destroy the existing cache entry?
         const entry = this.cache.get(nctNumber);
@@ -898,7 +925,7 @@ export class ClinicalTrialsGovService {
   getCachedClinicalStudy(nctNumber: NCTNumber): Promise<ClinicalStudy | null> {
     const entry = this.cache.get(nctNumber);
     if (entry) {
-      return entry.load();
+      return entry.load(this.log);
     } else {
       return Promise.resolve(null);
     }

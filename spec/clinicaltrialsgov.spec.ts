@@ -8,6 +8,7 @@ import fs from 'fs';
 import stream from 'stream';
 import path from 'path';
 import { EventEmitter } from 'events';
+import { debuglog } from 'util';
 import yauzl from 'yauzl';
 import nock from 'nock';
 // Trial missing summary, inclusion/exclusion criteria, phase and study type
@@ -136,6 +137,8 @@ describe('parseClinicalTrialXML', () => {
 describe('CacheEntry', () => {
   // Constant start time
   const startTime = new Date(2021, 0, 21, 12, 0, 0, 0);
+  // Use the same log that the service would use for invoking stubs
+  const log = debuglog('ctgovservice');
   describe('createdAt', () => {
     beforeAll(() => {
       jasmine.clock().install();
@@ -182,7 +185,7 @@ describe('CacheEntry', () => {
       });
       // Move forward a minute
       jasmine.clock().tick(60000);
-      const promise = entry.load();
+      const promise = entry.load(log);
       // Last access should now be a minute after the start time
       expect(entry.lastAccess).toEqual(new Date(2021, 0, 21, 12, 1, 0, 0));
       return expectAsync(promise).toBeResolved();
@@ -204,13 +207,13 @@ describe('CacheEntry', () => {
       const spy = spyOn(entry, 'readFile').and.callFake(() => Promise.resolve(createClinicalStudy()));
       // Now, attempt to load it. This should do nothing as the entry is pending.
       let shouldBeResolved = false;
-      const promise = entry.load();
+      const promise = entry.load(log);
       promise.then(() => {
         // Check if we should be resolved at this point
         expect(shouldBeResolved).toBeTrue();
         if (shouldBeResolved) {
           // If it should be resolved, it should have called readFile
-          expect(spy).toHaveBeenCalledOnceWith();
+          expect(spy).toHaveBeenCalledOnceWith(log);
         }
       });
       // Set a timeout to happen "on next event loop" that marks the cache entry as ready
@@ -237,7 +240,7 @@ describe('CacheEntry', () => {
         callback(new Error('Simulated error'));
       });
       const testEntry = new ctg.CacheEntry('test', {});
-      return expectAsync(testEntry.readFile()).toBeRejectedWithError('Simulated error');
+      return expectAsync(testEntry.readFile(log)).toBeRejectedWithError('Simulated error');
     });
   });
   describe('#remove()', () => {
@@ -862,8 +865,10 @@ describe('ClinicalTrialsGovService', () => {
       return expectAsync(downloader.getCachedClinicalStudy('test'))
         .toBeResolvedTo(study)
         .then(() => {
-          // Make sure the spy was called once (with no arguments)
-          expect(spy).toHaveBeenCalledOnceWith();
+          // Make sure the spy was called once (with just the logger as its arguments)
+          expect(spy.calls.count()).toEqual(1);
+          expect(spy.calls.first().args.length).toEqual(1);
+          expect(typeof spy.calls.first().args[0]).toEqual('function');
         });
     });
   });
@@ -939,16 +944,19 @@ describe('ClinicalTrialsGovService', () => {
       let mockZipFile: yauzl.ZipFile;
       beforeEach(() => {
         const mockObj = new EventEmitter();
-        // We currently never use any other methods other than the events, so force it in
+        // This is a partial implementation to avoid actual file system access
         mockZipFile = (mockObj as unknown) as yauzl.ZipFile;
+        mockZipFile.close = () => { /* no-op */ };
       });
 
       it('rejects on error', () => {
+        // Simulate error on first readEntry
+        mockZipFile.readEntry = () => {
+          mockZipFile.emit('error', new Error('Simulated error'));
+        };
         openSpy.and.callFake((path, options, callback) => {
           if (callback) {
             callback(undefined, mockZipFile);
-            // Once the callback has been invoked, we can do the simulated events
-            mockZipFile.emit('error', new Error('Simulated error'));
           }
         });
         return expectAsync(service['extractZip']('test.zip')).toBeRejectedWithError('Simulated error');
@@ -956,6 +964,8 @@ describe('ClinicalTrialsGovService', () => {
 
       describe('with an entry', () => {
         let entry: yauzl.Entry;
+        let entries: yauzl.Entry[];
+        let currentIndex: number;
         // To make the test easier, this is the method called with the callback
         let openReadStream: (callback: (err?: Error, stream?: stream.Readable) => void) => void;
         const mockNctNumber: ctg.NCTNumber = 'NCT12345678';
@@ -973,6 +983,8 @@ describe('ClinicalTrialsGovService', () => {
 
           // This is intentionally not a full mock implementation
           entry = (mockEntry as unknown) as yauzl.Entry;
+          entries = [ entry ];
+          currentIndex = 0;
           // Also need to install a fake openReadStream
           mockZipFile.openReadStream = (
             entry: yauzl.Entry,
@@ -1007,10 +1019,19 @@ describe('ClinicalTrialsGovService', () => {
           openSpy.and.callFake((path, options, callback) => {
             if (callback) {
               callback(undefined, mockZipFile);
-              // Once the callback has been returned, we can pump through our entry
-              mockZipFile.emit('entry', entry);
             }
           });
+
+          // Fake read entry implementation
+          mockZipFile.readEntry = () => {
+            if (currentIndex < entries.length) {
+              const e = entries[currentIndex];
+              currentIndex++;
+              mockZipFile.emit('entry', e);
+            } else {
+              mockZipFile.emit('end');
+            }
+          };
         });
 
         describe('skips entries with', () => {
