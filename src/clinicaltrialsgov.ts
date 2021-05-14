@@ -849,17 +849,20 @@ export class ClinicalTrialsGovService {
                   } else {
                     this.log('Extract [%s]...', entry.fileName);
                     zipFile.openReadStream(entry, (err, entryStream) => {
-                      if (err) {
-                        this.log('Error reading entry %s: skipping!', entry.fileName);
-                        zipFile.readEntry();
-                      } else if (entryStream) {
+                      if (entryStream) {
                         this.addCacheEntry(nctNumber, entryStream).then(() => {
                           zipFile.readEntry();
                         }, (err) => {
                           this.log('Error extracting %s: %o', entry.fileName, err);
                           zipFile.readEntry();
                         });
+                        return;
+                      } else if (err) {
+                        this.log('Error reading entry %s: skipping!', entry.fileName);
                       }
+                      // Ensure that even if entryStream and err are missing we load the next entry to avoid potentially
+                      // freezing the entire process (should never happen)
+                      zipFile.readEntry();
                     });
                     return;
                   }
