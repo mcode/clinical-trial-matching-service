@@ -1,5 +1,7 @@
 # clinical-trial-matching-service
 
+[![Node.js CI](https://github.com/mcode/clinical-trial-matching-service/actions/workflows/node.js.yml/badge.svg)](https://github.com/mcode/clinical-trial-matching-service/actions/workflows/node.js.yml)
+
 Provides a generic backend library for Clinical Trial Matching Service implementations. This provides the generic shell for services that connect to an actual clinical trial matching service. It receives a FHIR Bundle of patient information, and then uses that to generate a FHIR search result that contains FHIR ResearchStudy objects that describe matching clinical trials.
 
 For more information on the architecture and data schemas of the clinical trial matching system, please visit the clinical-trial-matching-engine [wiki](https://github.com/mcode/clinical-trial-matching-engine/wiki).
