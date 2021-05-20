@@ -132,6 +132,14 @@ describe('parseClinicalTrialXML', () => {
       'Unable to parse trial as valid clinical study XML'
     );
   });
+  it('logs failures', () => {
+    const log = jasmine.createSpy('log');
+    return expectAsync(ctg.parseClinicalTrialXML('<?xml version="1.0"?><root><child/></root>', log)).toBeRejectedWithError(
+      'Unable to parse trial as valid clinical study XML'
+    ).then(() => {
+      expect(log).toHaveBeenCalled();
+    });
+  });
 });
 
 describe('CacheEntry', () => {
@@ -241,6 +249,16 @@ describe('CacheEntry', () => {
       });
       const testEntry = new ctg.CacheEntry('test', {});
       return expectAsync(testEntry.readFile(log)).toBeRejectedWithError('Simulated error');
+    });
+    it('resolves to null if the file is empty', () => {
+      const readFileSpy = (spyOn(fs, 'readFile') as unknown) as jasmine.Spy<
+        (path: string, options: { encoding?: string }, callback: (err?: Error, data?: Buffer) => void) => void
+      >;
+      readFileSpy.and.callFake((path, options, callback) => {
+        callback(undefined, Buffer.alloc(0));
+      });
+      const testEntry = new ctg.CacheEntry('test', {});
+      return expectAsync(testEntry.readFile(log)).toBeResolvedTo(null);
     });
   });
   describe('#remove()', () => {
@@ -815,7 +833,7 @@ describe('ClinicalTrialsGovService', () => {
       ).toBeRejected();
     });
 
-    it('deletes the temporary ZIP failing', () => {
+    it('deletes the temporary ZIP', () => {
       // Spy on the unlink method
       const unlink = (spyOn(fs, 'unlink') as jasmine.Spy).and.callFake((_path: string, callback: fs.NoParamCallback) => {
         callback(null);
@@ -1079,21 +1097,42 @@ describe('ClinicalTrialsGovService', () => {
           });
         });
 
-        it('extracts the entry', () => {
-          // Allow the any here so we can install the spy on a private method - there's no other way around this without
-          // really messy code
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const extractSpy = spyOn<any>(service, 'addCacheEntry').and.callFake(() => {
-            // We need to return a promise that resolves or the entire thing won't resolve
-            return Promise.resolve();
+        describe('extracting an entry', () => {
+          let addCacheEntrySpy: jasmine.Spy;
+          beforeEach(() => {
+            // Allow the any here so we can install the spy on a private method - there's no other way around this
+            // without really messy code
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            addCacheEntrySpy = spyOn<any>(service, 'addCacheEntry');
           });
-          return expectAsync(service['extractZip']('test.zip'))
-            .toBeResolved()
-            .then(() => {
-              expect(extractSpy).toHaveBeenCalled();
-              // Make sure it was called with the correct NCT ID
-              expect(extractSpy.calls.first().args[0]).toEqual(mockNctNumber);
+
+          it('adds to cache on success', () => {
+            addCacheEntrySpy.and.callFake(() => {
+              // We need to return a promise that resolves or the entire thing won't resolve
+              return Promise.resolve();
             });
+            return expectAsync(service['extractZip']('test.zip'))
+              .toBeResolved()
+              .then(() => {
+                expect(addCacheEntrySpy).toHaveBeenCalled();
+                // Make sure it was called with the correct NCT ID
+                expect(addCacheEntrySpy.calls.first().args[0]).toEqual(mockNctNumber);
+              });
+          });
+
+          it('handles the parse failing', () => {
+            addCacheEntrySpy.and.callFake(() => {
+              return Promise.reject(new Error('Simulated parse failure'));
+            });
+            // This should still resolve successfully - parse failures are logged but otherwise skipped
+            return expectAsync(service['extractZip']('test.zip'))
+              .toBeResolved()
+              .then(() => {
+                expect(addCacheEntrySpy).toHaveBeenCalled();
+                // Make sure it was called with the correct NCT ID
+                expect(addCacheEntrySpy.calls.first().args[0]).toEqual(mockNctNumber);
+              });
+          });
         });
 
         it('handles an entry failing to extract', () => {
