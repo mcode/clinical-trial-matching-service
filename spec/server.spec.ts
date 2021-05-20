@@ -51,7 +51,7 @@ describe('ClinicalTrialMatchingService', () => {
       function getClinicalTrial(patientData: Record<string, unknown> | string = emptyPatientBundle): request.Test {
         return request(server)
           .post('/getClinicalTrial')
-          .send({ patientData: patientData })
+          .send(patientData)
           .set('Accept', 'application/json');
       }
 
@@ -65,14 +65,6 @@ describe('ClinicalTrialMatchingService', () => {
 
       it('responds to a valid request with a proper bundle', () => {
         return getClinicalTrial()
-          .expect(200)
-          .then((result) => {
-            expect(result.text).toEqual('{"resourceType":"Bundle","type":"searchset","total":0,"entry":[]}');
-          });
-      });
-
-      it('handles being given a string', () => {
-        return getClinicalTrial(JSON.stringify(emptyPatientBundle))
           .expect(200)
           .then((result) => {
             expect(result.text).toEqual('{"resourceType":"Bundle","type":"searchset","total":0,"entry":[]}');

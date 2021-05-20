@@ -170,10 +170,7 @@ export class ClinicalTrialMatchingService {
   }
 
   getClinicalTrial(request: express.Request, response: express.Response): void {
-    const postBody = request.body as Record<string, unknown>;
-    const patientBundle = (typeof postBody === 'string'
-      ? JSON.parse(postBody)
-      : postBody) as Record<string, unknown>;
+    const patientBundle = request.body as Record<string, unknown>;
     if (isBundle(patientBundle)) {
       // Error handler for exceptions raised (as it should be handled on the
       // resulting Promise and if invoking the matcher itself fails)
