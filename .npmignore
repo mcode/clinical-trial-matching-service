@@ -1,0 +1,25 @@
+# Do not package TypeScript source
+/src
+
+# Skip tests
+/.nyc_output
+/coverage
+/dist-spec
+/spec
+
+# Do not publish dev configuration
+/.editorconfig
+/.eslintignore
+/.eslintrc.js
+/.github
+/.nycrc
+/.prettierrc
+/tsconfig.json
+/tsconfig.*.json
+
+# Do not package test scripts
+/scripts
+
+# Do not package local configuration
+.env.local
+.env.*.local
