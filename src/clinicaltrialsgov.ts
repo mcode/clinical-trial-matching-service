@@ -36,6 +36,10 @@ import {
 } from './fhir-types';
 import { ClinicalStudy, isClinicalStudy, StatusEnum } from './clinicalstudy';
 import { addContainedResource, addToContainer } from './research-study';
+// Import the AWS API.
+var AWS = require('aws-sdk');
+// Create an s3 access object.
+var s3 = new AWS.S3();
 
 /**
  * Logger type from the NodeJS utilities. (The TypeScript definitions for Node
@@ -117,7 +121,8 @@ export function findNCTNumbers(studies: ResearchStudy[]): Map<NCTNumber, Researc
   const result = new Map<NCTNumber, ResearchStudy | Array<ResearchStudy>>();
   for (const study of studies) {
     const nctId = findNCTNumber(study);
-    if (nctId !== null) {
+    // Skips problem NCT files.
+    if (nctId !== null && nctId != 'NCT03980509' && nctId !== 'NCT03980509' && nctId !== 'NCT02788981' && nctId != 'NCT02788981' && nctId != '02788981' && nctId !== '02788981') {
       const existing = result.get(nctId);
       if (existing === undefined) {
         result.set(nctId, study);
@@ -133,25 +138,28 @@ export function findNCTNumbers(studies: ResearchStudy[]): Map<NCTNumber, Researc
   return result;
 }
 
-/**
- * Attempts to parse the given string as XML and into a ClinicalStudy object. If the XML parsing succeeds but the XML
- * is not recognized as a valid ClinicalStudy, this returns null. If the XML parsing fails, the Promise will be rejected.
- * @param fileContents the contents of the file as a string
- * @param log an optional logger
- * @returns a promise that resolves to the parsed object or null
- */
-export function parseClinicalTrialXML(fileContents: string, log?: Logger): Promise<ClinicalStudy | null> {
+export async function parseClinicalTrialXML(fileContents: string, nctNumber: NCTNumber): Promise<ClinicalStudy> {
   const parser = new xml2js.Parser();
-  return parser.parseStringPromise(fileContents).then((result) => {
+  fileContents = ("" + fileContents);
+  console.log("File contents type: " + (typeof fileContents) + " for trial " + nctNumber + ".");
+  console.log("File contents: " + (fileContents) + " for trial " + nctNumber + ".");
+  return await parser.parseStringPromise(fileContents).then((result) => {
     if (isTrialBackup(result)) {
       return result.clinical_study;
     } else {
-      if (log) {
-        log('Invalid XML result, XML parsing succeeded, but resulting object is not valid.');
-        log('XML parsed as: %j', result);
-      }
       throw new Error('Unable to parse trial as valid clinical study XML');
     }
+  }).catch((err) => {
+      fileContents = " "  +  (fileContents);
+      console.log("Promise Catch File contents type: " + (typeof fileContents) + " for trial " + nctNumber + ".");
+      console.log("Promise Catch File contents: " + (fileContents) + " for trial " + nctNumber + ".");
+      return parser.parseStringPromise(fileContents).then((new_result) => {
+        if (isTrialBackup(new_result)) {
+          return new_result.clinical_study;
+        } else {
+          throw new Error('Unable to parse trial as valid clinical study XML - 2 - Error: ' + err + ' new result: ' + new_result  + " for trial " + nctNumber + ".");
+        }
+      });
   });
 }
 
@@ -250,28 +258,27 @@ export class CacheEntry {
   }
 
   /**
-   * Loads the underlying file. If the entry is still pending, then the file is read once the entry is ready. This may
-   * resolve to null if the clinical study does not exist in the results.
+   * Loads the underlying file. If the entry is still pending, then the file is read once the entry is ready.
    */
-  load(log: Logger): Promise<ClinicalStudy | null> {
+  load(): Promise<ClinicalStudy> {
     // Move last access to now
     this._lastAccess = new Date();
     // If we're still pending, we have to wait for that to finish before we can
     // read the underlying file.
     if (this._pending) {
       return this._pending.then(() => {
-        return this.readFile(log);
+        return this.readFile();
       });
     } else {
       // Otherwise we can just return immediately
-      return this.readFile(log);
+      return this.readFile();
     }
   }
 
   /**
    * Always attempt to read the file, regardless of whether or not the entry is pending.
    */
-  readFile(log: Logger): Promise<ClinicalStudy | null> {
+  readFile(): Promise<ClinicalStudy> {
     return new Promise((resolve, reject) => {
       fs.readFile(this.filename, { encoding: 'utf8' }, (err, data) => {
         if (err) {
@@ -279,15 +286,8 @@ export class CacheEntry {
         } else {
           // Again bump last access to now since the access has completed
           this._lastAccess = new Date();
-          if (data.length === 0) {
-            // Sometimes files end up empty - this appears to be a bug?
-            // It's unclear what causes this to happen
-            log('Warning: %s is empty on read', this.filename);
-            resolve(null);
-          } else {
-            // Resolving with a Promise essentially "chains" that Promise
-            resolve(parseClinicalTrialXML(data, log));
-          }
+          // Resolving with a Promise essentially "chains" that Promise
+          resolve(parseClinicalTrialXML(data, "---"));
         }
       });
     });
@@ -319,23 +319,23 @@ export class CacheEntry {
  * @param path the path to create (will be created recursively)
  * @return a Promise that resolves as true if the directory was newly created or false if it existed
  */
-export function mkdir(path: string): Promise<boolean> {
-  return new Promise<boolean>((resolve, reject) => {
-    fs.mkdir(path, (err) => {
-      if (err) {
-        if (err.code === 'EEXIST') {
-          // This is fine - resolve false. We'll only get this if the final part of the path exists (although it will be
-          // EEXIST regardless of if it's a directory or a regular file)
-          resolve(false);
-        } else {
-          reject(err);
-        }
-      } else {
-        resolve(true);
-      }
-    });
-  });
-}
+// export function mkdir(path: string): Promise<boolean> {
+//   return new Promise<boolean>((resolve, reject) => {
+//     fs.mkdir(path, (err) => {
+//       if (err) {
+//         if (err.code === 'EEXIST') {
+//           // This is fine - resolve false. We'll only get this if the final part of the path exists (although it will be
+//           // EEXIST regardless of if it's a directory or a regular file)
+//           resolve(false);
+//         } else {
+//           reject(err);
+//         }
+//       } else {
+//         resolve(true);
+//       }
+//     });
+//   });
+// }
 
 export interface ClinicalTrialsGovServiceOptions {
   /**
@@ -424,7 +424,7 @@ export class ClinicalTrialsGovService {
     this._expirationTimeout = Math.max(value, 1000);
   }
 
-  private _cleanupIntervalMillis = 60 * 60 * 1000;
+  private _cleanupIntervalMillis = 0;
 
   /**
    * The interval between cleanup sweeps. Set to 0 (or any negative value) or Infinity to disable periodic cleanup. Note
@@ -449,7 +449,7 @@ export class ClinicalTrialsGovService {
    */
   maxAllowedEntrySize = 128 * 1024 * 1024;
 
-  private cacheDataDir: string;
+  // private cacheDataDir: string;
 
   /**
    * Actual cache of NCT IDs to their cached values. This is the "real cache" versus whatever's on the filesystem.
@@ -469,7 +469,7 @@ export class ClinicalTrialsGovService {
    *     meaning that the log can be activated by setting NODE_DEBUG to "ctgovservice"
    */
   constructor(public readonly dataDir: string, options?: ClinicalTrialsGovServiceOptions) {
-    this.cacheDataDir = path.join(dataDir, 'data');
+    // this.cacheDataDir = path.join(dataDir, 'data');
     const log = options ? options.log : null;
     // If no log was given, create it
     this.log = log ?? debuglog('ctgovservice');
@@ -484,19 +484,19 @@ export class ClinicalTrialsGovService {
    * directories of the cache will not be created automatically, they must already exist.
    */
   async init(): Promise<void> {
-    this.log('Using %s as cache dir for clinicaltrials.gov data', this.dataDir);
-    const baseDirExisted = !(await mkdir(this.dataDir));
-    // The XML
-    const xmlDirExisted = !(await mkdir(this.cacheDataDir));
-    if (baseDirExisted && xmlDirExisted) {
-      // If both directories existed, it's necessary to restore the cache directory
-      await this.restoreCacheFromFS();
-      this.log('Restored existing cache data.');
-    } else {
-      this.log(baseDirExisted ? 'Created XML directory for storing result' : 'Created new cache directory');
-    }
-    // Once started, run the cache cleanup every _cleanupIntervalMillis
-    this.setCleanupTimeout();
+    // this.log('Using %s as cache dir for clinicaltrials.gov data', this.dataDir);
+    // const baseDirExisted = !(await mkdir(this.dataDir));
+    // // The XML
+    // const xmlDirExisted = !(await mkdir(this.cacheDataDir));
+    // if (baseDirExisted && xmlDirExisted) {
+    //   // If both directories existed, it's necessary to restore the cache directory
+    //   await this.restoreCacheFromFS();
+    //   this.log('Restored existing cache data.');
+    // } else {
+    //   this.log(baseDirExisted ? 'Created XML directory for storing result' : 'Created new cache directory');
+    // }
+    // // Once started, run the cache cleanup every _cleanupIntervalMillis
+    // this.setCleanupTimeout();
   }
 
   /**
@@ -535,54 +535,74 @@ export class ClinicalTrialsGovService {
   /**
    * This attempts to load the cache from the filesystem.
    */
-  private restoreCacheFromFS(): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      this.log('Scanning %s for existing cache entries...', this.cacheDataDir);
-      fs.readdir(this.cacheDataDir, (err, files) => {
-        if (err) {
-          reject(err);
-        } else {
-          // Go through the files and create entries for them.
-          const promises: Promise<void>[] = [];
-          for (const file of files) {
-            this.log('Checking %s', file);
-            // Split this file name into two parts: the extension and the base name
-            const dotIdx = file.lastIndexOf('.');
-            if (dotIdx < 1) {
-              // Skip "bad" files
-              continue;
-            }
-            // FIXME: This is probably a bad idea. Right now the file name serves as the "master" name for files. It's
-            // probably possible to load the file and pull the NCT ID out that way, as well as clear out files that
-            // can't be parsed.
-            const baseName = file.substring(0, dotIdx);
-            const extension = file.substring(dotIdx + 1);
-            if (isValidNCTNumber(baseName) && extension === 'xml') {
-              promises.push(this.createCacheEntry(baseName, path.join(this.cacheDataDir, file)));
-            }
-          }
-          Promise.all(promises).then(() => { resolve(); }, reject);
-        }
-      });
-    });
-  }
+  // private restoreCacheFromFS(): Promise<void> {
+  //   return new Promise<void>((resolve, reject) => {
+  //     this.log('Scanning %s for existing cache entries...', this.cacheDataDir);
+  //     fs.readdir(this.cacheDataDir, (err, files) => {
+  //       if (err) {
+  //         reject(err);
+  //       } else {
+  //         // Go through the files and create entries for them.
+  //         const promises: Promise<void>[] = [];
+  //         for (const file of files) {
+  //           this.log('Checking %s', file);
+  //           // Split this file name into two parts: the extension and the base name
+  //           const dotIdx = file.lastIndexOf('.');
+  //           if (dotIdx < 1) {
+  //             // Skip "bad" files
+  //             continue;
+  //           }
+  //           // FIXME: This is probably a bad idea. Right now the file name serves as the "master" name for files. It's
+  //           // probably possible to load the file and pull the NCT ID out that way, as well as clear out files that
+  //           // can't be parsed.
+  //           const baseName = file.substring(0, dotIdx);
+  //           const extension = file.substring(dotIdx + 1);
+  //           if (isValidNCTNumber(baseName) && extension === 'xml') {
+  //             promises.push(this.createCacheEntry(baseName, path.join(this.cacheDataDir, file)));
+  //           }
+  //         }
+  //         Promise.all(promises).then(() => { resolve(); }, reject);
+  //       }
+  //     });
+  //   });
+  // }
 
-  private createCacheEntry(id: NCTNumber, filename: string): Promise<void> {
-    // Restoring this involves getting the time the file was created so we know when the entry expires
-    return new Promise((resolve, reject) => {
-      fs.stat(filename, (err, stats) => {
-        if (err) {
-          // TODO (maybe): Instead of rejecting, just log - rejecting will caused Promise.all to immediately reject and
-          // ignore the rest of the Promises. However, stat failing is probably a "real" error.
-          reject(err);
-        } else {
-          this.cache.set(id, new CacheEntry(filename, { stats: stats }));
-          this.log('Restored cache entry for %s', filename);
-          resolve();
-        }
-      });
-    });
-  }
+  // private createCacheEntry(id: NCTNumber, filename: string): Promise<void> {
+  //   // Restoring this involves getting the time the file was created so we know when the entry expires
+  //   return new Promise((resolve, reject) => {
+  //     fs.stat(filename, (err, stats) => {
+  //       if (err) {
+  //         // TODO (maybe): Instead of rejecting, just log - rejecting will caused Promise.all to immediately reject and
+  //         // ignore the rest of the Promises. However, stat failing is probably a "real" error.
+  //         reject(err);
+  //       } else {
+  //         this.cache.set(id, new CacheEntry(filename, { stats: stats }));
+  //         this.log('Restored cache entry for %s', filename);
+  //         resolve();
+  //       }
+  //     });
+  //   });
+  // }
+
+  //   private createCacheEntryFromS3(id: NCTNumber, filename: string): Promise<void> {
+  //   // Restoring this involves getting the time the file was created so we know when the entry expires
+
+    
+
+  //   return new Promise((resolve, reject) => {
+  //     fs.stat(filename, (err, stats) => {
+  //       if (err) {
+  //         // TODO (maybe): Instead of rejecting, just log - rejecting will caused Promise.all to immediately reject and
+  //         // ignore the rest of the Promises. However, stat failing is probably a "real" error.
+  //         reject(err);
+  //       } else {
+  //         this.cache.set(id, new CacheEntry(filename, { stats: stats }));
+  //         this.log('Restored cache entry for %s', filename);
+  //         resolve();
+  //       }
+  //     });
+  //   });
+  // }
 
   /**
    * Attempts to update the given research studies with data from within this store. This returns a Promise that
@@ -595,6 +615,7 @@ export class ClinicalTrialsGovService {
    *     in - this updates the given objects, it does not clone them and create new ones.
    */
   updateResearchStudies(studies: ResearchStudy[]): Promise<ResearchStudy[]> {
+
     const nctIdMap = findNCTNumbers(studies);
     if (nctIdMap.size === 0) {
       // Nothing to do
@@ -602,12 +623,12 @@ export class ClinicalTrialsGovService {
     } else {
       const nctIds = Array.from(nctIdMap.keys());
       // Make sure the NCT numbers are in the cache
-      return this.ensureTrialsAvailable(nctIds).then(() => {
+      // return this.ensureTrialsAvailable(nctIds).then(() => {
         const promises: Promise<ClinicalStudy | null>[] = [];
         // Go through the NCT numbers we found and updated all matching trials
         for (const entry of nctIdMap.entries()) {
           const [nctId, study] = entry;
-          const promise = this.getCachedClinicalStudy(nctId);
+          const promise = this.getCachedClinicalStudyFromS3Bucket(nctId);
           promises.push(promise);
           promise.then((clinicalStudy) => {
             if (clinicalStudy !== null) {
@@ -625,7 +646,7 @@ export class ClinicalTrialsGovService {
         }
         // Finally resolve to the promises we were given
         return Promise.all(promises).then(() => studies);
-      });
+      // });
     }
   }
 
@@ -669,30 +690,30 @@ export class ClinicalTrialsGovService {
    * @param ids the IDs to ensure are available
    * @returns a Promise that resolves once any downloads have completed
    */
-  ensureTrialsAvailable(ids: string[]): Promise<void>;
-  ensureTrialsAvailable(studies: ResearchStudy[]): Promise<void>;
-  ensureTrialsAvailable(idsOrStudies: Array<string | ResearchStudy>): Promise<void> {
-    // We only want string IDs and we may end up filtering some of them out
-    const ids: string[] = [];
-    for (const o of idsOrStudies) {
-      if (typeof o === 'string') {
-        if (isValidNCTNumber(o))
-          ids.push(o);
-      } else {
-        const id = findNCTNumber(o);
-        if (id)
-          ids.push(id);
-      }
-    }
-    // Now that we have the IDs, we can split them into download requests
-    const promises: Promise<void>[] = [];
-    for (let start = 0; start < ids.length; start += this.maxTrialsPerRequest) {
-      promises.push(this.downloadTrials(ids.slice(start, Math.min(start + this.maxTrialsPerRequest, ids.length))));
-    }
-    return Promise.all(promises).then(() => {
-      // This exists solely to turn the result from an array of nothing into a single nothing
-    });
-  }
+  // ensureTrialsAvailable(ids: string[]): Promise<void>;
+  // ensureTrialsAvailable(studies: ResearchStudy[]): Promise<void>;
+  // ensureTrialsAvailable(idsOrStudies: Array<string | ResearchStudy>): Promise<void> {
+  //   // We only want string IDs and we may end up filtering some of them out
+  //   const ids: string[] = [];
+  //   for (const o of idsOrStudies) {
+  //     if (typeof o === 'string') {
+  //       if (isValidNCTNumber(o))
+  //         ids.push(o);
+  //     } else {
+  //       const id = findNCTNumber(o);
+  //       if (id)
+  //         ids.push(id);
+  //     }
+  //   }
+  //   // Now that we have the IDs, we can split them into download requests
+  //   const promises: Promise<void>[] = [];
+  //   for (let start = 0; start < ids.length; start += this.maxTrialsPerRequest) {
+  //     promises.push(this.downloadTrials(ids.slice(start, Math.min(start + this.maxTrialsPerRequest, ids.length))));
+  //   }
+  //   return Promise.all(promises).then(() => {
+  //     // This exists solely to turn the result from an array of nothing into a single nothing
+  //   });
+  // }
 
   /**
    * Downloads the given trials from ClinicalTrials.gov and stores them in the data directory. Note that this will
@@ -701,45 +722,45 @@ export class ClinicalTrialsGovService {
    * @param ids the IDs of the trials to download
    * @returns a Promise that resolves to the path where the given IDs were downloaded
    */
-  protected downloadTrials(ids: string[]): Promise<void> {
-    const url = 'https://clinicaltrials.gov/ct2/download_studies?term=' + ids.join('+OR+');
-    // Now that we're starting to download clinical trials, immediately create pending entries for them.
-    for (const id of ids) {
-      if (!this.cache.has(id)) {
-        this.cache.set(id, new CacheEntry(this.pathForNctNumber(id), { pending: true }));
-      }
-    }
-    const result = new Promise<void>((resolve, reject) => {
-      this.log('Fetching [%s]', url);
-      this.getURL(url, (response) => {
-        if (response.statusCode !== 200) {
-          this.log('Error %d %s from server', response.statusCode, response.statusMessage);
-          // Resume the response to ensure it gets cleaned up properly
-          response.resume();
-          // Assume some sort of server error
-          reject(new Error(`Server error: ${response.statusCode} ${response.statusMessage}`));
-        } else {
-          this.extractResults(response).then(resolve, reject);
-        }
-      }).on('error', (error) => {
-        this.log('Error fetching [%s]: %o', url, error);
-        reject(error);
-      });
-    })
-    // Add a catch handler
-    result.catch(() => {
-      // If an error occurred within this promise, every cache entry we just loaded may be invalid.
-      this.log('Invalidating cache entry IDs for: %s', ids);
-      for (const id of ids) {
-        const entry = this.cache.get(id);
-        if (entry && entry.pending) {
-          this.cache.delete(id);
-        }
-      }
-    });
-    // But return the root promise (otherwise we chain off the result handler)
-    return result;
-  }
+  // protected downloadTrials(ids: string[]): Promise<void> {
+  //   const url = 'https://clinicaltrials.gov/ct2/download_studies?term=' + ids.join('+OR+');
+  //   // Now that we're starting to download clinical trials, immediately create pending entries for them.
+  //   for (const id of ids) {
+  //     if (!this.cache.has(id)) {
+  //       this.cache.set(id, new CacheEntry(this.pathForNctNumber(id), { pending: true }));
+  //     }
+  //   }
+  //   const result = new Promise<void>((resolve, reject) => {
+  //     this.log('Fetching [%s]', url);
+  //     this.getURL(url, (response) => {
+  //       if (response.statusCode !== 200) {
+  //         this.log('Error %d %s from server', response.statusCode, response.statusMessage);
+  //         // Resume the response to ensure it gets cleaned up properly
+  //         response.resume();
+  //         // Assume some sort of server error
+  //         reject(new Error(`Server error: ${response.statusCode} ${response.statusMessage}`));
+  //       } else {
+  //         this.extractResults(response).then(resolve, reject);
+  //       }
+  //     }).on('error', (error) => {
+  //       this.log('Error fetching [%s]: %o', url, error);
+  //       reject(error);
+  //     });
+  //   })
+  //   // Add a catch handler
+  //   result.catch(() => {
+  //     // If an error occurred within this promise, every cache entry we just loaded may be invalid.
+  //     this.log('Invalidating cache entry IDs for: %s', ids);
+  //     for (const id of ids) {
+  //       const entry = this.cache.get(id);
+  //       if (entry && entry.pending) {
+  //         this.cache.delete(id);
+  //       }
+  //     }
+  //   });
+  //   // But return the root promise (otherwise we chain off the result handler)
+  //   return result;
+  // }
 
   /**
    * Provides a method that can be overridden to alter how a web request is
@@ -752,174 +773,161 @@ export class ClinicalTrialsGovService {
   }
 
   /**
-   * Internal method to create a temporary file within the data directory. Temporary files created via this method are
-   * not automatically deleted and need to be cleaned up by the caller.
+   * Internal method to create a temporary file within the data directory. Temporary files created via this method
    */
-  private createTemporaryFileName(): string {
-    // For now, temporary files are always "temp-[DATE]-[PID]-[TEMPID]" where [TEMPID] is an incrementing internal ID.
-    // This means that temp files should never collide across processes or within a process. However, if a temporary
-    // file is created and then the server is restarted and it somehow manages to get the same PID, a collision can
-    // happen in that case.
-    const now = new Date();
-    return [
-      'temp-',
-      now.getUTCFullYear(),
-      (now.getUTCMonth()+1).toString().padStart(2, '0'),
-      now.getUTCDate().toString().padStart(2, '0'),
-      '-',
-      process.pid,
-      '-',
-      this.tempId++
-    ].join('');
-  }
+  // private createTemporaryFileName(): string {
+  //   // For now, temporary files are always "temp-[DATE]-[PID]-[TEMPID]" where [TEMPID] is an incrementing internal ID.
+  //   // This means that temp files should never collide across processes or within a process. However, if a temporary
+  //   // file is created and then the server is restarted and it somehow manages to get the same PID, a collision can
+  //   // happen in that case.
+  //   const now = new Date();
+  //   return [
+  //     'temp-',
+  //     now.getUTCFullYear(),
+  //     (now.getUTCMonth()+1).toString().padStart(2, '0'),
+  //     now.getUTCDate().toString().padStart(2, '0'),
+  //     '-',
+  //     process.pid,
+  //     '-',
+  //     this.tempId++
+  //   ].join('');
+  // }
 
-  /**
-   * Create a path to the data file that stores data about a cache entry.
-   * @param nctNumber the NCT number
-   */
-  private pathForNctNumber(nctNumber: NCTNumber): string {
-    // FIXME: It's probably best not to use the NCT number as the sole part of the filename. See
-    // removeExpiredCacheEntries for details.
-    return path.join(this.cacheDataDir, nctNumber + '.xml');
-  }
+  // /**
+  //  * Create a path to the data file that stores data about a cache entry.
+  //  * @param nctNumber the NCT number
+  //  */
+  // private pathForNctNumber(nctNumber: NCTNumber): string {
+  //   // FIXME: It's probably best not to use the NCT number as the sole part of the filename. See
+  //   // removeExpiredCacheEntries for details.
+  //   return path.join(this.cacheDataDir, nctNumber + '.xml');
+  // }
 
   /**
    * Extract a given set of results, updating any cache results with the contents.
    * @param results a readable stream that contains a ZIP file that contains the results
    * @returns a Promise that resolves when the files have been extracted
    */
-  protected extractResults(results: stream.Readable): Promise<void> {
-    const tempName = this.createTemporaryFileName();
-    const zipFilePath = path.join(this.dataDir, tempName + '.zip');
-    const file = fs.createWriteStream(zipFilePath);
-    return new Promise<void>((resolve, reject) => {
-      this.log('Saving download to [%s]...', zipFilePath);
-      results.on('error', (err: Error) => {
-        reject(err);
-      });
-      results.pipe(file).on('close', () => {
-        // Extract the file
-        this.extractZip(zipFilePath)
-          .then(() => {
-            // Since it's done, we should be able to delete the ZIP file now
-            fs.unlink(zipFilePath, (error) => {
-              if (error) {
-                this.log('Error deleting temporary file [%s]: %o', zipFilePath, error);
-                console.error(`Unable to remove temporary ZIP file ${zipFilePath}:`);
-                console.error(error);
-              }
-              // But otherwise eat the error message
-            });
-            resolve();
-          })
-          .catch(reject);
-      });
-    });
-  }
+  // protected extractResults(results: stream.Readable): Promise<void> {
+  //   const tempName = this.createTemporaryFileName();
+  //   const zipFilePath = path.join(this.dataDir, tempName + '.zip');
+  //   const file = fs.createWriteStream(zipFilePath);
+  //   return new Promise<void>((resolve, reject) => {
+  //     this.log('Saving download to [%s]...', zipFilePath);
+  //     results.on('error', (err: Error) => {
+  //       reject(err);
+  //     });
+  //     results.pipe(file).on('close', () => {
+  //       // Extract the file
+  //       this.extractZip(zipFilePath)
+  //         .then(() => {
+  //           // Since it's done, we should be able to delete the ZIP file now
+  //           fs.unlink(zipFilePath, (error) => {
+  //             if (error) {
+  //               this.log('Error deleting temporary file [%s]: %o', zipFilePath, error);
+  //               console.error(`Unable to remove temporary ZIP file ${zipFilePath}:`);
+  //               console.error(error);
+  //             }
+  //             // But otherwise eat the error message
+  //           });
+  //           resolve();
+  //         })
+  //         .catch(reject);
+  //     });
+  //   });
+  // }
 
   /**
    * Extracts clinical trials within a ZIP file.
    * @param zipPath the path to the ZIP file
    * @param opts the options
    */
-  private extractZip(zipPath: string): Promise<void> {
-    this.log('Extracting [%s]...', zipPath);
-    return new Promise<void>((resolve, reject) => {
-      yauzl.open(zipPath, { autoClose: false, lazyEntries: true }, (err, zipFile): void => {
-        if (err) {
-          this.log('Could not open [%s]: %o', zipPath, err);
-          reject(err);
-        } else if (zipFile) {
-          // Now that we have the file, it's time to add some events to it
-          zipFile.once('error', (err) => {
-            this.log('Error reading ZIP file: %o', err);
-            reject(err);
-          });
-          zipFile.on('entry', (entry: yauzl.Entry) => {
-            // This is where the bulk of our processing happens - we simply want to turn this into a proper cache entry
-            // Ensure the file name is what we expect it to be
-            const extensionIdx = entry.fileName.lastIndexOf('.');
-            if (extensionIdx > 0) {
-              // A dot at index 0 is malformed anyway. Actually, anything less than 11 will be rejected, but details
-              if (entry.fileName.substring(extensionIdx).toLowerCase() === '.xml') {
-                const nctNumber = entry.fileName.substring(0, extensionIdx);
-                if (isValidNCTNumber(nctNumber)) {
-                  if (entry.uncompressedSize > this.maxAllowedEntrySize) {
-                    this.log('Skipping entry %s: uncompressed size %d is larger than maximum allowed!', entry.fileName, entry.uncompressedSize);
-                  } else {
-                    this.log('Extract [%s]...', entry.fileName);
-                    zipFile.openReadStream(entry, (err, entryStream) => {
-                      if (entryStream) {
-                        this.addCacheEntry(nctNumber, entryStream).then(() => {
-                          zipFile.readEntry();
-                        }, (err) => {
-                          this.log('Error extracting %s: %o', entry.fileName, err);
-                          zipFile.readEntry();
-                        });
-                        return;
-                      } else if (err) {
-                        this.log('Error reading entry %s: skipping!', entry.fileName);
-                      }
-                      // Ensure that even if entryStream and err are missing we load the next entry to avoid potentially
-                      // freezing the entire process (should never happen)
-                      zipFile.readEntry();
-                    });
-                    return;
-                  }
-                } else {
-                  this.log('Skipping invalid entry [%s]: not a valid NCT number/file name', entry.fileName);
-                }
-              }
-            }
-            // If we're here, the entry was skipped for some reason. In any case, move on to the next entry.
-            zipFile.readEntry();
-          });
-          zipFile.once('end', () => {
-            // Now that we've read everything, resolve the Promise and close the ZIP file
-            resolve();
-            zipFile.close();
-          });
-          // Now that we've set up our event handlers, start
-          zipFile.readEntry();
-        } else {
-          reject(new Error('Invalid state: no error or zip file given.'));
-        }
-      });
-    });
-  }
+  // private extractZip(zipPath: string): Promise<void> {
+  //   this.log('Extracting [%s]...', zipPath);
+  //   return new Promise<void>((resolve, reject) => {
+  //     yauzl.open(zipPath, { }, (err, zipFile) => {
+  //       if (err) {
+  //         reject(err);
+  //       } else if (zipFile) {
+  //         const pendingPromises: Promise<void>[] = [];
+  //         // Now that we have the file, it's time to add some events to it
+  //         zipFile.once('error', (err) => {
+  //           reject(err);
+  //         });
+  //         zipFile.on('entry', (entry: yauzl.Entry) => {
+  //           // This is where the bulk of our processing happens - we simply want to turn this into a proper cache entry
+  //           // Ensure the file name is what we expect it to be
+  //           const extensionIdx = entry.fileName.lastIndexOf('.');
+  //           if (extensionIdx > 0) {
+  //             // A dot at index 0 is malformed anyway. Actually, anything less than 11 will be rejected, but details
+  //             if (entry.fileName.substring(extensionIdx).toLowerCase() === '.xml') {
+  //               const nctNumber = entry.fileName.substring(0, extensionIdx);
+  //               if (isValidNCTNumber(nctNumber)) {
+  //                 if (entry.uncompressedSize > this.maxAllowedEntrySize) {
+  //                   this.log('Skipping entry %s: uncompressed size %d is larger than maximum allowed!', entry.fileName, entry.uncompressedSize);
+  //                 } else {
+  //                   // In this case, add it to the cache
+  //                   pendingPromises.push(new Promise<void>((resolve) => {
+  //                     zipFile.openReadStream(entry, (err, entryStream) => {
+  //                       if (err) {
+  //                         this.log('Error reading entry %s: skipping!', entry.fileName);
+  //                       } else if (entryStream) {
+  //                         // Resolve with the Promise that actually finishes the thing
+  //                         resolve(this.addCacheEntry(nctNumber, entryStream));
+  //                         return;
+  //                       }
+  //                       // If we're here, there was an error or somehow the entryStream wasn't given. In either case,
+  //                       // just resolve the Promise anyway and let this entry be skipped.
+  //                       resolve();
+  //                     });
+  //                   }));
+  //                 }
+  //               }
+  //             }
+  //           }
+  //         });
+  //         Promise.all(pendingPromises).then(() => {
+  //           // Once all the pending promises from the entries (if any) are done, we can resolve
+  //           resolve();
+  //         });
+  //       } else {
+  //         reject(new Error('Invalid state: no error or zip file given.'));
+  //       }
+  //     });
+  //   });
+  // }
 
-  private addCacheEntry(nctNumber: NCTNumber, dataStream: stream.Readable): Promise<void> {
-    // The cache entry should already exist
-    const filename = path.join(this.cacheDataDir, nctNumber + '.xml');
-    const promise = new Promise<void>((resolve, reject) => {
-      // This indicates whether no error was raised - close can get called anyway, and it's slightly cleaner to just
-      // mark that an error happened and ignore the close handler if it did.
-      // (This also potentially allows us to do additional cleanup on close if an error happened.)
-      let success = true;
-      dataStream.pipe(fs.createWriteStream(filename)).on('error', (err) => {
-        this.log('Unable to create file [%s]: %o', filename, err);
-        // If the cache entry exists in pending mode, delete it - we failed to create this entry
-        // TODO: Does this failure destroy the existing cache entry?
-        const entry = this.cache.get(nctNumber);
-        if (entry && entry.pending) {
-          this.cache.delete(nctNumber);
-        }
-        // TODO: Do we also need to delete the file? Or will the error prevent the file from existing?
-        success = false;
-        reject(err);
-      }).on('close', () => {
-        if (success) {
-          // Once saved, resolve both the pending entry and this promise
-          const entry = this.cache.get(nctNumber);
-          if (entry && entry.pending) {
-            entry.ready();
-          }
-          resolve();
-        }
-      });
-    });
-    return promise;
-  }
+  // private addCacheEntry(nctNumber: NCTNumber, dataStream: stream.Readable): Promise<void> {
+  //   // The cache entry should already exist
+  //   const filename = path.join(this.cacheDataDir, nctNumber + '.xml');
+  //   const promise = new Promise<void>((resolve, reject) => {
+  //     // This indicates whether no error was raised - close can get called anyway, and it's slightly cleaner to just
+  //     // mark that an error happened and ignore the close handler if it did.
+  //     // (This also potentially allows us to do additional cleanup on close if an error happened.)
+  //     let success = true;
+  //     dataStream.pipe(fs.createWriteStream(filename)).on('error', (err) => {
+  //       // If the cache entry exists in pending mode, delete it - we failed to create this entry
+  //       // TODO: Does this failure destroy the existing cache entry?
+  //       const entry = this.cache.get(nctNumber);
+  //       if (entry && entry.pending) {
+  //         this.cache.delete(nctNumber);
+  //       }
+  //       // TODO: Do we also need to delete the file? Or will the error prevent the file from existing?
+  //       success = false;
+  //       reject(err);
+  //     }).on('close', () => {
+  //       if (success) {
+  //         // Once saved, resolve both the pending entry and this promise
+  //         const entry = this.cache.get(nctNumber);
+  //         if (entry && entry.pending) {
+  //           entry.ready();
+  //         }
+  //         resolve();
+  //       }
+  //     });
+  //   });
+  //   return promise;
+  // }
 
   /**
    * Loads a ClinicalStudy from an extracted dataset. This will never download a copy, this will only ever return from
@@ -930,11 +938,51 @@ export class ClinicalTrialsGovService {
   getCachedClinicalStudy(nctNumber: NCTNumber): Promise<ClinicalStudy | null> {
     const entry = this.cache.get(nctNumber);
     if (entry) {
-      return entry.load(this.log);
+      return entry.load();
     } else {
       return Promise.resolve(null);
     }
   }
+
+    /**
+   * Loads a ClinicalStudy by downloading it from the s3 bucket.
+   * @param nctNumber the NCT number
+   * @returns a Promise that resolves to either the parsed ClinicalStudy or to null if the ClinicalStudy does not exist
+   */
+     async getCachedClinicalStudyFromS3Bucket(nctNumber: NCTNumber): Promise<ClinicalStudy | null> {
+
+      const s3data = await s3.getObject(
+        { Bucket: "cache-storage-ctm", Key: (nctNumber + ".xml") },
+        function (error: any, data: any) {
+          if (error != null) {
+            console.log("Failed to retrieve an object: " + error);
+          } else {
+            console.log("Loaded " +  data + " with nct id " + nctNumber + " from s3.");
+            return (data);
+          }
+        }
+      ).promise();
+
+      console.log("Raw s3 data loaded " + s3data + " from the s3 bucket with trial id " + nctNumber + ". Raw s3 data type: " + typeof s3data + ". Object protoype: " + Object.prototype.toString.call(s3data));
+
+      if(s3data == null || s3data == undefined){
+        console.log("NULL/UNDEFINED: Raw s3 data " + s3data + " from the s3 bucket with trial id " + nctNumber + " is null/undefined.");
+      }
+
+      console.log("Stringified Raw s3 data: " + JSON.stringify(s3data) + " from the s3 bucket with trial id " + nctNumber + ".");
+
+      console.log("Raw s3 data .body " + s3data.body + "; Raw s3 data .Body " + s3data.Body + " from the s3 bucket with trial id " + nctNumber + ". Raw s3 data type: " + typeof s3data + ".");
+
+      const dataBody = s3data.Body.toString('utf-8');
+
+      console.log("toString()'ed Data Body loaded " + dataBody + " from the s3 bucket with trial id " + nctNumber + ". Databody type: " + typeof dataBody + ".");
+
+      let entry = (parseClinicalTrialXML(dataBody, nctNumber));
+
+      console.log("Parsed " + entry + " from the s3 bucket with trial id " + nctNumber + ".");
+
+      return entry;
+    }
 
   /**
    * The provides a stub that handles updating the research study with data from a clinical study downloaded from the
