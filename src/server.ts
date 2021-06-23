@@ -170,41 +170,33 @@ export class ClinicalTrialMatchingService {
   }
 
   getClinicalTrial(request: express.Request, response: express.Response): void {
-    const postBody = request.body as Record<string, unknown>;
-    if ('patientData' in postBody) {
-      const patientBundle = (typeof postBody.patientData === 'string'
-        ? JSON.parse(postBody.patientData)
-        : postBody.patientData) as Record<string, unknown>;
-      if (isBundle(patientBundle)) {
-        // Error handler for exceptions raised (as it should be handled on the
-        // resulting Promise and if invoking the matcher itself fails)
-        const handleError = (error: unknown): void => {
-          if (isHttpError(error)) {
-            response.status(restrictToHttpErrors(error.httpStatus)).send({ error: error.message });
-          } else {
-            console.error('An unexpected internal server error occurred:');
-            console.error(error);
-            response.status(500).send({ error: 'Internal server error', exception: Object.prototype.toString.call(error) as string });
-          }
-        };
-        try {
-          this.matcher(patientBundle)
-            .then((result) => {
-              response.status(200).send(JSON.stringify(result));
-            })
-            .catch(handleError);
-        } catch (ex) {
-          handleError(ex);
+    const patientBundle = request.body as Record<string, unknown>;
+    if (isBundle(patientBundle)) {
+      // Error handler for exceptions raised (as it should be handled on the
+      // resulting Promise and if invoking the matcher itself fails)
+      const handleError = (error: unknown): void => {
+        if (isHttpError(error)) {
+          response.status(restrictToHttpErrors(error.httpStatus)).send({ error: error.message });
+        } else {
+          console.error('An unexpected internal server error occurred:');
+          console.error(error);
+          response.status(500).send({ error: 'Internal server error', exception: Object.prototype.toString.call(error) as string });
         }
-      } else {
-        response.status(400).send({ error: 'Invalid patientBundle' });
+      };
+      try {
+        this.matcher(patientBundle)
+          .then((result) => {
+            response.status(200).send(JSON.stringify(result));
+          })
+          .catch(handleError);
+      } catch (ex) {
+        handleError(ex);
       }
     } else {
-      // request missing json fields
-      response.status(400).send({ error: 'Request missing required fields' });
+      response.status(400).send({ error: 'Invalid patientBundle' });
     }
   }
-
+  
   /**
    * Closes the server if it's running. Unlike the underlying service function,
    * no error is raised if the server wasn't running.
