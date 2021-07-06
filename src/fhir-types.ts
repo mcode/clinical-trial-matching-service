@@ -160,6 +160,18 @@ export interface Reference {
   display?: string;
 }
 
+export type PublicationStatus = '	draft' | 'active' | 'retired' | 'unknown';
+
+export interface PlanDefinition extends BaseResource {
+  resourceType: 'PlanDefinition',
+  status: PublicationStatus,
+  type?: CodeableConcept,
+  title?: string,
+  subtitle?: string,
+  description?: string,
+  subjectCodeableConcept?: CodeableConcept 
+}
+
 // FHIR resources contained within ResearchStudy
 export interface Group extends BaseResource {
   resourceType: 'Group';
@@ -207,7 +219,7 @@ export interface HumanName {
   text: string;
 }
 
-export type ContainedResource = Group | Location | Organization | Practitioner;
+export type ContainedResource = Group | Location | Organization | Practitioner | PlanDefinition;
 
 /**
  * Codes from https://www.hl7.org/fhir/codesystem-research-study-status.html
@@ -229,6 +241,7 @@ export interface ResearchStudy extends BaseResource {
   resourceType: 'ResearchStudy';
   identifier?: Identifier[];
   title?: string;
+  protocol?: Reference[];
   status?: ResearchStudyStatus;
   phase?: CodeableConcept;
   category?: CodeableConcept[];

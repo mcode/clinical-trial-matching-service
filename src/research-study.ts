@@ -113,6 +113,7 @@ export class ResearchStudy implements IResearchStudy {
   id?: string;
   identifier?: Identifier[];
   title?: string;
+  protocol?: Reference[];
   status?: ResearchStudyStatus;
   phase?: CodeableConcept;
   category?: CodeableConcept[];

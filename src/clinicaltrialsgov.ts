@@ -26,10 +26,13 @@ import * as stream from 'stream';
 import { debuglog } from 'util';
 import yauzl from 'yauzl';
 import {
+  Arm,
   CodeableConcept,
+  ContactDetail,
   ContactPoint,
   Group,
   Location,
+  PlanDefinition,
   Reference,
   ResearchStudy,
   ResearchStudyStatus
@@ -1035,6 +1038,8 @@ export function createClinicalTrialsGovService(
 /**
  * Updates a research study with data from a clinical study off the ClinicalTrials.gov website. This will only update
  * fields that do not have data, it will not overwrite any existing data.
+ * 
+ * Mapping as defined by https://www.hl7.org/fhir/researchstudy-mappings.html#clinicaltrials-gov
  *
  * @param result the research study to update
  * @param study the clinical study to use to update (this takes a partial as the ClinicalStudy type describes the XML
@@ -1057,12 +1062,14 @@ export function updateResearchStudyWithClinicalStudy(
       }
     }
   }
+
   if (!result.description) {
     const briefSummary = study.brief_summary;
     if (briefSummary) {
       result.description = briefSummary[0].textblock[0];
     }
   }
+
   if (!result.phase) {
     const phase = study.phase;
     if (phase) {
@@ -1078,12 +1085,52 @@ export function updateResearchStudyWithClinicalStudy(
       };
     }
   }
-  if (!result.category) {
-    const studyType = study.study_type;
-    if (studyType) {
-      result.category = [{ text: studyType[0] }];
-    }
+ 
+  // ------- Category 
+  // Since we may not have all of the Study design in the result, we need to do a merge of data
+  const studyType = study.study_type;
+  let categories:CodeableConcept[] = result.category ? result.category : [];
+
+  // We need to determine what categories have already been declared.
+  let types = categories.map(item => { const sep = item.text?.split(":"); return sep ? sep[0] : '' ;});
+  
+  if (studyType && !types.includes("Study Type")) {
+    categories.push({ text: "Study Type: " + studyType[0] });
   }
+
+  const study_design = study.study_design_info;
+  if (study_design) {
+    const info = study_design[0];
+
+    if (info.intervention_model && !types.includes("Intervention Model")) {
+            categories.push({ text: "Intervention Model: " + info.intervention_model[0] });
+    }
+
+    if (info.primary_purpose && !types.includes("Primary Purpose")) {
+            categories.push({ text: "Primary Purpose: " + info.primary_purpose[0] });
+    }
+
+    if (info.masking && !types.includes("Masking")) {
+            categories.push({ text: "Masking: " + info.masking[0] });
+    }
+
+    if (info.allocation && !types.includes("Allocation")) {
+            categories.push({ text: "Allocation: " + info.allocation[0] });
+    }
+
+    if (info.time_perspective && !types.includes("Time Perspective")) {
+            categories.push({ text: "Time Perspective: " + info.time_perspective[0] });
+    }
+
+    if (info.observational_model&& !types.includes("Observation Model")) {
+            categories.push({ text: "Observation Model: " + info.observational_model[0] });
+    }
+
+  }
+  
+  if (categories.length > 1) result.category = categories;
+  // ------- Category 
+  
   if (!result.status) {
     const overallStatus = study.overall_status;
     if (overallStatus) {
@@ -1097,6 +1144,7 @@ export function updateResearchStudyWithClinicalStudy(
       result.condition = convertArrayToCodeableConcept(study.condition);
     }
   }
+
   if (!result.site) {
     if (study.location) {
       let index = 0;
@@ -1136,6 +1184,99 @@ export function updateResearchStudyWithClinicalStudy(
         addToContainer<ResearchStudy, Reference, 'site'>(result, 'site', addContainedResource(result, fhirLocation));
       }
     }
+
   }
+
+  if (!result.arm) {
+    if (study.arm_group) {
+      for(const study_arm of study.arm_group) {
+        const arm:Arm = {
+          ...(study_arm.arm_group_label && {name: study_arm.arm_group_label[0]}),
+          ...(study_arm.arm_group_type && {type: {
+            coding: [
+                {
+                  code: study_arm.arm_group_type[0],
+                  display: study_arm.arm_group_type[0]
+                }
+            ],
+            text: study_arm.arm_group_type[0]
+          }}),
+          ...(study_arm.description && {description: study_arm.description[0]})
+        };
+
+        if (arm.name) addToContainer<ResearchStudy, Arm, 'arm'>(result, 'arm', arm);
+      }
+    }
+
+  }
+
+  if (!result.protocol) {
+    if (study.intervention) {
+      let index = 0; 
+      for (const intervention of study.intervention) {
+        if(intervention.arm_group_label) {
+          for (const arm_group of intervention.arm_group_label) {
+            let plan: PlanDefinition = { resourceType: 'PlanDefinition', status: 'unknown', id: 'plan-' + index++};
+
+            plan = {
+              ...plan,
+              ...(intervention.description && { description: intervention.description[0] }),
+              ...(intervention.intervention_name && { title: intervention.intervention_name[0] } ),
+              ...(intervention.other_name && { subtitle: intervention.other_name[0] }),
+              ...(intervention.intervention_type && {type: { text: intervention.intervention_type[0] } } ),
+              ...({ subjectCodeableConcept: { text: arm_group } } )
+            };
+
+            if (plan.title) addToContainer<ResearchStudy, Reference, 'protocol'>(result, 'protocol', addContainedResource(result, plan));
+          }
+
+        } else {
+          let plan: PlanDefinition = { resourceType: 'PlanDefinition', status: 'unknown', id: 'plan-' + index++};
+
+          plan = {
+            ...plan,
+            ...(intervention.description && { description: intervention.description[0] }),
+            ...(intervention.intervention_name && { title: intervention.intervention_name[0] } ),
+            ...(intervention.other_name && { subtitle: intervention.other_name[0] }),
+            ...(intervention.intervention_type && {type: { text: intervention.intervention_type[0] } } )
+          };
+
+          if (plan.title) addToContainer<ResearchStudy, Reference, 'protocol'>(result, 'protocol', addContainedResource(result, plan));
+        }
+      }
+    }
+
+  }
+
+  if (!result.contact) {
+    let contacts = [study.overall_contact, study.overall_contact_backup];
+
+    for (const contact of contacts) {
+      if (contact != undefined) {
+        const contact_info = contact[0];
+        const contact_name:string = (contact_info.first_name ? contact_info.first_name[0] : '' ) 
+                                  + (contact_info.middle_name ? ' ' + contact_info.middle_name[0] : '' )
+                                  + (contact_info.last_name ? ' ' + contact_info.last_name[0] : '' )
+                                  + (contact_info.degrees ? ", " + contact_info.degrees[0] : '' )
+
+        const fhir_contact:ContactDetail = { name: contact_name}
+        if (contact_info.email) {
+            addToContainer<ContactDetail, ContactPoint, 'telecom'>(fhir_contact, 'telecom', {
+              system: 'email',
+              value: contact_info.email[0],
+              use: 'work'
+            });
+        if (contact_info.phone) {
+            addToContainer<ContactDetail, ContactPoint, 'telecom'>(fhir_contact, 'telecom', {
+              system: 'phone',
+              value: contact_info.phone[0],
+              use: 'work'
+            });
+        }
+        addToContainer<ResearchStudy, ContactDetail, 'contact'>(result, 'contact', fhir_contact);
+      }
+    }
+  }
+}
   return result;
 }
