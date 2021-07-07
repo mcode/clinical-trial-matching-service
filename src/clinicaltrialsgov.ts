@@ -125,7 +125,7 @@ export function findNCTNumbers(studies: ResearchStudy[]): Map<NCTNumber, Researc
         if (Array.isArray(existing)) {
           existing.push(study);
         } else {
-          result.set(nctId, [ existing, study ]);
+          result.set(nctId, [existing, study]);
         }
       }
     }
@@ -188,6 +188,23 @@ function convertArrayToCodeableConcept(trialConditions: string[]): CodeableConce
 }
 
 /**
+ * Subset of the Node.js fs module necessary to handle the cache file system, allowing it to be overridden if
+ * necessary.
+ */
+export interface FileSystem {
+  readFile: (
+    name: string,
+    options: { encoding: BufferEncoding; flag?: string } | string,
+    callback: (err: NodeJS.ErrnoException | null, data: string) => void
+  ) => void;
+  mkdir: (path: string, callback: (err: NodeJS.ErrnoException | null) => void) => void;
+  readdir: (path: string, callback: (err: NodeJS.ErrnoException | null, files: string[]) => void) => void;
+  stat: (path: string, callback: (err: NodeJS.ErrnoException | null, stat: fs.Stats) => void) => void;
+  createWriteStream: (path: string) => NodeJS.WritableStream;
+  unlink: (path: string, callback: (err: NodeJS.ErrnoException | null) => void) => void;
+}
+
+/**
  * A cache entry. Cache entries basically operate in two modes: an entry that is pending being written based on a ZIP
  * file, and a file that has a backing file ready to be loaded.
  *
@@ -196,6 +213,7 @@ function convertArrayToCodeableConcept(trialConditions: string[]): CodeableConce
  * instead the resolve method is stored until the pending state can be resolved.
  */
 export class CacheEntry {
+  private _cache: ClinicalTrialsGovService;
   // Dates are, sadly, mutable via set methods. This makes it impractical to attempt to make them immutable.
   private _createdAt: Date;
   private _lastAccess: Date;
@@ -208,7 +226,13 @@ export class CacheEntry {
    * The resolve function of the pending Promise.
    */
   private _resolvePending: (() => void) | undefined;
-  constructor(public filename: string, options: { stats?: fs.Stats, pending?: boolean }) {
+  /**
+   * Create a new cache entry.
+   * @param filename the file name of the entry
+   * @param options the file stats (if the file exists) or a flag indicating it's pending (being downloaded still)
+   */
+  constructor(cache: ClinicalTrialsGovService, public filename: string, options: { stats?: fs.Stats; pending?: boolean }) {
+    this._cache = cache;
     if (options.stats) {
       // Default to using the metadata from the fs.Stats object
       this._createdAt = options.stats.ctime;
@@ -253,27 +277,27 @@ export class CacheEntry {
    * Loads the underlying file. If the entry is still pending, then the file is read once the entry is ready. This may
    * resolve to null if the clinical study does not exist in the results.
    */
-  load(log: Logger): Promise<ClinicalStudy | null> {
+  load(): Promise<ClinicalStudy | null> {
     // Move last access to now
     this._lastAccess = new Date();
     // If we're still pending, we have to wait for that to finish before we can
     // read the underlying file.
     if (this._pending) {
       return this._pending.then(() => {
-        return this.readFile(log);
+        return this.readFile();
       });
     } else {
       // Otherwise we can just return immediately
-      return this.readFile(log);
+      return this.readFile();
     }
   }
 
   /**
    * Always attempt to read the file, regardless of whether or not the entry is pending.
    */
-  readFile(log: Logger): Promise<ClinicalStudy | null> {
+  readFile(): Promise<ClinicalStudy | null> {
     return new Promise((resolve, reject) => {
-      fs.readFile(this.filename, { encoding: 'utf8' }, (err, data) => {
+      this._cache.fs.readFile(this.filename, { encoding: 'utf8' }, (err, data) => {
         if (err) {
           reject(err);
         } else {
@@ -282,11 +306,11 @@ export class CacheEntry {
           if (data.length === 0) {
             // Sometimes files end up empty - this appears to be a bug?
             // It's unclear what causes this to happen
-            log('Warning: %s is empty on read', this.filename);
+            this._cache.log('Warning: %s is empty on read', this.filename);
             resolve(null);
           } else {
             // Resolving with a Promise essentially "chains" that Promise
-            resolve(parseClinicalTrialXML(data, log));
+            resolve(parseClinicalTrialXML(data, this._cache.log));
           }
         }
       });
@@ -319,7 +343,7 @@ export class CacheEntry {
  * @param path the path to create (will be created recursively)
  * @return a Promise that resolves as true if the directory was newly created or false if it existed
  */
-export function mkdir(path: string): Promise<boolean> {
+export function mkdir(fs: FileSystem, path: string): Promise<boolean> {
   return new Promise<boolean>((resolve, reject) => {
     fs.mkdir(path, (err) => {
       if (err) {
@@ -351,6 +375,11 @@ export interface ClinicalTrialsGovServiceOptions {
    * Interval in milliseconds to run periodic cache clean-ups. If set to 0 or infinity, never run cleanups.
    */
   cleanInterval?: number;
+  /**
+   * If given, rather than use the default Node.js file system, use the given override. Mainly used for tests but may
+   * also be useful in instances where a "real" file system is unavailable.
+   */
+  fs?: FileSystem;
 }
 
 /**
@@ -387,7 +416,7 @@ export class ClinicalTrialsGovService {
    * function. With the latter, activate by setting the NODE_DEBUG environment variable to "ctgovservice" (or include it
    * in a comma separated list of debugging modules to include).
    */
-  private log: Logger;
+  readonly log: Logger;
 
   private _maxTrialsPerRequest = 128;
   /**
@@ -440,7 +469,8 @@ export class ClinicalTrialsGovService {
     // Clamp it to 0 (special value for "never") or at least 60000 - also clamp the maximum to a 32-bit signed integer
     // which is the maximum allowed timeout within Node.js. (Exceeding that value changes the timeout to 1ms. Surprise!
     // I mean, sure, that's documented, but...)
-    this._cleanupIntervalMillis = value <= 0 ? 0 : (value === Infinity ? 0 : Math.min(Math.max(Math.floor(value), 60000), 0x7FFFFFFF));
+    this._cleanupIntervalMillis =
+      value <= 0 ? 0 : value === Infinity ? 0 : Math.min(Math.max(Math.floor(value), 60000), 0x7fffffff);
   }
 
   /**
@@ -460,6 +490,11 @@ export class ClinicalTrialsGovService {
   private cleanupTimeout: NodeJS.Timeout | null = null;
 
   /**
+   * The filesystem being used by the cache.
+   */
+  readonly fs: FileSystem;
+
+  /**
    * Creates a new instance. This will not initialize the cache or load anything, this merely creates the object. Use
    * the #init() method to initialize the service and load existing data. (Or use createClinicalTrialsGovService() do
    * construct and initialize at the same time.)
@@ -477,6 +512,7 @@ export class ClinicalTrialsGovService {
     this.expirationTimeout = options?.expireAfter ?? 60 * 60 * 1000;
     // Default cleanup interval to an hour
     this.cleanupInterval = options?.cleanInterval ?? 60 * 60 * 1000;
+    this.fs = options?.fs ?? fs;
   }
 
   /**
@@ -485,9 +521,9 @@ export class ClinicalTrialsGovService {
    */
   async init(): Promise<void> {
     this.log('Using %s as cache dir for clinicaltrials.gov data', this.dataDir);
-    const baseDirExisted = !(await mkdir(this.dataDir));
+    const baseDirExisted = !(await mkdir(this.fs, this.dataDir));
     // The XML
-    const xmlDirExisted = !(await mkdir(this.cacheDataDir));
+    const xmlDirExisted = !(await mkdir(this.fs, this.cacheDataDir));
     if (baseDirExisted && xmlDirExisted) {
       // If both directories existed, it's necessary to restore the cache directory
       await this.restoreCacheFromFS();
@@ -506,14 +542,17 @@ export class ClinicalTrialsGovService {
     // If set to infinity we internally set it to 0
     if (this._cleanupIntervalMillis > 0) {
       this.cleanupTimeout = setTimeout(() => {
-        this.removeExpiredCacheEntries().then(() => {
-          // Set up to do this again when that's done
-          this.setCleanupTimeout();
-        }, (error) => {
-          this.log('Error cleaning expired cache entries: %o', error);
-          // Even though this attempt failed, try again later
-          this.setCleanupTimeout();
-        });
+        this.removeExpiredCacheEntries().then(
+          () => {
+            // Set up to do this again when that's done
+            this.setCleanupTimeout();
+          },
+          (error) => {
+            this.log('Error cleaning expired cache entries: %o', error);
+            // Even though this attempt failed, try again later
+            this.setCleanupTimeout();
+          }
+        );
       }, this._cleanupIntervalMillis);
     }
   }
@@ -538,7 +577,7 @@ export class ClinicalTrialsGovService {
   private restoreCacheFromFS(): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       this.log('Scanning %s for existing cache entries...', this.cacheDataDir);
-      fs.readdir(this.cacheDataDir, (err, files) => {
+      this.fs.readdir(this.cacheDataDir, (err, files) => {
         if (err) {
           reject(err);
         } else {
@@ -561,7 +600,9 @@ export class ClinicalTrialsGovService {
               promises.push(this.createCacheEntry(baseName, path.join(this.cacheDataDir, file)));
             }
           }
-          Promise.all(promises).then(() => { resolve(); }, reject);
+          Promise.all(promises).then(() => {
+            resolve();
+          }, reject);
         }
       });
     });
@@ -570,13 +611,13 @@ export class ClinicalTrialsGovService {
   private createCacheEntry(id: NCTNumber, filename: string): Promise<void> {
     // Restoring this involves getting the time the file was created so we know when the entry expires
     return new Promise((resolve, reject) => {
-      fs.stat(filename, (err, stats) => {
+      this.fs.stat(filename, (err, stats) => {
         if (err) {
           // TODO (maybe): Instead of rejecting, just log - rejecting will caused Promise.all to immediately reject and
           // ignore the rest of the Promises. However, stat failing is probably a "real" error.
           reject(err);
         } else {
-          this.cache.set(id, new CacheEntry(filename, { stats: stats }));
+          this.cache.set(id, new CacheEntry(this, filename, { stats: stats }));
           this.log('Restored cache entry for %s', filename);
           resolve();
         }
@@ -661,7 +702,9 @@ export class ClinicalTrialsGovService {
 
     // The "then" essentially removes the array of undefined that will result
     // into a single undefined.
-    return Promise.all(expiredPromises).then(() => { /* do nothing */ });
+    return Promise.all(expiredPromises).then(() => {
+      /* do nothing */
+    });
   }
 
   /**
@@ -676,12 +719,10 @@ export class ClinicalTrialsGovService {
     const ids: string[] = [];
     for (const o of idsOrStudies) {
       if (typeof o === 'string') {
-        if (isValidNCTNumber(o))
-          ids.push(o);
+        if (isValidNCTNumber(o)) ids.push(o);
       } else {
         const id = findNCTNumber(o);
-        if (id)
-          ids.push(id);
+        if (id) ids.push(id);
       }
     }
     // Now that we have the IDs, we can split them into download requests
@@ -706,7 +747,7 @@ export class ClinicalTrialsGovService {
     // Now that we're starting to download clinical trials, immediately create pending entries for them.
     for (const id of ids) {
       if (!this.cache.has(id)) {
-        this.cache.set(id, new CacheEntry(this.pathForNctNumber(id), { pending: true }));
+        this.cache.set(id, new CacheEntry(this, this.pathForNctNumber(id), { pending: true }));
       }
     }
     const result = new Promise<void>((resolve, reject) => {
@@ -725,7 +766,7 @@ export class ClinicalTrialsGovService {
         this.log('Error fetching [%s]: %o', url, error);
         reject(error);
       });
-    })
+    });
     // Add a catch handler
     result.catch(() => {
       // If an error occurred within this promise, every cache entry we just loaded may be invalid.
@@ -764,7 +805,7 @@ export class ClinicalTrialsGovService {
     return [
       'temp-',
       now.getUTCFullYear(),
-      (now.getUTCMonth()+1).toString().padStart(2, '0'),
+      (now.getUTCMonth() + 1).toString().padStart(2, '0'),
       now.getUTCDate().toString().padStart(2, '0'),
       '-',
       process.pid,
@@ -791,18 +832,19 @@ export class ClinicalTrialsGovService {
   protected extractResults(results: stream.Readable): Promise<void> {
     const tempName = this.createTemporaryFileName();
     const zipFilePath = path.join(this.dataDir, tempName + '.zip');
-    const file = fs.createWriteStream(zipFilePath);
+    const file = this.fs.createWriteStream(zipFilePath);
     return new Promise<void>((resolve, reject) => {
       this.log('Saving download to [%s]...', zipFilePath);
       results.on('error', (err: Error) => {
         reject(err);
       });
-      results.pipe(file).on('close', () => {
+      // For some crazy reason memfs calls close multiple times but we should only process it once
+      results.pipe(file).once('close', () => {
         // Extract the file
         this.extractZip(zipFilePath)
           .then(() => {
             // Since it's done, we should be able to delete the ZIP file now
-            fs.unlink(zipFilePath, (error) => {
+            this.fs.unlink(zipFilePath, (error) => {
               if (error) {
                 this.log('Error deleting temporary file [%s]: %o', zipFilePath, error);
                 console.error(`Unable to remove temporary ZIP file ${zipFilePath}:`);
@@ -845,17 +887,24 @@ export class ClinicalTrialsGovService {
                 const nctNumber = entry.fileName.substring(0, extensionIdx);
                 if (isValidNCTNumber(nctNumber)) {
                   if (entry.uncompressedSize > this.maxAllowedEntrySize) {
-                    this.log('Skipping entry %s: uncompressed size %d is larger than maximum allowed!', entry.fileName, entry.uncompressedSize);
+                    this.log(
+                      'Skipping entry %s: uncompressed size %d is larger than maximum allowed!',
+                      entry.fileName,
+                      entry.uncompressedSize
+                    );
                   } else {
                     this.log('Extract [%s]...', entry.fileName);
                     zipFile.openReadStream(entry, (err, entryStream) => {
                       if (entryStream) {
-                        this.addCacheEntry(nctNumber, entryStream).then(() => {
-                          zipFile.readEntry();
-                        }, (err) => {
-                          this.log('Error extracting %s: %o', entry.fileName, err);
-                          zipFile.readEntry();
-                        });
+                        this.addCacheEntry(nctNumber, entryStream).then(
+                          () => {
+                            zipFile.readEntry();
+                          },
+                          (err) => {
+                            this.log('Error extracting %s: %o', entry.fileName, err);
+                            zipFile.readEntry();
+                          }
+                        );
                         return;
                       } else if (err) {
                         this.log('Error reading entry %s: skipping!', entry.fileName);
@@ -896,27 +945,30 @@ export class ClinicalTrialsGovService {
       // mark that an error happened and ignore the close handler if it did.
       // (This also potentially allows us to do additional cleanup on close if an error happened.)
       let success = true;
-      dataStream.pipe(fs.createWriteStream(filename)).on('error', (err) => {
-        this.log('Unable to create file [%s]: %o', filename, err);
-        // If the cache entry exists in pending mode, delete it - we failed to create this entry
-        // TODO: Does this failure destroy the existing cache entry?
-        const entry = this.cache.get(nctNumber);
-        if (entry && entry.pending) {
-          this.cache.delete(nctNumber);
-        }
-        // TODO: Do we also need to delete the file? Or will the error prevent the file from existing?
-        success = false;
-        reject(err);
-      }).on('close', () => {
-        if (success) {
-          // Once saved, resolve both the pending entry and this promise
+      dataStream
+        .pipe(this.fs.createWriteStream(filename))
+        .on('error', (err) => {
+          this.log('Unable to create file [%s]: %o', filename, err);
+          // If the cache entry exists in pending mode, delete it - we failed to create this entry
+          // TODO: Does this failure destroy the existing cache entry?
           const entry = this.cache.get(nctNumber);
           if (entry && entry.pending) {
-            entry.ready();
+            this.cache.delete(nctNumber);
           }
-          resolve();
-        }
-      });
+          // TODO: Do we also need to delete the file? Or will the error prevent the file from existing?
+          success = false;
+          reject(err);
+        })
+        .on('close', () => {
+          if (success) {
+            // Once saved, resolve both the pending entry and this promise
+            const entry = this.cache.get(nctNumber);
+            if (entry && entry.pending) {
+              entry.ready();
+            }
+            resolve();
+          }
+        });
     });
     return promise;
   }
@@ -930,7 +982,7 @@ export class ClinicalTrialsGovService {
   getCachedClinicalStudy(nctNumber: NCTNumber): Promise<ClinicalStudy | null> {
     const entry = this.cache.get(nctNumber);
     if (entry) {
-      return entry.load(this.log);
+      return entry.load();
     } else {
       return Promise.resolve(null);
     }
@@ -973,7 +1025,10 @@ export class ClinicalTrialsGovService {
  * @param options additional options that can be set to further configure the trial service
  * @returns a Promise that resolves when the service is ready
  */
-export function createClinicalTrialsGovService(dataDir: string, options?: ClinicalTrialsGovServiceOptions): Promise<ClinicalTrialsGovService> {
+export function createClinicalTrialsGovService(
+  dataDir: string,
+  options?: ClinicalTrialsGovServiceOptions
+): Promise<ClinicalTrialsGovService> {
   return ClinicalTrialsGovService.create(dataDir, options);
 }
 
@@ -1048,8 +1103,7 @@ export function updateResearchStudyWithClinicalStudy(
       for (const location of study.location) {
         const fhirLocation: Location = { resourceType: 'Location', id: 'location-' + index++ };
         if (location.facility) {
-          if (location.facility[0].name)
-            fhirLocation.name = location.facility[0].name[0];
+          if (location.facility[0].name) fhirLocation.name = location.facility[0].name[0];
           if (location.facility[0].address) {
             // Also add the address information
             const address = location.facility[0].address[0];
