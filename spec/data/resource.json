@@ -98,7 +98,19 @@
           },
           "category": [
             {
-              "text": "Interventional"
+              "text": "Study Type: Interventional"
+            },
+            {
+              "text": "Intervention Model: Parallel Assignment"
+            },
+            {
+              "text": "Primary Purpose: Treatment"
+            },
+            {
+              "text": "Masking: None (Open Label)"
+            },
+            {
+              "text": "Allocation: Randomized"
             }
           ],
           "condition": [
@@ -200,7 +212,7 @@
           },
           "category": [
             {
-              "text": "Interventional"
+              "text": "Study Type: Interventional"
             }
           ],
           "condition": [
@@ -437,7 +449,7 @@
           },
           "category": [
             {
-              "text": "Interventional"
+              "text": "Study Type: Interventional"
             }
           ],
           "condition": [
