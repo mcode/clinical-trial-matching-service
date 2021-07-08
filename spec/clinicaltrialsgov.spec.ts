@@ -268,7 +268,7 @@ describe('CacheEntry', () => {
     let unlinkSpy: jasmine.Spy<(path: string, callback: (err?: Error) => void) => void>;
     beforeEach(() => {
       entry = new ctg.CacheEntry(service, 'NCT12345678.xml', {});
-      unlinkSpy = (spyOn(fs, 'unlink') as unknown) as jasmine.Spy<
+      unlinkSpy = spyOn(fs, 'unlink') as unknown as jasmine.Spy<
         (path: string, callback: (err?: Error) => void) => void
       >;
     });
@@ -490,9 +490,11 @@ describe('ClinicalTrialsGovService', () => {
 
     it('rejects if a single file load fails', () => {
       // FIXME (maybe): it's unclear to me if this is correct behavior - maybe the file should be skipped?
-      (spyOn(cacheFS, 'stat') as jasmine.Spy).and.callFake((filename, callback: (err?: Error, stats?: fs.Stats) => void) => {
-        callback(new Error('Simulated error'));
-      });
+      (spyOn(cacheFS, 'stat') as jasmine.Spy).and.callFake(
+        (filename, callback: (err?: Error, stats?: fs.Stats) => void) => {
+          callback(new Error('Simulated error'));
+        }
+      );
       const testService = new ctg.ClinicalTrialsGovService(dataDirPath, { fs: cacheFS });
       return expectAsync(testService.init()).toBeRejectedWithError('Simulated error');
     });
@@ -665,22 +667,24 @@ describe('ClinicalTrialsGovService', () => {
       jasmine.clock().install();
       // Set the start date to the cache start time
       jasmine.clock().mockDate(cacheStartTime);
-      return ctg.createClinicalTrialsGovService(multipleEntriesDataDir, { expireAfter: 60000, fs: cacheFS }).then((newService) => {
-        service = newService;
-        // "Steal" the cache to grab entries for spying purposes
-        const cache = service['cache'];
-        function safeGet(key: string): ctg.CacheEntry {
-          const result = cache.get(key);
-          if (result) {
-            return result;
-          } else {
-            throw new Error('Missing cache entry for ' + key + ' (bailing before tests will fail)');
+      return ctg
+        .createClinicalTrialsGovService(multipleEntriesDataDir, { expireAfter: 60000, fs: cacheFS })
+        .then((newService) => {
+          service = newService;
+          // "Steal" the cache to grab entries for spying purposes
+          const cache = service['cache'];
+          function safeGet(key: string): ctg.CacheEntry {
+            const result = cache.get(key);
+            if (result) {
+              return result;
+            } else {
+              throw new Error('Missing cache entry for ' + key + ' (bailing before tests will fail)');
+            }
           }
-        }
-        entry1 = safeGet('NCT00000001');
-        entry2 = safeGet('NCT00000002');
-        entry3 = safeGet('NCT00000003');
-      });
+          entry1 = safeGet('NCT00000001');
+          entry2 = safeGet('NCT00000002');
+          entry3 = safeGet('NCT00000003');
+        });
     });
     afterEach(() => {
       // Stop playing with time
@@ -828,9 +832,11 @@ describe('ClinicalTrialsGovService', () => {
 
     it('deletes the temporary ZIP', () => {
       // Spy on the unlink method
-      const unlink = (spyOn(cacheFS, 'unlink') as jasmine.Spy).and.callFake((_path: string, callback: fs.NoParamCallback) => {
-        callback(null);
-      });
+      const unlink = (spyOn(cacheFS, 'unlink') as jasmine.Spy).and.callFake(
+        (_path: string, callback: fs.NoParamCallback) => {
+          callback(null);
+        }
+      );
       // Don't actually do anything
       downloader['extractZip'] = jasmine.createSpy('extractZip').and.callFake(() => {
         return Promise.resolve();
@@ -1424,6 +1430,42 @@ describe('ClinicalTrialsGovService', () => {
       }
     });
 
+    it('fills in interventions even without arms', () => {
+      const researchStudy = new ResearchStudyObj('id');
+      const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
+        intervention: [
+          {
+            intervention_type: ['Behavioral'],
+            intervention_name: ['Name'],
+            description: ['Description'],
+            other_name: ['Other name']
+          }
+        ]
+      });
+
+      expect(result.protocol).toBeDefined();
+      expect(result.protocol).toHaveSize(1);
+
+      if (result.protocol && result.protocol.length > 0) {
+        if (result.protocol[0].reference && result.protocol[0].reference.length > 1) {
+          const intervention: PlanDefinition = getContainedResource(
+            result,
+            result.protocol[0].reference.substring(1)
+          ) as PlanDefinition;
+          expect(intervention).toEqual(
+            jasmine.objectContaining({
+              resourceType: 'PlanDefinition',
+              status: 'unknown',
+              description: 'Description',
+              title: 'Name',
+              subtitle: 'Other name',
+              type: { text: 'Behavioral' }
+            })
+          );
+        }
+      }
+    });
+
     it('fills in description', () => {
       expect(updatedTrial.description).toBeDefined();
     });
@@ -1462,6 +1504,55 @@ describe('ClinicalTrialsGovService', () => {
         expect(actual.condition.length).toEqual(2);
         expect(actual.condition[0].text).toEqual('Condition 1');
         expect(actual.condition[1].text).toEqual('Condition 2');
+      }
+    });
+
+    it('fills in contact', () => {
+      const researchStudy = new ResearchStudyObj('id');
+      const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
+        overall_contact: [
+          {
+            first_name: ['First'],
+            middle_name: ['Middle'],
+            last_name: ['Last'],
+            degrees: ['MD'],
+            phone: ['1112223333'],
+            email: ['email@example.com']
+          }
+        ],
+        overall_contact_backup: [
+          {
+            first_name: ['First2'],
+            middle_name: ['Middle2'],
+            last_name: ['Last2'],
+            degrees: ['DO'],
+            phone: ['1234567890'],
+            email: ['email2@example.com']
+          }
+        ]
+      });
+
+      expect(result.contact).toBeDefined();
+      if (result.contact) {
+        expect(result.contact).toHaveSize(2);
+        expect(result.contact).toEqual(
+          jasmine.arrayContaining([
+            jasmine.objectContaining({
+              name: 'First Middle Last, MD',
+              telecom: [
+                { system: 'email', value: 'email@example.com', use: 'work' },
+                { system: 'phone', value: '1112223333', use: 'work' }
+              ]
+            }),
+            jasmine.objectContaining({
+              name: 'First2 Middle2 Last2, DO',
+              telecom: [
+                { system: 'email', value: 'email2@example.com', use: 'work' },
+                { system: 'phone', value: '1234567890', use: 'work' }
+              ]
+            })
+          ])
+        );
       }
     });
 
