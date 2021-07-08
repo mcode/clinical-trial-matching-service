@@ -1089,10 +1089,10 @@ export function updateResearchStudyWithClinicalStudy(
   // ------- Category 
   // Since we may not have all of the Study design in the result, we need to do a merge of data
   const studyType = study.study_type;
-  let categories:CodeableConcept[] = result.category ? result.category : [];
+  const categories:CodeableConcept[] = result.category ? result.category : [];
 
   // We need to determine what categories have already been declared.
-  let types = categories.map(item => { const sep = item.text?.split(":"); return sep ? sep[0] : '' ;});
+  const types = categories.map(item => { const sep = item.text?.split(":"); return sep ? sep[0] : '' ;});
   
   if (studyType && !types.includes("Study Type")) {
     categories.push({ text: "Study Type: " + studyType[0] });
@@ -1249,7 +1249,7 @@ export function updateResearchStudyWithClinicalStudy(
   }
 
   if (!result.contact) {
-    let contacts = [study.overall_contact, study.overall_contact_backup];
+    const contacts = [study.overall_contact, study.overall_contact_backup];
 
     for (const contact of contacts) {
       if (contact != undefined) {
