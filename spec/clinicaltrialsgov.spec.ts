@@ -499,6 +499,10 @@ describe('ClinicalTrialsGovService', () => {
       return expectAsync(testService.init()).toBeRejectedWithError('Simulated error');
     });
 
+    it('can have no options', () => {
+      expect(() => new ctg.ClinicalTrialsGovService(dataDirPath)).not.toThrowError();
+    });
+
     describe('starts a timer', () => {
       const realTimeout = setTimeout;
       let testService: ctg.ClinicalTrialsGovService;
@@ -1366,6 +1370,21 @@ describe('ClinicalTrialsGovService', () => {
       }
     });
 
+    it('will retain old categories if not part of standard study design', () => {
+      const researchStudy = new ResearchStudyObj('id');
+      // Empty category but there is an object there for the sake of this test.
+      researchStudy.category = [{}];
+
+      const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
+        study_type: ['Interventional']
+      });
+
+      expect(researchStudy.category).toBeDefined();
+      if (researchStudy.category) {
+        expect(researchStudy.category).toHaveSize(2);
+      }
+    });
+
     it('fills in arms', () => {
       expect(updatedTrial.arm).toBeDefined();
       if (updatedTrial.arm) {
@@ -1466,6 +1485,44 @@ describe('ClinicalTrialsGovService', () => {
       }
     });
 
+    it('fills in interventions with description and subtitle', () => {
+      const researchStudy = new ResearchStudyObj('id');
+      const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
+        intervention: [
+          {
+            intervention_type: ['Behavioral'],
+            intervention_name: ['Name'],
+            description: ['Description'],
+            other_name: ['Other name'],
+            arm_group_label: ['Arm']
+          }
+        ]
+      });
+
+      expect(result.protocol).toBeDefined();
+      expect(result.protocol).toHaveSize(1);
+
+      if (result.protocol && result.protocol.length > 0) {
+        if (result.protocol[0].reference && result.protocol[0].reference.length > 1) {
+          const intervention: PlanDefinition = getContainedResource(
+            result,
+            result.protocol[0].reference.substring(1)
+          ) as PlanDefinition;
+          expect(intervention).toEqual(
+            jasmine.objectContaining({
+              resourceType: 'PlanDefinition',
+              status: 'unknown',
+              description: 'Description',
+              title: 'Name',
+              subtitle: 'Other name',
+              type: { text: 'Behavioral' },
+              subjectCodeableConcept: { text: 'Arm'}
+            })
+          );
+        }
+      }
+    });
+
     it('fills in description', () => {
       expect(updatedTrial.description).toBeDefined();
     });
@@ -1548,6 +1605,48 @@ describe('ClinicalTrialsGovService', () => {
               name: 'First2 Middle2 Last2, DO',
               telecom: [
                 { system: 'email', value: 'email2@example.com', use: 'work' },
+                { system: 'phone', value: '1234567890', use: 'work' }
+              ]
+            })
+          ])
+        );
+      }
+    });
+
+
+    it('fills in contacts even with missing information', () => {
+      const researchStudy = new ResearchStudyObj('id');
+      const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
+        overall_contact: [
+          {
+            first_name: ['First'],
+            last_name: ['Last'],
+            email: ['email@example.com']
+          }
+        ],
+        overall_contact_backup: [
+          {
+            middle_name: ['Middle2'],
+            degrees: ['DO'],
+            phone: ['1234567890']
+          }
+        ]
+      });
+
+      expect(result.contact).toBeDefined();
+      if (result.contact) {
+        expect(result.contact).toHaveSize(2);
+        expect(result.contact).toEqual(
+          jasmine.arrayContaining([
+            jasmine.objectContaining({
+              name: 'First Last',
+              telecom: [
+                { system: 'email', value: 'email@example.com', use: 'work' },
+              ]
+            }),
+            jasmine.objectContaining({
+              name: ' Middle2, DO',
+              telecom: [
                 { system: 'phone', value: '1234567890', use: 'work' }
               ]
             })

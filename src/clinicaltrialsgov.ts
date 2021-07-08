@@ -1204,7 +1204,7 @@ export function updateResearchStudyWithClinicalStudy(
           ...(study_arm.description && {description: study_arm.description[0]})
         };
 
-        if (arm.name) addToContainer<ResearchStudy, Arm, 'arm'>(result, 'arm', arm);
+        addToContainer<ResearchStudy, Arm, 'arm'>(result, 'arm', arm);
       }
     }
 
@@ -1227,7 +1227,7 @@ export function updateResearchStudyWithClinicalStudy(
               ...({ subjectCodeableConcept: { text: arm_group } } )
             };
 
-            if (plan.title) addToContainer<ResearchStudy, Reference, 'protocol'>(result, 'protocol', addContainedResource(result, plan));
+            addToContainer<ResearchStudy, Reference, 'protocol'>(result, 'protocol', addContainedResource(result, plan));
           }
 
         } else {
@@ -1241,7 +1241,7 @@ export function updateResearchStudyWithClinicalStudy(
             ...(intervention.intervention_type && {type: { text: intervention.intervention_type[0] } } )
           };
 
-          if (plan.title) addToContainer<ResearchStudy, Reference, 'protocol'>(result, 'protocol', addContainedResource(result, plan));
+          addToContainer<ResearchStudy, Reference, 'protocol'>(result, 'protocol', addContainedResource(result, plan));
         }
       }
     }
@@ -1266,6 +1266,7 @@ export function updateResearchStudyWithClinicalStudy(
               value: contact_info.email[0],
               use: 'work'
             });
+        }
         if (contact_info.phone) {
             addToContainer<ContactDetail, ContactPoint, 'telecom'>(fhir_contact, 'telecom', {
               system: 'phone',
@@ -1277,6 +1278,6 @@ export function updateResearchStudyWithClinicalStudy(
       }
     }
   }
-}
+  
   return result;
 }
