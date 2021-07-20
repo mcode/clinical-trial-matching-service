@@ -15,9 +15,6 @@ import trialFilled from './data/complete_study.json';
 import { ClinicalStudy, StatusEnum } from '../src/clinicalstudy';
 import { createClinicalStudy } from './support/clinicalstudy-factory';
 import { createResearchStudy } from './support/researchstudy-factory';
-import Item from 'mock-fs/lib/item';
-import { fail } from 'assert';
-import { exception } from 'console';
 import { PlanDefinition } from '../dist/fhir-types';
 
 function specFilePath(specFilePath: string): string {
@@ -1337,7 +1334,7 @@ describe('ClinicalTrialsGovService', () => {
       const researchStudy = new ResearchStudyObj('id');
       researchStudy.category = [{ text: 'Study Type: Example' }];
 
-      const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
+      ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
         study_type: ['Interventional'],
         study_design_info: [
           {
@@ -1375,7 +1372,7 @@ describe('ClinicalTrialsGovService', () => {
       // Empty category but there is an object there for the sake of this test.
       researchStudy.category = [{}];
 
-      const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
+      ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
         study_type: ['Interventional']
       });
 
