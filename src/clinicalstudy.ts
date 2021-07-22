@@ -141,7 +141,7 @@ export type EnrollmentStruct =
 // Arm Group
 
 export interface ArmGroupStruct {
-  arm_group_label?: One<string>;
+  arm_group_label: One<string>;
   arm_group_type?: One<string>;
   description?: One<string>;
 }

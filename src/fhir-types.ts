@@ -160,7 +160,7 @@ export interface Reference {
   display?: string;
 }
 
-export type PublicationStatus = '	draft' | 'active' | 'retired' | 'unknown';
+export type PublicationStatus = 'draft' | 'active' | 'retired' | 'unknown';
 
 export interface PlanDefinition extends BaseResource {
   resourceType: 'PlanDefinition',
