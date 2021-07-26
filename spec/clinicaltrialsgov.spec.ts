@@ -1513,7 +1513,7 @@ describe('ClinicalTrialsGovService', () => {
               title: 'Name',
               subtitle: 'Other name',
               type: { text: 'Behavioral' },
-              subjectCodeableConcept: { text: 'Arm'}
+              subjectCodeableConcept: { text: 'Arm' }
             })
           );
         }
@@ -1610,7 +1610,6 @@ describe('ClinicalTrialsGovService', () => {
       }
     });
 
-
     it('fills in contacts even with missing information', () => {
       const researchStudy = new ResearchStudyObj('id');
       const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
@@ -1637,15 +1636,11 @@ describe('ClinicalTrialsGovService', () => {
           jasmine.arrayContaining([
             jasmine.objectContaining({
               name: 'First Last',
-              telecom: [
-                { system: 'email', value: 'email@example.com', use: 'work' },
-              ]
+              telecom: [{ system: 'email', value: 'email@example.com', use: 'work' }]
             }),
             jasmine.objectContaining({
               name: ' Middle2, DO',
-              telecom: [
-                { system: 'phone', value: '1234567890', use: 'work' }
-              ]
+              telecom: [{ system: 'phone', value: '1234567890', use: 'work' }]
             })
           ])
         );
