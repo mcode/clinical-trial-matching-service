@@ -15,6 +15,7 @@ import trialFilled from './data/complete_study.json';
 import { ClinicalStudy, StatusEnum } from '../src/clinicalstudy';
 import { createClinicalStudy } from './support/clinicalstudy-factory';
 import { createResearchStudy } from './support/researchstudy-factory';
+import { PlanDefinition } from '../dist/fhir-types';
 
 function specFilePath(specFilePath: string): string {
   return path.join(__dirname, '../../spec/data', specFilePath);
@@ -132,11 +133,11 @@ describe('parseClinicalTrialXML', () => {
   });
   it('logs failures', () => {
     const log = jasmine.createSpy('log');
-    return expectAsync(ctg.parseClinicalTrialXML('<?xml version="1.0"?><root><child/></root>', log)).toBeRejectedWithError(
-      'Unable to parse trial as valid clinical study XML'
-    ).then(() => {
-      expect(log).toHaveBeenCalled();
-    });
+    return expectAsync(ctg.parseClinicalTrialXML('<?xml version="1.0"?><root><child/></root>', log))
+      .toBeRejectedWithError('Unable to parse trial as valid clinical study XML')
+      .then(() => {
+        expect(log).toHaveBeenCalled();
+      });
   });
 });
 
@@ -239,7 +240,7 @@ describe('CacheEntry', () => {
   });
   describe('#readFile()', () => {
     it('rejects with an error if it fails', () => {
-      const readFileSpy = (spyOn(fs, 'readFile') as unknown) as jasmine.Spy<
+      const readFileSpy = spyOn(fs, 'readFile') as unknown as jasmine.Spy<
         (path: string, options: { encoding?: string }, callback: (err?: Error, data?: Buffer) => void) => void
       >;
       readFileSpy.and.callFake((path, options, callback) => {
@@ -249,7 +250,7 @@ describe('CacheEntry', () => {
       return expectAsync(testEntry.readFile()).toBeRejectedWithError('Simulated error');
     });
     it('resolves to null if the file is empty', () => {
-      const readFileSpy = (spyOn(fs, 'readFile') as unknown) as jasmine.Spy<
+      const readFileSpy = spyOn(fs, 'readFile') as unknown as jasmine.Spy<
         (path: string, options: { encoding?: string }, callback: (err?: Error, data?: Buffer) => void) => void
       >;
       readFileSpy.and.callFake((path, options, callback) => {
@@ -264,7 +265,7 @@ describe('CacheEntry', () => {
     let unlinkSpy: jasmine.Spy<(path: string, callback: (err?: Error) => void) => void>;
     beforeEach(() => {
       entry = new ctg.CacheEntry(service, 'NCT12345678.xml', {});
-      unlinkSpy = (spyOn(fs, 'unlink') as unknown) as jasmine.Spy<
+      unlinkSpy = spyOn(fs, 'unlink') as unknown as jasmine.Spy<
         (path: string, callback: (err?: Error) => void) => void
       >;
     });
@@ -486,11 +487,17 @@ describe('ClinicalTrialsGovService', () => {
 
     it('rejects if a single file load fails', () => {
       // FIXME (maybe): it's unclear to me if this is correct behavior - maybe the file should be skipped?
-      (spyOn(cacheFS, 'stat') as jasmine.Spy).and.callFake((filename, callback: (err?: Error, stats?: fs.Stats) => void) => {
-        callback(new Error('Simulated error'));
-      });
+      (spyOn(cacheFS, 'stat') as jasmine.Spy).and.callFake(
+        (filename, callback: (err?: Error, stats?: fs.Stats) => void) => {
+          callback(new Error('Simulated error'));
+        }
+      );
       const testService = new ctg.ClinicalTrialsGovService(dataDirPath, { fs: cacheFS });
       return expectAsync(testService.init()).toBeRejectedWithError('Simulated error');
+    });
+
+    it('can have no options', () => {
+      expect(() => new ctg.ClinicalTrialsGovService(dataDirPath)).not.toThrowError();
     });
 
     describe('starts a timer', () => {
@@ -603,7 +610,7 @@ describe('ClinicalTrialsGovService', () => {
         createResearchStudy('singleton', 'NCT00000003')
       ];
       const testStudy = createClinicalStudy();
-      const updateSpy = spyOn(service, 'updateResearchStudy').and.returnValue();
+      const updateSpy = spyOn(service, 'updateResearchStudy');
       const getTrialSpy = jasmine.createSpy('getCachedClinicalStudy').and.callFake((nctId: string) => {
         return Promise.resolve(nctId === 'NCT00000002' ? null : testStudy);
       });
@@ -638,7 +645,7 @@ describe('ClinicalTrialsGovService', () => {
         createResearchStudy('test4', 'NCT00000004')
       ];
       const testStudy = createClinicalStudy();
-      spyOn(service, 'updateResearchStudy').and.returnValue();
+      spyOn(service, 'updateResearchStudy');
       const getTrialSpy = jasmine.createSpy('getCachedClinicalStudy').and.callFake(() => {
         return Promise.resolve(testStudy);
       });
@@ -661,22 +668,24 @@ describe('ClinicalTrialsGovService', () => {
       jasmine.clock().install();
       // Set the start date to the cache start time
       jasmine.clock().mockDate(cacheStartTime);
-      return ctg.createClinicalTrialsGovService(multipleEntriesDataDir, { expireAfter: 60000, fs: cacheFS }).then((newService) => {
-        service = newService;
-        // "Steal" the cache to grab entries for spying purposes
-        const cache = service['cache'];
-        function safeGet(key: string): ctg.CacheEntry {
-          const result = cache.get(key);
-          if (result) {
-            return result;
-          } else {
-            throw new Error('Missing cache entry for ' + key + ' (bailing before tests will fail)');
+      return ctg
+        .createClinicalTrialsGovService(multipleEntriesDataDir, { expireAfter: 60000, fs: cacheFS })
+        .then((newService) => {
+          service = newService;
+          // "Steal" the cache to grab entries for spying purposes
+          const cache = service['cache'];
+          function safeGet(key: string): ctg.CacheEntry {
+            const result = cache.get(key);
+            if (result) {
+              return result;
+            } else {
+              throw new Error('Missing cache entry for ' + key + ' (bailing before tests will fail)');
+            }
           }
-        }
-        entry1 = safeGet('NCT00000001');
-        entry2 = safeGet('NCT00000002');
-        entry3 = safeGet('NCT00000003');
-      });
+          entry1 = safeGet('NCT00000001');
+          entry2 = safeGet('NCT00000002');
+          entry3 = safeGet('NCT00000003');
+        });
     });
     afterEach(() => {
       // Stop playing with time
@@ -785,11 +794,9 @@ describe('ClinicalTrialsGovService', () => {
       interceptor.reply(200, 'Unimportant', {
         'Content-type': 'application/zip'
       });
-      const spy = jasmine.createSpy('extractResults').and.callFake(
-        (): Promise<void> => {
-          return Promise.resolve();
-        }
-      );
+      const spy = jasmine.createSpy('extractResults').and.callFake((): Promise<void> => {
+        return Promise.resolve();
+      });
       // Jam the spy in (method is protected, that's why it can't be created directly)
       downloader['extractResults'] = spy;
       return expectAsync(
@@ -826,16 +833,20 @@ describe('ClinicalTrialsGovService', () => {
 
     it('deletes the temporary ZIP', () => {
       // Spy on the unlink method
-      const unlink = (spyOn(cacheFS, 'unlink') as jasmine.Spy).and.callFake((_path: string, callback: fs.NoParamCallback) => {
-        callback(null);
-      });
+      const unlink = (spyOn(cacheFS, 'unlink') as jasmine.Spy).and.callFake(
+        (_path: string, callback: fs.NoParamCallback) => {
+          callback(null);
+        }
+      );
       // Don't actually do anything
       downloader['extractZip'] = jasmine.createSpy('extractZip').and.callFake(() => {
         return Promise.resolve();
       });
-      return expectAsync(downloader['extractResults'](stream.Readable.from('Test'))).toBeResolved().then(() => {
-        expect(unlink).toHaveBeenCalledTimes(1);
-      });
+      return expectAsync(downloader['extractResults'](stream.Readable.from('Test')))
+        .toBeResolved()
+        .then(() => {
+          expect(unlink).toHaveBeenCalledTimes(1);
+        });
     });
 
     it('handles deleting the temporary ZIP failing', () => {
@@ -895,9 +906,7 @@ describe('ClinicalTrialsGovService', () => {
     });
 
     it('excludes invalid NCT numbers in an array of strings', () => {
-      return expectAsync(
-        service.ensureTrialsAvailable(['NCT00000001', 'NCT00000012', 'invalid', 'NCT01234567'])
-      )
+      return expectAsync(service.ensureTrialsAvailable(['NCT00000001', 'NCT00000012', 'invalid', 'NCT01234567']))
         .toBeResolved()
         .then(() => {
           expect(downloadTrials).toHaveBeenCalledOnceWith(['NCT00000001', 'NCT00000012', 'NCT01234567']);
@@ -952,8 +961,10 @@ describe('ClinicalTrialsGovService', () => {
       beforeEach(() => {
         const mockObj = new EventEmitter();
         // This is a partial implementation to avoid actual file system access
-        mockZipFile = (mockObj as unknown) as yauzl.ZipFile;
-        mockZipFile.close = () => { /* no-op */ };
+        mockZipFile = mockObj as unknown as yauzl.ZipFile;
+        mockZipFile.close = () => {
+          /* no-op */
+        };
       });
 
       it('rejects on error', () => {
@@ -989,8 +1000,8 @@ describe('ClinicalTrialsGovService', () => {
           };
 
           // This is intentionally not a full mock implementation
-          entry = (mockEntry as unknown) as yauzl.Entry;
-          entries = [ entry ];
+          entry = mockEntry as unknown as yauzl.Entry;
+          entries = [entry];
           currentIndex = 0;
           // Also need to install a fake openReadStream
           mockZipFile.openReadStream = (
@@ -1043,9 +1054,13 @@ describe('ClinicalTrialsGovService', () => {
 
         describe('skips entries with', () => {
           let openReadStreamSpy: jasmine.Spy<{
-            (entry: yauzl.Entry, options: yauzl.ZipFileOptions, callback: (err?: Error, stream?: stream.Readable) => void): void;
+            (
+              entry: yauzl.Entry,
+              options: yauzl.ZipFileOptions,
+              callback: (err?: Error, stream?: stream.Readable) => void
+            ): void;
             (entry: yauzl.Entry, callback: (err?: Error, stream?: stream.Readable) => void): void;
-        }>;
+          }>;
           beforeEach(() => {
             openReadStreamSpy = spyOn(mockZipFile, 'openReadStream');
             // Should this somehow be called, have it invoke the already stubbed test method to ensure that the tests don't hang
@@ -1137,7 +1152,7 @@ describe('ClinicalTrialsGovService', () => {
             callback();
           };
           return expectAsync(service['extractZip']('test.zip')).toBeResolved();
-        })
+        });
       });
     });
   });
@@ -1173,7 +1188,7 @@ describe('ClinicalTrialsGovService', () => {
       });
       spyOn(cacheFS, 'createWriteStream').and.callFake(() => {
         // Pretend this is a file stream for TypeScript - it doesn't really matter
-        return (mockFileStream as unknown) as fs.WriteStream;
+        return mockFileStream as unknown as fs.WriteStream;
       });
     });
 
@@ -1297,11 +1312,211 @@ describe('ClinicalTrialsGovService', () => {
       if (updatedTrial.phase) expect(updatedTrial.phase.text).toBe('Phase 3');
     });
 
-    it('fills in study type', () => {
+    it('fills in categories', () => {
       expect(updatedTrial.category).toBeDefined();
       if (updatedTrial.category) {
-        expect(updatedTrial.category.length).toBeGreaterThan(0);
-        expect(updatedTrial.category[0].text).toBe('Interventional');
+        expect(updatedTrial.category.length).toEqual(5);
+        const categories = updatedTrial.category.map((item) => item.text);
+        expect(categories).toHaveSize(5);
+        expect(categories).toEqual(
+          jasmine.arrayContaining([
+            'Study Type: Interventional',
+            'Intervention Model: Parallel Assignment',
+            'Primary Purpose: Treatment',
+            'Masking: None (Open Label)',
+            'Allocation: Randomized'
+          ])
+        );
+      }
+    });
+
+    it('does not overwrite existing categories', () => {
+      const researchStudy = new ResearchStudyObj('id');
+      researchStudy.category = [{ text: 'Study Type: Example' }];
+
+      ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
+        study_type: ['Interventional'],
+        study_design_info: [
+          {
+            intervention_model: ['Parallel Assignment'],
+            primary_purpose: ['Treatment'],
+            masking: ['None (Open Label)'],
+            allocation: ['Randomized'],
+            time_perspective: ['Example'],
+            observational_model: ['Something']
+          }
+        ]
+      });
+
+      expect(researchStudy.category).toBeDefined();
+      if (researchStudy.category) {
+        expect(researchStudy.category).toHaveSize(7);
+        const categories = researchStudy.category.map((item) => item.text);
+        expect(categories).toHaveSize(7);
+        expect(categories).toEqual(
+          jasmine.arrayContaining([
+            'Study Type: Example',
+            'Intervention Model: Parallel Assignment',
+            'Primary Purpose: Treatment',
+            'Masking: None (Open Label)',
+            'Allocation: Randomized',
+            'Time Perspective: Example',
+            'Observation Model: Something'
+          ])
+        );
+      }
+    });
+
+    it('will retain old categories if not part of standard study design', () => {
+      const researchStudy = new ResearchStudyObj('id');
+      // Empty category but there is an object there for the sake of this test.
+      researchStudy.category = [{}];
+
+      ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
+        study_type: ['Interventional']
+      });
+
+      expect(researchStudy.category).toBeDefined();
+      if (researchStudy.category) {
+        expect(researchStudy.category).toHaveSize(2);
+      }
+    });
+
+    it('fills in arms', () => {
+      expect(updatedTrial.arm).toBeDefined();
+      if (updatedTrial.arm) {
+        expect(updatedTrial.arm).toHaveSize(2);
+        expect(updatedTrial.arm).toEqual(
+          jasmine.arrayContaining([
+            jasmine.objectContaining({
+              name: 'Arm A',
+              type: {
+                coding: jasmine.arrayContaining([{ code: 'Experimental', display: 'Experimental' }]),
+                text: 'Experimental'
+              },
+              description:
+                'Palbociclib at a dose of 125 mg orally once daily, Day 1 to Day 21 followed by 7 days off treatment in a 28-day cycle for a total duration of 2 years, in addition to standard adjuvant endocrine therapy for a duration of at least 5 years.'
+            }),
+            jasmine.objectContaining({
+              name: 'Arm B',
+              type: { coding: jasmine.arrayContaining([{ code: 'Other', display: 'Other' }]), text: 'Other' },
+              description: 'Standard adjuvant endocrine therapy for a duration of at least 5 years.'
+            })
+          ])
+        );
+      }
+    });
+
+    it('fills in protocol with interventions and arm references', () => {
+      expect(updatedTrial.protocol).toBeDefined();
+      if (updatedTrial.protocol) {
+        expect(updatedTrial.protocol).toHaveSize(3);
+        const references: PlanDefinition[] = [];
+        for (const plan of updatedTrial.protocol) {
+          if (plan.reference && plan.reference.length > 1) {
+            const intervention: PlanDefinition = getContainedResource(
+              updatedTrial,
+              plan.reference.substring(1)
+            ) as PlanDefinition;
+            if (intervention) references.push(intervention);
+          } else {
+            fail('PlanDefinition not defined for intervention');
+          }
+        }
+
+        try {
+          const titles = references.map((item) => item.title);
+          const types = references.map((item) => (item.type ? item.type.text : null));
+          const subjects = references.map((item) =>
+            item.subjectCodeableConcept ? item.subjectCodeableConcept.text : null
+          );
+
+          expect(titles).toEqual(
+            jasmine.arrayContaining([
+              'Palbociclib',
+              'Standard Adjuvant Endocrine Therapy',
+              'Standard Adjuvant Endocrine Therapy'
+            ])
+          );
+          expect(types).toEqual(jasmine.arrayContaining(['Drug', 'Drug', 'Drug']));
+          expect(subjects).toEqual(jasmine.arrayContaining(['Arm A', 'Arm A', 'Arm B']));
+        } catch (err) {
+          fail(err);
+        }
+      }
+    });
+
+    it('fills in interventions even without arms', () => {
+      const researchStudy = new ResearchStudyObj('id');
+      const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
+        intervention: [
+          {
+            intervention_type: ['Behavioral'],
+            intervention_name: ['Name'],
+            description: ['Description'],
+            other_name: ['Other name']
+          }
+        ]
+      });
+
+      expect(result.protocol).toBeDefined();
+      expect(result.protocol).toHaveSize(1);
+
+      if (result.protocol && result.protocol.length > 0) {
+        if (result.protocol[0].reference && result.protocol[0].reference.length > 1) {
+          const intervention: PlanDefinition = getContainedResource(
+            result,
+            result.protocol[0].reference.substring(1)
+          ) as PlanDefinition;
+          expect(intervention).toEqual(
+            jasmine.objectContaining({
+              resourceType: 'PlanDefinition',
+              status: 'unknown',
+              description: 'Description',
+              title: 'Name',
+              subtitle: 'Other name',
+              type: { text: 'Behavioral' }
+            })
+          );
+        }
+      }
+    });
+
+    it('fills in interventions with description and subtitle', () => {
+      const researchStudy = new ResearchStudyObj('id');
+      const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
+        intervention: [
+          {
+            intervention_type: ['Behavioral'],
+            intervention_name: ['Name'],
+            description: ['Description'],
+            other_name: ['Other name'],
+            arm_group_label: ['Arm']
+          }
+        ]
+      });
+
+      expect(result.protocol).toBeDefined();
+      expect(result.protocol).toHaveSize(1);
+
+      if (result.protocol && result.protocol.length > 0) {
+        if (result.protocol[0].reference && result.protocol[0].reference.length > 1) {
+          const intervention: PlanDefinition = getContainedResource(
+            result,
+            result.protocol[0].reference.substring(1)
+          ) as PlanDefinition;
+          expect(intervention).toEqual(
+            jasmine.objectContaining({
+              resourceType: 'PlanDefinition',
+              status: 'unknown',
+              description: 'Description',
+              title: 'Name',
+              subtitle: 'Other name',
+              type: { text: 'Behavioral' },
+              subjectCodeableConcept: { text: 'Arm' }
+            })
+          );
+        }
       }
     });
 
@@ -1324,7 +1539,7 @@ describe('ClinicalTrialsGovService', () => {
         { resourceType: 'ResearchStudy' },
         {
           // Lie about types
-          overall_status: [('something invalid' as unknown) as StatusEnum]
+          overall_status: ['something invalid' as unknown as StatusEnum]
         }
       );
       // It shouldn't have changed it, because it can't
@@ -1343,6 +1558,92 @@ describe('ClinicalTrialsGovService', () => {
         expect(actual.condition.length).toEqual(2);
         expect(actual.condition[0].text).toEqual('Condition 1');
         expect(actual.condition[1].text).toEqual('Condition 2');
+      }
+    });
+
+    it('fills in contact', () => {
+      const researchStudy = new ResearchStudyObj('id');
+      const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
+        overall_contact: [
+          {
+            first_name: ['First'],
+            middle_name: ['Middle'],
+            last_name: ['Last'],
+            degrees: ['MD'],
+            phone: ['1112223333'],
+            email: ['email@example.com']
+          }
+        ],
+        overall_contact_backup: [
+          {
+            first_name: ['First2'],
+            middle_name: ['Middle2'],
+            last_name: ['Last2'],
+            degrees: ['DO'],
+            phone: ['1234567890'],
+            email: ['email2@example.com']
+          }
+        ]
+      });
+
+      expect(result.contact).toBeDefined();
+      if (result.contact) {
+        expect(result.contact).toHaveSize(2);
+        expect(result.contact).toEqual(
+          jasmine.arrayContaining([
+            jasmine.objectContaining({
+              name: 'First Middle Last, MD',
+              telecom: [
+                { system: 'email', value: 'email@example.com', use: 'work' },
+                { system: 'phone', value: '1112223333', use: 'work' }
+              ]
+            }),
+            jasmine.objectContaining({
+              name: 'First2 Middle2 Last2, DO',
+              telecom: [
+                { system: 'email', value: 'email2@example.com', use: 'work' },
+                { system: 'phone', value: '1234567890', use: 'work' }
+              ]
+            })
+          ])
+        );
+      }
+    });
+
+    it('fills in contacts even with missing information', () => {
+      const researchStudy = new ResearchStudyObj('id');
+      const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
+        overall_contact: [
+          {
+            first_name: ['First'],
+            last_name: ['Last'],
+            email: ['email@example.com']
+          }
+        ],
+        overall_contact_backup: [
+          {
+            middle_name: ['Middle2'],
+            degrees: ['DO'],
+            phone: ['1234567890']
+          }
+        ]
+      });
+
+      expect(result.contact).toBeDefined();
+      if (result.contact) {
+        expect(result.contact).toHaveSize(2);
+        expect(result.contact).toEqual(
+          jasmine.arrayContaining([
+            jasmine.objectContaining({
+              name: 'First Last',
+              telecom: [{ system: 'email', value: 'email@example.com', use: 'work' }]
+            }),
+            jasmine.objectContaining({
+              name: ' Middle2, DO',
+              telecom: [{ system: 'phone', value: '1234567890', use: 'work' }]
+            })
+          ])
+        );
       }
     });
 

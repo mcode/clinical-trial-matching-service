@@ -465,14 +465,14 @@ export interface ClinicalStudy {
   number_of_groups?: One<XSInteger>;
   enrollment?: One<EnrollmentStruct>;
   condition?: Unbounded<string>;
-  // arm_group: arm_group_struct; //  minOccurs="0" maxOccurs="unbounded"
-  // intervention: intervention_struct; //  minOccurs="0" maxOccurs="unbounded"
+  arm_group?: Unbounded<ArmGroupStruct>; //  minOccurs="0" maxOccurs="unbounded"
+  intervention?: Unbounded<InterventionStruct>; //  minOccurs="0" maxOccurs="unbounded"
   // biospec_retention: biospec_retention_enum; //  minOccurs="0"
   // biospec_descr: textblock_struct; //  minOccurs="0"
   eligibility?: One<EligibilityStruct>; //  minOccurs="0"
   // overall_official: investigator_struct; //  minOccurs="0" maxOccurs="unbounded"
-  // overall_contact: contact_struct; //  minOccurs="0"
-  // overall_contact_backup: contact_struct; //  minOccurs="0"
+  overall_contact?: One<ContactStruct>; //  minOccurs="0"
+  overall_contact_backup?: One<ContactStruct>; //  minOccurs="0"
   location?: Unbounded<LocationStruct>;
   // location_countries: countries_struct; //  minOccurs="0"
   // removed_countries: countries_struct; //  minOccurs="0"

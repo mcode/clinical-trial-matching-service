@@ -10,6 +10,20 @@
   ],
   "title": "PALbociclib CoLlaborative Adjuvant Study: A Randomized Phase III Trial of Palbociclib With Standard Adjuvant Endocrine Therapy Versus Standard Adjuvant Endocrine Therapy Alone for Hormone Receptor Positive (HR+) / Human Epidermal Growth Factor Receptor 2 (HER2)-Negative Early Breast Cancer",
   "status": "active",
+  "protocol":[
+      {
+         "reference":"#plan-0",
+         "type":"PlanDefinition"
+      },
+      {
+         "reference":"#plan-1",
+         "type":"PlanDefinition"
+      },
+      {
+         "reference":"#plan-2",
+         "type":"PlanDefinition"
+      }
+   ],
   "condition": [{ "text": "Breast Cancer" }],
   "contact": [{ "name": "Edward Habermehl" }],
   "keyword": [{ "text": "HR+/HER2- breast cancer" }, { "text": "Palbociclib" }],
@@ -47,18 +61,77 @@
     ],
     "text": "Phase 3"
   },
-  "category": [{ "text": "Interventional" }],
+  "category": [
+    {
+      "text": "Study Type: Interventional"
+    },
+    {
+      "text": "Intervention Model: Parallel Assignment"
+    },
+    {
+      "text": "Primary Purpose: Treatment"
+    },
+    {
+      "text": "Masking: None (Open Label)"
+    },
+    {
+      "text": "Allocation: Randomized"
+    }
+  ],
   "site": [
     {
       "reference": "#site",
       "type": "Location"
     }
   ],
+   "arm":[
+      {
+         "name":"Arm A",
+         "type":{
+            "coding":[
+               {
+                  "code":"Experimental",
+                  "display":"Experimental"
+               }
+            ],
+            "text":"Experimental"
+         },
+         "description":"Palbociclib at a dose of 125 mg orally once daily, Day 1 to Day 21 followed by 7 days off treatment in a 28-day cycle for a total duration of 2 years, in addition to standard adjuvant endocrine therapy for a duration of at least 5 years."
+      },
+      {
+         "name":"Arm B",
+         "type":{
+            "coding":[
+               {
+                  "code":"Other",
+                  "display":"Other"
+               }
+            ],
+            "text":"Other"
+         },
+         "description":"Standard adjuvant endocrine therapy for a duration of at least 5 years."
+      }
+   ],
   "contained": [
     {
       "resourceType": "Location",
       "id": "site",
       "name": "Site"
+    },
+    {
+      "resourceType": "PlanDefinition",
+      "id": "plan-0",
+      "name": "Plan 0"
+    },
+    {
+      "resourceType": "PlanDefinition",
+      "id": "plan-1",
+      "name": "Plan 1"
+    },
+    {
+      "resourceType": "PlanDefinition",
+      "id": "plan-2",
+      "name": "Plan 2"
     }
   ]
 }
