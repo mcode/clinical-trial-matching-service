@@ -160,7 +160,10 @@ describe('CacheEntry', () => {
     });
     it('clones the created at time', () => {
       const entry = new ctg.CacheEntry(service, 'test', {});
-      entry.createdAt.setMonth(5);
+      const createdAt = entry.createdAt;
+      expect(createdAt).toBeDefined();
+      if (createdAt)
+        createdAt.setMonth(5);
       expect(entry.createdAt).toEqual(startTime);
     });
   });
@@ -774,7 +777,20 @@ describe('ClinicalTrialsGovService', () => {
       downloader['cache'].set(nctIDs[1], new ctg.CacheEntry(downloader, nctIDs[1] + '.xml', {}));
       // Also mock the extraction process so it thinks everything is fine
       downloader['extractResults'] = () => {
-        // Just pretend everything is fine
+        // Grab cache entries for our NCTs and say they've been resolved
+        for (const id of nctIDs) {
+          const entry = downloader['cache'].get(id);
+          expect(entry).toBeDefined();
+          if (entry) {
+            // Indicate that the entry is found
+            entry.found();
+          }
+        }
+        // Only mark entry 1 ready
+        const entry = downloader['cache'].get(nctIDs[1]);
+        if (entry) {
+          entry.ready();
+        }
         return Promise.resolve();
       };
       return expectAsync(downloader['downloadTrials'](nctIDs))
@@ -795,6 +811,15 @@ describe('ClinicalTrialsGovService', () => {
         'Content-type': 'application/zip'
       });
       const spy = jasmine.createSpy('extractResults').and.callFake((): Promise<void> => {
+        // Grab cache entries for our NCTs and say they've been resolved
+        for (const id of nctIDs) {
+          const entry = downloader['cache'].get(id);
+          expect(entry).toBeDefined();
+          if (entry) {
+            entry.found();
+            entry.ready();
+          }
+        }
         return Promise.resolve();
       });
       // Jam the spy in (method is protected, that's why it can't be created directly)
@@ -806,6 +831,32 @@ describe('ClinicalTrialsGovService', () => {
           expect(scope.isDone()).toBeTrue();
         })
       ).toBeResolved();
+    });
+
+    it('invalidates cache entries that were not found in the downloaded ZIP', () => {
+      // This is kind of complicated, but basically, we need to have it "create" the entries for the NCT IDs, but then
+      // have extractResults "not create" some of the entries.
+      interceptor.reply(200, 'Unimportant', {
+        'Content-type': 'application/zip'
+      });
+      const spy = jasmine.createSpy('extractResults').and.callFake((): Promise<void> => {
+        // For this test, we only mark one OK
+        const entry = downloader['cache'].get(nctIDs[1]);
+        expect(entry).toBeDefined();
+        if (entry) {
+          entry.found();
+          entry.ready();
+        }
+        return Promise.resolve();
+      });
+      // Jam the spy in (method is protected, that's why it can't be created directly)
+      downloader['extractResults'] = spy;
+      return expectAsync(downloader['downloadTrials'](nctIDs).then(() => {
+        // The failed NCT IDs should be removed at this point
+        expect(downloader['cache'].has(nctIDs[0])).toBeFalse();
+        expect(downloader['cache'].has(nctIDs[1])).toBeTrue();
+        expect(downloader['cache'].has(nctIDs[2])).toBeFalse();
+      }));
     });
   });
 
