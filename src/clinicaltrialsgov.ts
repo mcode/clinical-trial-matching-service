@@ -469,8 +469,8 @@ export interface ClinicalTrialsGovServiceOptions {
  * Call updateResearchStudies() with the ResearchStudy objects to update. It will locate all ResearchStudy objects that
  * contain an NCT ID. It will then:
  *
- * 1. Call downloadTrials() is used to download the ClinicalStudy data from clinicaltrials.gov. It starts an HTTPS
- *    request to download the trial results and, if successful, passes the response stream off to extractResults().
+ * 1. Call downloadTrials() to download the ClinicalStudy data from clinicaltrials.gov. It starts an HTTPS request to
+ *    download the trial results and, if successful, passes the response stream off to extractResults().
  * 2. extractResults() saves the stream its given to a temporary ZIP file and extracts that file to a temporary
  *    directory. Once the ZIP is extracted, it deletes the temporary ZIP. It then returns the directory where the files
  *    were extracted.
@@ -862,6 +862,7 @@ export class ClinicalTrialsGovService {
       for (const id of ids) {
         const entry = this.cache.get(id);
         if (entry && entry.createdAt === null) {
+          this.log('Removing cache entry for %s: it was not in the downloaded bundle!', id);
           entry.fail('Not found in bundle');
           this.cache.delete(id);
         }
