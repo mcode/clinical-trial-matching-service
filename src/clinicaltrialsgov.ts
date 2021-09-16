@@ -207,6 +207,12 @@ export interface FileSystem {
   unlink: (path: string, callback: (err: NodeJS.ErrnoException | null) => void) => void;
 }
 
+interface PendingState {
+  promise: Promise<void>;
+  resolve: () => void;
+  reject: (e: Error) => void;
+}
+
 /**
  * A cache entry. Cache entries basically operate in two modes: an entry that is pending being written based on a ZIP
  * file, and a file that has a backing file ready to be loaded.
@@ -217,18 +223,17 @@ export interface FileSystem {
  */
 export class CacheEntry {
   private _cache: ClinicalTrialsGovService;
-  // Dates are, sadly, mutable via set methods. This makes it impractical to attempt to make them immutable.
-  private _createdAt: Date;
+  // Dates are, sadly, mutable via set methods. This makes it impractical to attempt to make properties involving them
+  // immutable.
+  private _createdAt: Date | null;
   private _lastAccess: Date;
   /**
-   * If this Promise exists, it puts the cache entry into a "pending" state and means a download has been started for
-   * it. The Promise will resolve when the cache entry is "live."
+   * The pending status. Either a Promise (in which case it is not only pending, but has things actively waiting for
+   * it), or true, in which case it is pending but the promise is yet to be created, or false if pending but the promise
+   * has not been created. This is so that no Promise is created if nothing ever needs it, which avoids cases where the
+   * Promise won't have a catch handler attached to it.
    */
-  private _pending: Promise<void> | undefined;
-  /**
-   * The resolve function of the pending Promise.
-   */
-  private _resolvePending: (() => void) | undefined;
+  private _pending: PendingState | boolean = false;
   /**
    * Create a new cache entry.
    * @param filename the file name of the entry
@@ -251,33 +256,75 @@ export class CacheEntry {
       this._lastAccess = new Date();
     }
     if (options.pending) {
-      this._pending = new Promise((resolve) => {
-        this._resolvePending = resolve;
-      });
+      // In this mode, mark createdAt as null
+      this._createdAt = null;
+      this._pending = true;
     }
   }
-  get createdAt(): Date {
-    return new Date(this._createdAt);
+  // As the returned Date objects are mutable, return copies
+  /**
+   * Gets the time when this entry was initially created. If null, that indicates that the entry was never successfully
+   * created - it's still waiting for data to be downloaded.
+   */
+  get createdAt(): Date | null {
+    return this._createdAt === null ? null : new Date(this._createdAt);
   }
+  /**
+   * Gets the last time the cache entry was accessed. This is updated whenever
+   * #load() is called.
+   */
   get lastAccess(): Date {
     return new Date(this._lastAccess);
   }
+  /**
+   * Determine if the cache entry is still pending: data for it has not yet been saved.
+   */
   get pending(): boolean {
-    return this._pending !== undefined;
+    return this._pending !== false;
   }
+
+  /**
+   * Check if the last access time is before the given date
+   * @param date the date to check
+   * @returns true if the last access time was before the given date
+   */
   lastAccessedBefore(date: Date): boolean {
     return this._lastAccess < date;
   }
 
   /**
-   * Resolves the pending state (if the entry was pending), otherwise does nothing.
+   * Indicates that the entry has been located somewhere and that data for it is now being prepared.
+   */
+  found(): void {
+    if (this._createdAt === null) {
+      this._createdAt = new Date();
+    }
+  }
+
+  /**
+   * Resolves the pending state (if the entry was pending), otherwise does nothing. This does not change the "found"
+   * status - if ready() is called without found(), createdAt remains null and the entry may be removed as pointing to
+   * a record that does not exist.
    */
   ready(): void {
-    if (this._resolvePending) {
-      this._resolvePending();
+    if (typeof this._pending === 'object') {
+      this._pending.resolve();
     }
-    this._pending = undefined;
-    this._resolvePending = undefined;
+    this._pending = false;
+  }
+
+  /**
+   * Forcibly fail the entry.
+   * @param e the error to fail the entry with
+   */
+  fail(e: Error | string): void {
+    if (typeof this._pending === 'object') {
+      if (typeof e === 'string') {
+        e = new Error(e);
+      }
+      this._pending.reject(e);
+    }
+    this._pending = false;
   }
 
   /**
@@ -290,7 +337,31 @@ export class CacheEntry {
     // If we're still pending, we have to wait for that to finish before we can
     // read the underlying file.
     if (this._pending) {
-      return this._pending.then(() => {
+      let promise: Promise<void>;
+      if (this._pending === true) {
+        // This is the only case when we actually create the Promise - when still pending and something attempts a load.
+        // TODO (maybe): Add a timeout?
+        // There's no way to prove it to TypeScript, but the executor function in the Promise runs immediately when the
+        // Promise is created. So create useless no-op funcs to avoid "may be undefined" errors.
+        let resolveFunc: () => void = () => {
+            /* no-op */
+          },
+          rejectFunc: (e: Error) => void = () => {
+            /* no-op */
+          };
+        promise = new Promise<void>((resolve, reject) => {
+          resolveFunc = resolve;
+          rejectFunc = reject;
+        });
+        this._pending = {
+          promise: promise,
+          resolve: resolveFunc,
+          reject: rejectFunc
+        };
+      } else {
+        promise = this._pending.promise;
+      }
+      return promise.then(() => {
         return this.readFile();
       });
     } else {
@@ -398,8 +469,8 @@ export interface ClinicalTrialsGovServiceOptions {
  * Call updateResearchStudies() with the ResearchStudy objects to update. It will locate all ResearchStudy objects that
  * contain an NCT ID. It will then:
  *
- * 1. Call downloadTrials() is used to download the ClinicalStudy data from clinicaltrials.gov. It starts an HTTPS
- *    request to download the trial results and, if successful, passes the response stream off to extractResults().
+ * 1. Call downloadTrials() to download the ClinicalStudy data from clinicaltrials.gov. It starts an HTTPS request to
+ *    download the trial results and, if successful, passes the response stream off to extractResults().
  * 2. extractResults() saves the stream its given to a temporary ZIP file and extracts that file to a temporary
  *    directory. Once the ZIP is extracted, it deletes the temporary ZIP. It then returns the directory where the files
  *    were extracted.
@@ -786,7 +857,17 @@ export class ClinicalTrialsGovService {
       }
     });
     // But return the root promise (otherwise we chain off the result handler)
-    return result;
+    return result.then(() => {
+      // Invalidate any IDs that are still pending ZIP
+      for (const id of ids) {
+        const entry = this.cache.get(id);
+        if (entry && entry.createdAt === null) {
+          this.log('Removing cache entry for %s: it was not in the downloaded bundle!', id);
+          entry.fail('Not found in bundle');
+          this.cache.delete(id);
+        }
+      }
+    });
   }
 
   /**
@@ -945,8 +1026,13 @@ export class ClinicalTrialsGovService {
   }
 
   private addCacheEntry(nctNumber: NCTNumber, dataStream: stream.Readable): Promise<void> {
-    // The cache entry should already exist
     const filename = path.join(this.cacheDataDir, nctNumber + '.xml');
+    // The cache entry should already exist
+    const entry = this.cache.get(nctNumber);
+    // Tell the entry that we are writing data
+    if (entry) {
+      entry.found();
+    }
     const promise = new Promise<void>((resolve, reject) => {
       // This indicates whether no error was raised - close can get called anyway, and it's slightly cleaner to just
       // mark that an error happened and ignore the close handler if it did.
@@ -957,9 +1043,8 @@ export class ClinicalTrialsGovService {
         .on('error', (err) => {
           this.log('Unable to create file [%s]: %o', filename, err);
           // If the cache entry exists in pending mode, delete it - we failed to create this entry
-          // TODO: Does this failure destroy the existing cache entry?
-          const entry = this.cache.get(nctNumber);
           if (entry && entry.pending) {
+            entry.fail('Unable to create file');
             this.cache.delete(nctNumber);
           }
           // TODO: Do we also need to delete the file? Or will the error prevent the file from existing?
@@ -969,7 +1054,6 @@ export class ClinicalTrialsGovService {
         .on('close', () => {
           if (success) {
             // Once saved, resolve both the pending entry and this promise
-            const entry = this.cache.get(nctNumber);
             if (entry && entry.pending) {
               entry.ready();
             }
