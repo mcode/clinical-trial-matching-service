@@ -851,12 +851,12 @@ describe('ClinicalTrialsGovService', () => {
       });
       // Jam the spy in (method is protected, that's why it can't be created directly)
       downloader['extractResults'] = spy;
-      return expectAsync(downloader['downloadTrials'](nctIDs).then(() => {
+      return expectAsync(downloader['downloadTrials'](nctIDs)).toBeResolved().then(() => {
         // The failed NCT IDs should be removed at this point
         expect(downloader['cache'].has(nctIDs[0])).toBeFalse();
         expect(downloader['cache'].has(nctIDs[1])).toBeTrue();
         expect(downloader['cache'].has(nctIDs[2])).toBeFalse();
-      }));
+      });
     });
   });
 
