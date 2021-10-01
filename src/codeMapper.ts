@@ -1,77 +1,98 @@
+import { Coding } from "./fhir-types";
+
+/**
+ * Enumeration of the possible code systems.
+ * Source: https://masteringjs.io/tutorials/fundamentals/enum
+ */
+export class CodeSystemEnum {
+
+  static ICD10 = new CodeSystemEnum("ICD10");
+  static SNOMED = new CodeSystemEnum("SNOMED");
+  static RXNORM = new CodeSystemEnum("RXNORM");
+  static AJCC = new CodeSystemEnum("AJCC");
+  static LOINC = new CodeSystemEnum("LOINC");
+  static NIH = new CodeSystemEnum("NIH");
+  static HGNC = new CodeSystemEnum("HGNC");
+  static HL7 = new CodeSystemEnum("HL7");
+
+  system: string;
+
+  /**
+   * Constructor
+   * @param system The system name.
+   */
+  constructor(system: string) {
+    this.system = system;
+  }
+
+  toString(): string {
+    return this.system;
+  }
+}
+
 /**
  * A class that acts a Code Mapper that maps an input JSON's codes to their associated profiles.
  */
 export class CodeMapper {
-  // Map<Profile -> Map<System -> List<Codes>>>
-  code_map: Map<string, Map<string, string[]>>;
+
+  // Map<MedicalCode -> Profile[]>
+  code_map: Map<string, string[]>;
 
   /**
    * Constructor for a Code Mapper.
    * @param code_mapping_file The file that dictates the code mapping.
    */
-  constructor(code_mapping_file: any) {
-    this.code_map = CodeMapper.convertJsonToMap(code_mapping_file);
+  constructor(code_mapping_file: {[key: string]: ProfileSystemCodes;}) {
+    this.code_map = CodeMapper.convertJsonToCodeMap(code_mapping_file);
   }
 
   /**
-   * Converts the JSON object to the Map<Profile -> Map<System -> List<Codes>>> format.
+   * Converts the JSON object to the Map<Code -> Profile[]> format.
    * @param obj The JSON object.
    * @returns Map<String. Map<String -> List<String>>>
    */
-  static convertJsonToMap(obj: {
+  static convertJsonToCodeMap(obj: {
     [key: string]: ProfileSystemCodes;
-  }): Map<string, Map<string, string[]>> {
-    const profile_map = new Map<string, Map<string, string[]>>();
-    for (const profile_key of Object.keys(obj)) {
-      const code_map = new Map<string, string[]>();
-      for (const system_key of Object.keys(obj[profile_key])) {
-        const codes = obj[profile_key][system_key];
-        const code_strings: string[] = codes.map(function (code) {
-          return code.code;
-        });
-        code_map.set(system_key, code_strings);
+  }): Map<string, string[]> {
+    const code_map = new Map<string, string[]>();
+    for (const profile of Object.keys(obj)) {
+      for (const system of Object.keys(obj[profile])) {
+        for (const code of obj[profile][system]) {
+          const code_string = new MedicalCode(code, system).toString();
+          if (!code_map.has(code_string)) {
+            code_map.set(code_string, []);
+          }
+          (code_map.get(code_string)!).push(profile);
+        }
       }
-      // For the current profile, inserts the current system->code mapping.
-      profile_map.set(profile_key, code_map);
     }
-    return profile_map;
+    return code_map;
   }
 
   /**
-   * Checks whether the given code is within one of the given profile mappings.
+   * Extracts the code mappings for the given list of codings.
+   * @param codings The codings to map to profiles.
+   * @returns The list of mapped strings for the codings.
    */
-  codeIsInMapping(coding: Coding, ...profiles: string[]): boolean {
-    const system = CodeMapper.normalizeCodeSystem(coding.system);
-    for (const profile of profiles) {
-      if(!this.code_map.has(profile)){
-        throw "Profile '" + profile + "' does not exist in the given profile mappings."
-      }
-      const code_profiles: Map<string, string[]> = this.code_map.get(profile) as Map<string, string[]>; // Pull the codes for the profile
-      if(code_profiles == undefined || !code_profiles.has(system)){
-        // If the system is not in this code profile, then the code does not map to this one.
-        continue;
-      }
-      const codes_to_check: string[] = code_profiles.get(system) as string[];
-      if (
-        codes_to_check != undefined && (
-        codes_to_check.includes(coding.code) ||
-        codes_to_check.includes(coding.display))
-      ) {
-        return true;
+  extractCodeMappings(codings: Coding[]): string[] {
+    const extracted_mappings: string[] = [];
+    for (const code of codings) {
+      const medical_code_key = new MedicalCode(code.code, code.system).toString();
+      if (this.code_map.has(medical_code_key)) {
+        extracted_mappings.push(...(this.code_map.get(medical_code_key)!));
       }
     }
-    return false;
+    return extracted_mappings;
   }
 
   /**
-   * Returns whether the given code is any code not in the given profile.
+   * Returns whether the given coding equals the given code attributes.
+   * @param input_coding The coding to check against.
+   * @param system The system of the code to compare to.
+   * @param code The code of the code to compare to.
    */
-  codeIsNotInMapping(coding: Coding, profile: string): boolean {
-    if (coding.code == undefined || coding.code == null) {
-      return false;
-    } else {
-      return !this.codeIsInMapping(coding, profile);
-    }
+  static codesEqual(input_coding: Coding, system: CodeSystemEnum, code: string ): boolean {
+    return new MedicalCode(input_coding.code, input_coding.system).equalsMedicalCode(new MedicalCode(code, system.toString()));
   }
 
   /**
@@ -79,33 +100,68 @@ export class CodeMapper {
    * @param codeSystem  The code system to normalize.
    * @returns The normalized code system.
    */
-  static normalizeCodeSystem(codeSystem: string): string {
+  static normalizeCodeSystem(codeSystem: string): CodeSystemEnum {
     const lowerCaseCodeSystem: string = codeSystem.toLowerCase();
     if (lowerCaseCodeSystem.includes("snomed")) {
-      return "SNOMED";
+      return CodeSystemEnum.SNOMED;
     } else if (lowerCaseCodeSystem.includes("rxnorm")) {
-      return "RxNorm";
-    } else if (lowerCaseCodeSystem.includes("icd-10")) {
-      return "ICD-10";
+      return CodeSystemEnum.RXNORM;
+    } else if (
+      lowerCaseCodeSystem.includes("icd-10") ||
+      lowerCaseCodeSystem.includes("icd10")
+    ) {
+      return CodeSystemEnum.ICD10;
     } else if (
       lowerCaseCodeSystem.includes("ajcc") ||
       lowerCaseCodeSystem.includes("cancerstaging.org")
     ) {
-      return "AJCC";
+      return CodeSystemEnum.AJCC;
     } else if (lowerCaseCodeSystem.includes("loinc")) {
-      return "LOINC";
+      return CodeSystemEnum.LOINC;
     } else if (lowerCaseCodeSystem.includes("nih")) {
-      return "NIH";
+      return CodeSystemEnum.NIH;
     } else if (
       lowerCaseCodeSystem.includes("hgnc") ||
       lowerCaseCodeSystem.includes("genenames.org")
     ) {
-      return "HGNC";
+      return CodeSystemEnum.HGNC;
     } else if (lowerCaseCodeSystem.includes("hl7")) {
-      return "HL7";
+      return CodeSystemEnum.HL7;
     } else {
-      throw ("Profile codes do not support code system: " + codeSystem);
+      throw "Profile codes do not support code system: " + codeSystem;
     }
+  }
+}
+
+/**
+ * A class that defines a medical code.
+ */
+class MedicalCode {
+  code: string;
+  system: CodeSystemEnum;
+
+  /**
+   * Constructor for a Medical Code.
+   * @param code_string
+   * @param system_string
+   * @param system_enum
+   */
+  constructor(
+    code_string: string,
+    system_string: string,
+  ) {
+    this.code = code_string;
+    this.system = CodeMapper.normalizeCodeSystem(system_string);
+  }
+
+  toString() {
+    return (
+      "Medical Code {code: " + this.code + ", system: " + this.system.toString() + "}"
+    );
+  }
+
+  equalsMedicalCode(that: MedicalCode) {
+    return this.toString() === that.toString();
   }
 }
 
@@ -113,14 +169,6 @@ export class CodeMapper {
  * Describes the format that the JSON object should be made up of.
  */
 interface ProfileSystemCodes {
-  [system: string]: { code: string }[];
-}
-
-/**
- * Describes a Coding object.
- */
-interface Coding {
-  system: string;
-  code: string;
-  display: string;
+  // System -> Code[]
+  [system: string]: string[];
 }

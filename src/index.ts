@@ -7,7 +7,7 @@ export * as fhir from './fhir-types';
 export * from './research-study';
 export * from './searchset';
 export * from './clinicaltrialsgov';
-export * from './CodeMapper';
+export * from './codeMapper';
 
 // The export { v } from "mod" forms do not appear to work yet
 import { ClinicalStudy } from './clinicalstudy';

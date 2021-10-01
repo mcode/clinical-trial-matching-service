@@ -21,6 +21,15 @@ export interface BundleEntry {
 }
 
 /**
+ * Describes a Coding object.
+ */
+export interface Coding {
+  system: string;
+  code: string;
+  display?: string;
+}
+
+/**
  * The search entry mode valueset (from https://www.hl7.org/fhir/valueset-search-entry-mode.html).
  */
 export type SearchEntryMode = 'match' | 'include' | 'outcome';
