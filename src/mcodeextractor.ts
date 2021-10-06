@@ -4,10 +4,10 @@ import * as fhir from "./fhir-types";
 
 export type FHIRPath = string;
 
-export interface ReasonReference {
+  export interface ReasonReference {
     reference?: string;
     display?: string;
-    reference_meta_profile?: string;
+    meta_profile?: string;
   }
   
   export interface Quantity {
@@ -30,7 +30,7 @@ export interface ReasonReference {
   export interface CancerConditionParent extends BaseFhirResource {
     clinicalStatus: fhir.Coding[];
     meta_profile: string;
-    full_url: string;
+    id: string;
   }
   
   export interface PrimaryCancerCondition extends CancerConditionParent {
@@ -169,14 +169,12 @@ export interface ReasonReference {
             this.resourceProfile(this.lookup(resource, 'meta.profile'), 'mcode-primary-cancer-condition')
           ) {
             const tempPrimaryCancerCondition: PrimaryCancerCondition = {
-              clinicalStatus: [],
+              clinicalStatus: this.lookup(resource, 'clinicalStatus.coding') as unknown as fhir.Coding[],
               meta_profile: 'mcode-primary-cancer-condition',
-              full_url: '',
               histologyMorphologyBehavior: [],
-              coding: []
+              coding: this.lookup(resource, 'code.coding') as unknown as fhir.Coding[],
+              id: (this.lookup(resource, 'id') as string[])[0]
             };
-            tempPrimaryCancerCondition.coding.push(...this.lookup(resource, 'code.coding') as unknown as fhir.Coding[]);
-            tempPrimaryCancerCondition.clinicalStatus = this.lookup(resource, 'clinicalStatus.coding') as unknown as fhir.Coding[];
             if (this.lookup(resource, 'extension').length !== 0) {
               let count = 0;
               for (const extension of this.lookup(resource, 'extension')) {
@@ -225,15 +223,12 @@ export interface ReasonReference {
             this.resourceProfile(this.lookup(resource, 'meta.profile'), 'mcode-secondary-cancer-condition')
           ) {
             const tempSecondaryCancerCondition: SecondaryCancerCondition = {
-              clinicalStatus: [],
+              clinicalStatus: this.lookup(resource, 'clinicalStatus.coding') as unknown as fhir.Coding[],
               meta_profile: 'mcode-secondary-cancer-condition',
-              full_url: '',
-              bodySite: [],
-              coding: []
+              id: (this.lookup(resource, 'id') as string[])[0],
+              bodySite: this.lookup(resource, 'bodySite.coding') as unknown as fhir.Coding[],
+              coding: this.lookup(resource, 'code.coding') as unknown as fhir.Coding[]
             };
-            tempSecondaryCancerCondition.coding.push(...this.lookup(resource, 'code.coding') as unknown as fhir.Coding[]);
-            tempSecondaryCancerCondition.clinicalStatus.push(...this.lookup(resource, 'clinicalStatus.coding') as unknown as fhir.Coding[]);
-            tempSecondaryCancerCondition.bodySite.push(...this.lookup(resource, 'bodySite.coding') as unknown as fhir.Coding[]);
             if (this.secondaryCancerCondition) {
               this.secondaryCancerCondition.push(tempSecondaryCancerCondition); // needs specific de-dup helper function
             } else {
@@ -257,17 +252,12 @@ export interface ReasonReference {
             this.resourceProfile(this.lookup(resource, 'meta.profile'), 'mcode-tumor-marker')
           ) {
             const tempTumorMarker: TumorMarker = {
-              valueQuantity: [],
-              valueRatio: [],
-              valueCodeableConcept: [],
-              interpretation: [],
-              coding: []
+              valueQuantity: this.lookup(resource, 'valueQuantity') as Quantity[],
+              valueRatio: this.lookup(resource, 'valueRatio') as Ratio[],
+              valueCodeableConcept: this.lookup(resource, 'valueCodeableConcept.coding') as unknown as fhir.Coding[],
+              interpretation: this.lookup(resource, 'interpretation.coding') as unknown as fhir.Coding[],
+              coding: this.lookup(resource, 'code.coding') as unknown as fhir.Coding[]
             };
-            tempTumorMarker.coding.push(...this.lookup(resource, 'code.coding') as unknown as fhir.Coding[]);
-            tempTumorMarker.valueQuantity = this.lookup(resource, 'valueQuantity') as Quantity[];
-            tempTumorMarker.valueRatio = this.lookup(resource, 'valueRatio') as Ratio[];
-            tempTumorMarker.valueCodeableConcept = this.lookup(resource, 'valueCodeableConcept.coding') as unknown as fhir.Coding[];
-            tempTumorMarker.interpretation = this.lookup(resource, 'interpretation.coding') as unknown as fhir.Coding[];
             if (this.tumorMarker) {
               this.tumorMarker.push(tempTumorMarker);
             } else {
@@ -280,15 +270,10 @@ export interface ReasonReference {
             this.resourceProfile(this.lookup(resource, 'meta.profile'), 'mcode-cancer-genetic-variant')
           ) {
             const tempCGV: CancerGeneticVariant = {
-              coding: [],
-              component: {geneStudied: [], genomicsSourceClass: []},
+              coding: this.lookup(resource, 'code.coding') as unknown as fhir.Coding[],
+              component: {geneStudied: [] as CancerGeneticVariantComponentType[], genomicsSourceClass: [] as CancerGeneticVariantComponentType[]},
               valueCodeableConcept: [],
               interpretation: []
-            };
-            tempCGV.coding = this.lookup(resource, 'code.coding') as unknown as fhir.Coding[];
-            tempCGV.component = {
-              geneStudied: [] as CancerGeneticVariantComponentType[],
-              genomicsSourceClass: [] as CancerGeneticVariantComponentType[]
             };
             for (const currentComponent of this.lookup(resource, 'component') as unknown as CancerGeneticVariantComponentType[]) {
               if(currentComponent.code == undefined){
@@ -323,23 +308,15 @@ export interface ReasonReference {
             this.resourceProfile(this.lookup(resource, 'meta.profile'), 'mcode-cancer-related-radiation-procedure')
           ) {
             const tempCancerRelatedRadiationProcedure: CancerRelatedRadiationProcedure = {
-              bodySite: [],
+              bodySite: this.lookup(resource, 'bodySite.coding') as unknown as fhir.Coding[],
               mcodeTreatmentIntent: [],
-              coding: []
+              coding: this.lookup(resource, 'code.coding') as unknown as fhir.Coding[]
             };
-            tempCancerRelatedRadiationProcedure.coding.push(...this.lookup(resource, 'code.coding') as unknown as fhir.Coding[]);
-            tempCancerRelatedRadiationProcedure.bodySite.push(...this.lookup(resource, 'bodySite.coding') as unknown as fhir.Coding[]);
-            if (this.cancerRelatedRadiationProcedure) {
-              if (
-                !this.listContainsProcedure(
-                  this.cancerRelatedRadiationProcedure,
-                  tempCancerRelatedRadiationProcedure
-                )
-              ) {
-                this.cancerRelatedRadiationProcedure.push(tempCancerRelatedRadiationProcedure);
-              }
-            } else {
-              this.cancerRelatedRadiationProcedure = [tempCancerRelatedRadiationProcedure];
+            if (!this.listContainsProcedure(
+                this.cancerRelatedRadiationProcedure,
+                tempCancerRelatedRadiationProcedure)
+            ) {
+              this.cancerRelatedRadiationProcedure.push(tempCancerRelatedRadiationProcedure);
             }
           }
   
@@ -348,35 +325,15 @@ export interface ReasonReference {
             this.resourceProfile(this.lookup(resource, 'meta.profile'), 'mcode-cancer-related-surgical-procedure')
           ) {
             const tempCancerRelatedSurgicalProcedure: CancerRelatedSurgicalProcedure = {
-              bodySite: [],
-              reasonReference: {},
-              coding: []
+              bodySite: this.lookup(resource, 'bodySite.coding') as unknown as fhir.Coding[],
+              reasonReference: (this.lookup(resource, 'reasonReference') as ReasonReference[])[0],
+              coding: this.lookup(resource, 'code.coding') as unknown as fhir.Coding[]
             };
-            tempCancerRelatedSurgicalProcedure.coding.push(...this.lookup(resource, 'code.coding') as unknown as fhir.Coding[]);
-            tempCancerRelatedSurgicalProcedure.bodySite = this.lookup(resource, 'bodySite.coding') as unknown as fhir.Coding[];
-            const reasonReference = this.lookup(resource, 'reasonReference') as ReasonReference;
-            for(const condition of this.primaryCancerCondition){
-              if(condition.full_url == reasonReference.reference){
-                reasonReference.reference_meta_profile = condition.meta_profile
-              }
-            }
-            for(const condition of this.secondaryCancerCondition){
-              if(condition.full_url == reasonReference.reference){
-                reasonReference.reference_meta_profile = condition.meta_profile
-              }
-            }
-            tempCancerRelatedSurgicalProcedure.reasonReference = reasonReference;
-            if (this.cancerRelatedSurgicalProcedure) {
-              if (
-                !this.listContainsProcedure(
-                  this.cancerRelatedSurgicalProcedure,
-                  tempCancerRelatedSurgicalProcedure
-                )
-              ) {
-                this.cancerRelatedSurgicalProcedure.push(tempCancerRelatedSurgicalProcedure);
-              }
-            } else {
-              this.cancerRelatedSurgicalProcedure = [tempCancerRelatedSurgicalProcedure];
+            if (!this.listContainsProcedure(
+                this.cancerRelatedSurgicalProcedure,
+                tempCancerRelatedSurgicalProcedure)
+            ) {
+              this.cancerRelatedSurgicalProcedure.push(tempCancerRelatedSurgicalProcedure);
             }
           }
   
@@ -407,13 +364,26 @@ export interface ReasonReference {
         }
       }
 
-    // Checking if the performanceStatus exists and also making sure it's not 0, as 0 is a valid score
+      // Checking if the performanceStatus exists and also making sure it's not 0, as 0 is a valid score
       if (!this.ecogPerformaceStatus && this.ecogPerformaceStatus != 0) {
         this.ecogPerformaceStatus = undefined;
       }
       if (!this.karnofskyPerformanceStatus && this.karnofskyPerformanceStatus != 0) {
         this.karnofskyPerformanceStatus = undefined;
       }
+
+      // Once all resources are loaded, check to add the meta.profile for cancer related surgical procedure reason references.
+      for(const procedure of this.cancerRelatedSurgicalProcedure){
+        const conditions: CancerConditionParent[] = (this.primaryCancerCondition as CancerConditionParent[]).concat(this.secondaryCancerCondition);
+        const reasonReference = procedure.reasonReference;
+        for (const condition of conditions) {
+          if(condition.id === reasonReference.reference){
+            const reasonReferenceResult = {reference: reasonReference.reference, display: reasonReference.display, meta_profile: condition.meta_profile} as ReasonReference;
+            procedure.reasonReference = reasonReferenceResult;
+          }
+        }
+      }
+
     }
   
     /**
@@ -478,22 +448,19 @@ export interface ReasonReference {
      * @param procedure 
      * @returns 
      */
-    private listContainsProcedure(
+     listContainsProcedure(
       procedureList: CancerRelatedProcedureParent[],
       procedure: CancerRelatedProcedureParent
     ): boolean {
-      if(procedure.coding == undefined){
-          return false;
-      }
       for (const storedProcedure of procedureList) {
         if (
           procedure.coding.every((coding1) =>
-            storedProcedure.coding!.some((coding2) => coding1.system == coding2.system && coding1.code == coding2.code)
+            storedProcedure.coding.some((coding2) => coding1.system == coding2.system && coding1.code == coding2.code)
           ) &&
           (!procedure.bodySite ||
             !storedProcedure.bodySite ||
             procedure.bodySite.every((coding1) =>
-              storedProcedure.coding!.some((coding2) => coding1.system == coding2.system && coding1.code == coding2.code)
+              storedProcedure.coding.some((coding2) => coding1.system == coding2.system && coding1.code == coding2.code)
             ))
         ) {
           return true;
