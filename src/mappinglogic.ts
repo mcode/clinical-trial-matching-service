@@ -4,7 +4,7 @@ import * as mcode from './mcodeextractor';
 /**
  * A class that describes the mapping logic of the matching service.
  */
-abstract class MappingLogic {
+export abstract class MappingLogic {
   /**
    * The extracted mcode of the patient bundle.
    */
