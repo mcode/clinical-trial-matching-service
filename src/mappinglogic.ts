@@ -51,10 +51,10 @@ export abstract class MappingLogic {
   protected getExtractedCancerRelatedMedicationStatements(): fhir.Coding[] {
     return this.extractedMcode.getCancerRelatedMedicationStatements();
   }
-  protected getExtractedEcogPerformaceStatus() {
+  protected getExtractedEcogPerformaceStatus(): number {
     return this.extractedMcode.getEcogPerformaceStatus();
   }
-  protected getExtractedKarnofskyPerformanceStatus() {
+  protected getExtractedKarnofskyPerformanceStatus(): number {
     return this.extractedMcode.getKarnofskyPerformanceStatus();
   }
 

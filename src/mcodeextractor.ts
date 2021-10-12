@@ -130,11 +130,11 @@ export class mCODEextractor {
   getCancerRelatedMedicationStatements(): fhir.Coding[] {
     return this.cancerRelatedMedicationStatement;
   }
-  getEcogPerformaceStatus() {
-    return this.ecogPerformaceStatus;
+  getEcogPerformaceStatus(): number {
+    return this.ecogPerformaceStatus ? this.ecogPerformaceStatus : -1;
   }
-  getKarnofskyPerformanceStatus() {
-    return this.karnofskyPerformanceStatus;
+  getKarnofskyPerformanceStatus(): number {
+    return this.karnofskyPerformanceStatus ? this.karnofskyPerformanceStatus : -1;
   }
 
   /**
@@ -168,7 +168,7 @@ export class mCODEextractor {
           const tempPrimaryCancerCondition: PrimaryCancerCondition = {
             clinicalStatus: this.lookup(resource, 'clinicalStatus.coding') as unknown as fhir.Coding[],
             meta_profile: 'mcode-primary-cancer-condition',
-            histologyMorphologyBehavior: [],
+            histologyMorphologyBehavior: [] as fhir.Coding[],
             coding: this.lookup(resource, 'code.coding') as unknown as fhir.Coding[],
             id: (this.lookup(resource, 'id') as string[])[0]
           };
@@ -188,10 +188,6 @@ export class mCODEextractor {
               count++;
             }
           }
-          if (!tempPrimaryCancerCondition.histologyMorphologyBehavior) {
-            tempPrimaryCancerCondition.histologyMorphologyBehavior = [] as fhir.Coding[];
-          }
-
           this.primaryCancerCondition.push(tempPrimaryCancerCondition);
         }
 
@@ -226,11 +222,7 @@ export class mCODEextractor {
             bodySite: this.lookup(resource, 'bodySite.coding') as unknown as fhir.Coding[],
             coding: this.lookup(resource, 'code.coding') as unknown as fhir.Coding[]
           };
-          if (this.secondaryCancerCondition) {
-            this.secondaryCancerCondition.push(tempSecondaryCancerCondition); // needs specific de-dup helper function
-          } else {
-            this.secondaryCancerCondition = [tempSecondaryCancerCondition];
-          }
+          this.secondaryCancerCondition.push(tempSecondaryCancerCondition); // needs specific de-dup helper function
         }
 
         if (
@@ -255,11 +247,7 @@ export class mCODEextractor {
             interpretation: this.lookup(resource, 'interpretation.coding') as unknown as fhir.Coding[],
             coding: this.lookup(resource, 'code.coding') as unknown as fhir.Coding[]
           };
-          if (this.tumorMarker) {
-            this.tumorMarker.push(tempTumorMarker);
-          } else {
-            this.tumorMarker = [tempTumorMarker];
-          }
+          this.tumorMarker.push(tempTumorMarker);
         }
         // Parse and Extract mCODE Cancer Genetic Variant
         if (
@@ -302,11 +290,7 @@ export class mCODEextractor {
             'valueCodeableConcept.coding'
           ) as unknown as fhir.Coding[];
           tempCGV.interpretation = this.lookup(resource, 'interpretation.coding') as unknown as fhir.Coding[];
-          if (this.cancerGeneticVariant) {
-            this.cancerGeneticVariant.push(tempCGV);
-          } else {
-            this.cancerGeneticVariant = [tempCGV];
-          }
+          this.cancerGeneticVariant.push(tempCGV);
         }
 
         if (
