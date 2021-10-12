@@ -128,7 +128,7 @@ export class CodeMapper {
     } else if (lowerCaseCodeSystem.includes("hl7")) {
       return CodeSystemEnum.HL7;
     } else {
-      throw "Profile codes do not support code system: " + codeSystem;
+      throw Error("Profile codes do not support code system: " + codeSystem);
     }
   }
 }

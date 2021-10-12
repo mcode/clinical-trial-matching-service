@@ -93,4 +93,8 @@ describe('Code Mapper Tests', () => {
     expect(CodeMapper.codesEqual(code1, CodeMapper.normalizeCodeSystem(code2.system), code2.code)).toBeTrue();
     expect(CodeMapper.codesEqual(code1, CodeMapper.normalizeCodeSystem(code3.system), code3.code)).toBeFalse();
   });
+
+  it('Test NIH System Normalizer.', () => {
+    expect(CodeMapper.normalizeCodeSystem("nih")).toBe(CodeSystemEnum.NIH);
+  });
 });
