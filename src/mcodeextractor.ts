@@ -269,21 +269,19 @@ export class mCODEextractor {
           ) as unknown as CancerGeneticVariantComponentType[]) {
             if (currentComponent.code == undefined) {
               continue;
-            }
-            if (currentComponent.code.coding[0].code == '48018-6') {
-              // With this code, we've reached a GeneStudied. Populate the GeneStudied attribute.
-              if (tempCGV.component == undefined || tempCGV.component.geneStudied == undefined) {
-                continue;
+            } else {
+              for(const currentComponentCode of currentComponent.code.coding){
+                if (currentComponentCode.code == '48018-6') {
+                  // With this code, we've reached a GeneStudied. Populate the GeneStudied attribute.
+                  tempCGV.component.geneStudied.push(currentComponent);
+                }
+                if (currentComponentCode.code == '48002-0') {
+                  // With this code, we've reached a GenomicSourceClass. Populate the GenomicSourceClass attribute.
+                  tempCGV.component.genomicsSourceClass.push(currentComponent);
+                }
               }
-              tempCGV.component.geneStudied.push(currentComponent);
             }
-            if (currentComponent.code.coding[0].code == '48002-0') {
-              // With this code, we've reached a GenomicSourceClass. Populate the GenomicSourceClass attribute.
-              if (tempCGV.component == undefined || tempCGV.component.genomicsSourceClass == undefined) {
-                continue;
-              }
-              tempCGV.component.genomicsSourceClass.push(currentComponent);
-            }
+
           }
           tempCGV.valueCodeableConcept = this.lookup(
             resource,

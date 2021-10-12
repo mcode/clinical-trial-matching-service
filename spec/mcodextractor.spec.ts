@@ -191,7 +191,7 @@ describe('Missing Birthdate/ECOG/Karnofsky ExtractedMCODE Import', () => {
   let sampleData: fhir.Bundle;
   beforeAll(() => {
     return new Promise((resolve, reject) => {
-      const patientDataPath = path.join(__dirname, '../../spec/data/patient_data_missing_birthdate_invalid_ecog_karnofsky.json');
+      const patientDataPath = path.join(__dirname, '../../spec/data/patient_data_empty-cgv.json');
       fs.readFile(patientDataPath, { encoding: 'utf8' }, (error, data) => {
         if (error) {
           console.error('Could not read spec file');
@@ -211,8 +211,37 @@ describe('Missing Birthdate/ECOG/Karnofsky ExtractedMCODE Import', () => {
 
   it('checkMissingBirthdateEcogKarnofsky', function () {
     const extractedData = new mcode.mCODEextractor(sampleData);
-    expect(extractedData.getBirthDate()).toBe('NA');
+    expect(extractedData.getBirthDate()).toBe('N/A');
     expect(extractedData.getEcogPerformaceStatus()).toBe(-1)
     expect(extractedData.getKarnofskyPerformanceStatus()).toBe(-1)
   });
 });
+
+describe('Missing Cancer Genetic Variant Attributes Test', () => {
+  let sampleData: fhir.Bundle;
+  beforeAll(() => {
+    return new Promise((resolve, reject) => {
+      const patientDataPath = path.join(__dirname, '../../spec/data/patient_data_missing_birthdate_invalid_ecog_karnofsky.json');
+      fs.readFile(patientDataPath, { encoding: 'utf8' }, (error, data) => {
+        if (error) {
+          console.error('Could not read spec file');
+          reject(error);
+          return;
+        }
+        try {
+          sampleData = JSON.parse(data) as fhir.Bundle;
+          // The object we resolve to doesn't really matter
+          resolve(sampleData);
+        } catch (ex) {
+          reject(error);
+        }
+      });
+    });
+  });
+
+  it('checkMissingCgvAttributes', function () {
+    const extractedData = new mcode.mCODEextractor(sampleData);
+    expect(extractedData.getCancerGeneticVariants().length).toBe(0)
+  });
+});
+
