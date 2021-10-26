@@ -108,6 +108,32 @@ When thrown from the matching function, this allows greater customization of a 4
 
 Construct an error with the given `message` string and possibly with an `httpStatus` code.
 
+## mCODE Extractor
+
+The mCODEextractor is a class within the package that can be used to extract and create mCODE objects from an input patient record.
+Construct with: `const extractedMcode = new mcode.mCODEextractor(patientBundle: fhir.Bundle);`
+Then, you can pull out the different objects using:
+  `getPrimaryCancerConditions(): PrimaryCancerCondition[]`
+  `getSecondaryCancerConditions(): SecondaryCancerCondition[]`
+  `getTNMclinicalStageGroup(): fhir.Coding[]`
+  `getTNMpathologicalStageGroup(): fhir.Coding[]`
+  `getBirthDate(): string`
+  `getTumorMarkers(): TumorMarker[]`
+  `getCancerGeneticVariants(): CancerGeneticVariant[]`
+  `getCancerRelatedRadiationProcedures(): CancerRelatedRadiationProcedure[]`
+  `getCancerRelatedSurgicalProcedures(): CancerRelatedSurgicalProcedure[]`
+  `getCancerRelatedMedicationStatements(): fhir.Coding[]`
+  `getEcogPerformaceStatus(): number`
+  `getKarnofskyPerformanceStatus(): number`
+
+## MappingLogic
+
+MappingLogic is an abstract class that can be extended to implement your own Mapping Logic. Its constructor takes, by default, a `(patientBundle: fhir.Bundle)` and automatically builds out the extracted mCODE objects. It includes several required methods that are necessary to have logic for.
+
+## CodeMapper
+
+The CodeMapper class is one that can be used to automatically build out a mapping of codes to profile strings. It can be constructed using `const codeMapper = new CodeMapper(code_mapping_file: {[key: string]: ProfileSystemCodes;});`. The required structure of this input JSON can be viewed in the example file at `/spec/data/code_mapper_test.json`.
+
 # Lint and tests
 
 Use `npm run-script lint` to run the linter and `npm test` to run tests. Additionally, `npm run-script coverage` generates a coverage report and `npm run-script coverage:html` generates an HTML coverage report that can be viewed in a browser.
