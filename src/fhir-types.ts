@@ -3,6 +3,7 @@
  * these types should likely be replaced with an open source library, but as
  * we're currently only using a subset of FHIR, this covers only that subset.
  */
+ import { fhirclient } from 'fhirclient/lib/types';
 
 /**
  * Mark URLs
@@ -12,6 +13,21 @@ type URLString = string;
 export interface BaseResource {
   resourceType: string;
   id?: string;
+  meta?: {profile: string[], lastUpdated: string};
+  component?: {interpretation?: CodingList, valueCodeableConcept?: CodingList}[];
+  interpretation?: CodingList;
+  valueCodeableConcept?: CodingList;
+  code?: CodingList;
+  extension?: Extension[];
+}
+
+interface CodingList {
+  coding: Coding[];
+}
+
+interface Extension {
+  url?: string;
+  valueCodeableConcept?: CodingList;
 }
 
 export interface BundleEntry {
@@ -111,11 +127,14 @@ export interface Observation extends BaseResource {
 export interface Patient extends BaseResource {
   resourceType: 'Patient';
   birthDate: string;
+  gender?: string;
 }
 
 export interface Procedure extends BaseResource {
   resourceType: 'Procedure';
   code: Code;
+  bodySite?: CodingList[];
+  reasonReference?: Reference;
 }
 
 export interface MedicationStatement extends BaseResource {

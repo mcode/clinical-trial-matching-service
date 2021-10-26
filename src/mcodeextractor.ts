@@ -343,6 +343,8 @@ export class mCODEextractor {
           this.karnofskyPerformanceStatus = this.lookup(resource, 'valueInteger')[0] as number; // so is this
         }
       }
+    } else {
+      throw Error("Input Patient Bundle is null.");
     }
 
     // Checking if the performanceStatus exists and also making sure it's not 0, as 0 is a valid score
