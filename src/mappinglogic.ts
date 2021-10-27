@@ -62,14 +62,14 @@ export abstract class MappingLogic {
    * Required method signatures.
    */
   abstract getPrimaryCancerValues(): string;
-  abstract getSecondaryCancerValues(): string[];
+  abstract getSecondaryCancerValues(): string[] | string;
   abstract getHistologyMorphologyValue(): string;
-  abstract getRadiationProcedureValues(): string[];
-  abstract getSurgicalProcedureValues(): string[];
-  abstract getAgeValue(): number;
-  abstract getStageValues(): string;
-  abstract getTumorMarkerValues(): string[];
+  abstract getRadiationProcedureValues(): string[] | string;
+  abstract getSurgicalProcedureValues(): string[] | string;
+  abstract getAgeValue(): number | string;
+  abstract getStageValues(): string | string[];
+  abstract getTumorMarkerValues(): string[] | string;
   abstract getMedicationStatementValues(): string[];
-  abstract getECOGScore(): number;
-  abstract getKarnofskyScore(): number;
+  abstract getECOGScore(): number | string;
+  abstract getKarnofskyScore(): number | string;
 }
