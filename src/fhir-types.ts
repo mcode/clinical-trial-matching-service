@@ -3,7 +3,6 @@
  * these types should likely be replaced with an open source library, but as
  * we're currently only using a subset of FHIR, this covers only that subset.
  */
- import { fhirclient } from 'fhirclient/lib/types';
 
 /**
  * Mark URLs
