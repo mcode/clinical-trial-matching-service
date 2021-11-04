@@ -117,6 +117,8 @@ export interface Code {
 export interface Condition extends BaseResource {
   resourceType: 'Condition';
   code: Code;
+  clinicalStatus: Code;
+  bodySite: Code;
 }
 
 export interface Observation extends BaseResource {
