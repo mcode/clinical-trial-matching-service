@@ -412,22 +412,18 @@ export class mCODEextractor {
   }
 
   /**
-   * Adds the given coding to the given coding.
+   * Adds the given coding to the given coding list.
    * @param codingList
    * @param codes
    * @returns
    */
   private addCoding(codingList: fhir.Coding[], codes: fhir.Coding[]): fhir.Coding[] {
-    if (codingList) {
-      for (const code of codes) {
-        if (!this.contains(codingList, code)) {
-          codingList.push(code);
-        }
+    for (const code of codes) {
+      if (!this.contains(codingList, code)) {
+        codingList.push(code);
       }
-      return codingList;
-    } else {
-      return codes;
     }
+    return codingList;
   }
 
   /**
