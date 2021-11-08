@@ -153,7 +153,7 @@ export class mCODEextractor {
     this.cancerGeneticVariant = [] as CancerGeneticVariant[];
     this.birthDate = 'N/A';
 
-    if (patientBundle != null) {
+    if (patientBundle != undefined) {
       for (const entry of patientBundle.entry) {
         if (!('resource' in entry)) {
           // Skip bad entries

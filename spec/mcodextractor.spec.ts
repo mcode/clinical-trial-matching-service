@@ -245,3 +245,9 @@ describe('Missing Cancer Genetic Variant Attributes Test', () => {
   });
 });
 
+describe('Null Patient Bundle Test', () => {
+  it('Null Patient Bundle Test.', function () {
+    const testFunc = () => new mcode.mCODEextractor(undefined as unknown as fhir.Bundle);
+    expect(testFunc).toThrow(Error('Input Patient Bundle is null.'));
+  });
+});
