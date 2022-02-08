@@ -23,7 +23,7 @@ function customMatchingFunction(patientData: Bundle): Promise<SearchSet> {
   return new Promise((resolve, reject) => {
     // Code to do the searching:
     const results: ResearchStudy[] = findMatchingServices(patientData);
-    resolve(new SeaarchSet(results));
+    resolve(new SearchSet(results));
   });
 }
 
@@ -123,7 +123,7 @@ Then, you can pull out the different objects using:
   `getCancerRelatedRadiationProcedures(): CancerRelatedRadiationProcedure[]`
   `getCancerRelatedSurgicalProcedures(): CancerRelatedSurgicalProcedure[]`
   `getCancerRelatedMedicationStatements(): fhir.Coding[]`
-  `getEcogPerformaceStatus(): number`
+  `getEcogPerformanceStatus(): number`
   `getKarnofskyPerformanceStatus(): number`
 
 ## MappingLogic
