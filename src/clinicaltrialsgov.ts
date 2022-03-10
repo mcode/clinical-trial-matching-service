@@ -1376,27 +1376,15 @@ export function updateResearchStudyWithClinicalStudy(
     if (study.start_date || study.completion_date) {
       // Because of the VariableDate, we need to normalize the dates
       const convertToDate = (study_date:VariableDateStruct):string | undefined => {
-        try {
-          if (typeof study_date == "string") {
-            if (study_date == "Unknown") return undefined
-            
-            const date = new Date(study_date);
+        if (typeof study_date == "string") {
+          const date = new Date(study_date);
 
-            return date.toString() == "Invalid Date" ? undefined : date.toISOString();
-          } else if (study_date?._){
-            if (study_date._ == "Unknown") return undefined
+          return date.toString() == "Invalid Date" ? undefined : date.toISOString();
+        } else {
+          const date = new Date(study_date._);
 
-            const date = new Date(study_date._);
-
-            return date.toString() == "Invalid Date" ? undefined : date.toISOString();
-          }
-        } catch (err) {
-          // Any errors -- we'll say it is undefined
-          return undefined
+          return date.toString() == "Invalid Date" ? undefined : date.toISOString();
         }
-
-        // Again when in doubt return undefined
-        return undefined;
       }
 
       // Set the period object as appropriate 
