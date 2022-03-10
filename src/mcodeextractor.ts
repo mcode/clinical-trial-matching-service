@@ -94,7 +94,7 @@ export class mCODEextractor {
   private cancerRelatedRadiationProcedure: CancerRelatedRadiationProcedure[];
   private cancerRelatedSurgicalProcedure: CancerRelatedSurgicalProcedure[];
   private cancerRelatedMedicationStatement: fhir.Coding[];
-  private ecogPerformaceStatus?: number;
+  private ecogPerformanceStatus?: number;
   private karnofskyPerformanceStatus?: number;
 
   /**
@@ -130,8 +130,8 @@ export class mCODEextractor {
   getCancerRelatedMedicationStatements(): fhir.Coding[] {
     return this.cancerRelatedMedicationStatement;
   }
-  getEcogPerformaceStatus(): number {
-    return this.ecogPerformaceStatus ? this.ecogPerformaceStatus : -1;
+  getEcogPerformanceStatus(): number {
+    return this.ecogPerformanceStatus ? this.ecogPerformanceStatus : -1;
   }
   getKarnofskyPerformanceStatus(): number {
     return this.karnofskyPerformanceStatus ? this.karnofskyPerformanceStatus : -1;
@@ -333,7 +333,7 @@ export class mCODEextractor {
           resource.resourceType === 'Observation' &&
           this.resourceProfile(this.lookup(resource, 'meta.profile'), 'mcode-ecog-performance-status')
         ) {
-          this.ecogPerformaceStatus = this.lookup(resource, 'valueInteger')[0] as number; // this is probably bad type handling
+          this.ecogPerformanceStatus = this.lookup(resource, 'valueInteger')[0] as number; // this is probably bad type handling
         }
 
         if (
@@ -348,8 +348,8 @@ export class mCODEextractor {
     }
 
     // Checking if the performanceStatus exists and also making sure it's not 0, as 0 is a valid score
-    if (!this.ecogPerformaceStatus && this.ecogPerformaceStatus != 0) {
-      this.ecogPerformaceStatus = undefined;
+    if (!this.ecogPerformanceStatus && this.ecogPerformanceStatus != 0) {
+      this.ecogPerformanceStatus = undefined;
     }
     if (!this.karnofskyPerformanceStatus && this.karnofskyPerformanceStatus != 0) {
       this.karnofskyPerformanceStatus = undefined;

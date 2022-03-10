@@ -94,7 +94,7 @@ class DummyMappingLogic extends MappingLogic {
     return [JSON.stringify(this.getExtractedCancerRelatedMedicationStatements())];
   }
   getECOGScore(): number {
-    return this.getExtractedEcogPerformaceStatus();
+    return this.getExtractedEcogPerformanceStatus();
   }
   getKarnofskyScore(): number {
     return this.getExtractedKarnofskyPerformanceStatus();

@@ -38,7 +38,7 @@ describe('ExtractedMCODE Import', () => {
     expect(extractedData.getCancerRelatedSurgicalProcedures().length).toBe(3);
     expect(extractedData.getCancerRelatedMedicationStatements().length).toBe(1);
     expect(extractedData.getCancerGeneticVariants().length).toBe(2);
-    expect(extractedData.getEcogPerformaceStatus()).toBe(3);
+    expect(extractedData.getEcogPerformanceStatus()).toBe(3);
     expect(extractedData.getKarnofskyPerformanceStatus()).toBe(90);
   });
 
@@ -212,7 +212,7 @@ describe('Missing Birthdate/ECOG/Karnofsky ExtractedMCODE Import', () => {
   it('checkMissingBirthdateEcogKarnofsky', function () {
     const extractedData = new mcode.mCODEextractor(sampleData);
     expect(extractedData.getBirthDate()).toBe('N/A');
-    expect(extractedData.getEcogPerformaceStatus()).toBe(-1)
+    expect(extractedData.getEcogPerformanceStatus()).toBe(-1)
     expect(extractedData.getKarnofskyPerformanceStatus()).toBe(-1)
   });
 });
