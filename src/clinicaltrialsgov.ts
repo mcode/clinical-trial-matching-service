@@ -37,7 +37,7 @@ import {
   ResearchStudy,
   ResearchStudyStatus
 } from './fhir-types';
-import { ClinicalStudy, isClinicalStudy, StatusEnum } from './clinicalstudy';
+import { ClinicalStudy, isClinicalStudy, StatusEnum, VariableDateStruct } from './clinicalstudy';
 import { addContainedResource, addToContainer } from './research-study';
 
 /**
@@ -1369,6 +1369,43 @@ export function updateResearchStudyWithClinicalStudy(
         }
         addToContainer<ResearchStudy, ContactDetail, 'contact'>(result, 'contact', fhir_contact);
       }
+    }
+  }
+
+  if (!result.period) {
+    if (study.start_date || study.completion_date) {
+      // Because of the VariableDate, we need to normalize the dates
+      const convertToDate = (study_date:VariableDateStruct):string | undefined => {
+        try {
+          if (typeof study_date == "string") {
+            if (study_date == "Unknown") return undefined
+            
+            const date = new Date(study_date);
+
+            return date.toString() == "Invalid Date" ? undefined : date.toISOString();
+          } else if (study_date?._){
+            if (study_date._ == "Unknown") return undefined
+
+            const date = new Date(study_date._);
+
+            return date.toString() == "Invalid Date" ? undefined : date.toISOString();
+          }
+        } catch (err) {
+          // Any errors -- we'll say it is undefined
+          return undefined
+        }
+
+        // Again when in doubt return undefined
+        return undefined;
+      }
+
+      // Set the period object as appropriate 
+      const period = {
+          ...(study.start_date && convertToDate(study.start_date[0]) && { start: convertToDate(study.start_date[0]) }),
+          ...(study.completion_date && convertToDate(study.completion_date[0]) && { end: convertToDate(study.completion_date[0]) })
+      };
+
+      if (Object.keys(period).length != 0) result.period = period;
     }
   }
 

@@ -154,6 +154,12 @@ export interface CodeableConcept {
   text?: string;
 }
 
+export interface Period {
+  start?: string;
+  end?: string;
+
+}
+
 export type ContactPointSystem = 'phone' | 'fax' | 'email' | 'pager' | 'url' | 'sms' | 'other';
 export type ContactPointUse = 'home' | 'work' | 'temp' | 'old' | 'mobile';
 
@@ -282,6 +288,7 @@ export interface ResearchStudy extends BaseResource {
   arm?: Arm[];
   objective?: Objective[];
   enrollment?: Reference[];
+  period?: Period;
   sponsor?: Reference;
   principalInvestigator?: Reference;
   site?: Reference[];
