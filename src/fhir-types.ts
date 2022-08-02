@@ -5,13 +5,61 @@
  */
 
 /**
- * Mark URLs
+ * Indicates that the string value is a URL. URLs are more restrictive than URIs
+ * in FHIR.
  */
 type URLString = string;
+
+/**
+ * Indicates that the string value is a URI.
+ */
+type URIString = string;
+
+/**
+ * Marks strings that are actually Markdown.
+ */
+type MarkdownString = string;
+
+/**
+ * See http://hl7.org/fhir/datatypes.html#canonical
+ */
+type CanonicalString = string;
+
+/**
+ * FHIR DateTime.
+ */
+type DateTime = string;
+
+export interface Element {
+  id?: string;
+  extension?: Extension[];
+}
+
+export interface Extension {
+  id?: string;
+  // The URL is, of course, actually a URI.
+  url: URIString;
+}
 
 export interface BaseResource {
   resourceType: string;
   id?: string;
+}
+
+export interface DomainResource extends BaseResource {
+  contained?: ContainedResource[];
+}
+
+export interface Period extends Element {
+  start?: DateTime;
+  end?: DateTime;
+}
+
+export interface Annotation extends Element {
+  authorReference?: Reference;
+  authorString?: string;
+  time?: DateTime;
+  text: MarkdownString;
 }
 
 export interface BundleEntry {
@@ -96,7 +144,8 @@ export interface Condition extends BaseResource {
 
 export interface Observation extends BaseResource {
   resourceType: 'Observation';
-  valueCodeableConcept: Code;
+  code: CodeableConcept;
+  valueCodeableConcept?: CodeableConcept;
 }
 
 export interface Patient extends BaseResource {
@@ -169,7 +218,7 @@ export interface PlanDefinition extends BaseResource {
   title?: string,
   subtitle?: string,
   description?: string,
-  subjectCodeableConcept?: CodeableConcept 
+  subjectCodeableConcept?: CodeableConcept
 }
 
 // FHIR resources contained within ResearchStudy
@@ -221,6 +270,30 @@ export interface HumanName {
 
 export type ContainedResource = Group | Location | Organization | Practitioner | PlanDefinition;
 
+export type RelatedArtifactType = 'documentation' | 'justification' | 'citation' | 'predecessor' | 'successor' |
+  'derived-from' | 'depends-on' | 'composed-of';
+
+export interface Attachment {
+  contentType?: string;
+  language?: string;
+  data?: string;
+  url?: URLString;
+  size?: number;
+  hash?: string;
+  title?: string;
+  creation?: string;
+}
+
+export interface RelatedArtifact {
+  type: RelatedArtifactType;
+  label?: string;
+  display?: string;
+  citation?: MarkdownString;
+  url?: URLString;
+  document?: Attachment;
+  resource?: CanonicalString;
+}
+
 /**
  * Codes from https://www.hl7.org/fhir/codesystem-research-study-status.html
  */
@@ -237,26 +310,31 @@ export type ResearchStudyStatus =
   | 'temporarily-closed-to-accrual-and-intervention'
   | 'withdrawn';
 
-export interface ResearchStudy extends BaseResource {
+export interface ResearchStudy extends DomainResource {
   resourceType: 'ResearchStudy';
   identifier?: Identifier[];
   title?: string;
   protocol?: Reference[];
   status?: ResearchStudyStatus;
+  primaryPurposeType?: CodeableConcept;
   phase?: CodeableConcept;
   category?: CodeableConcept[];
+  focus?: CodeableConcept[];
   condition?: CodeableConcept[];
   contact?: ContactDetail[];
+  relatedArtifact?: RelatedArtifact[];
   keyword?: CodeableConcept[];
   location?: CodeableConcept[];
-  description?: string; // Should actually be markdown
-  arm?: Arm[];
-  objective?: Objective[];
+  description?: MarkdownString;
   enrollment?: Reference[];
+  period?: Period;
   sponsor?: Reference;
   principalInvestigator?: Reference;
   site?: Reference[];
-  contained?: ContainedResource[];
+  reasonStopped?: CodeableConcept;
+  note?: Annotation;
+  arm?: Arm[];
+  objective?: Objective[];
 }
 
 export type Resource = Condition | Parameters | Observation | Patient | Procedure | MedicationStatement | ResearchStudy;
