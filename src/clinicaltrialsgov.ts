@@ -196,8 +196,8 @@ function convertArrayToCodeableConcept(trialConditions: string[]): CodeableConce
  */
 export interface FileSystem {
   readFile: (
-    name: string,
-    options: { encoding: BufferEncoding; flag?: string } | string,
+    path: fs.PathOrFileDescriptor,
+    options: { encoding: BufferEncoding; flag?: string },
     callback: (err: NodeJS.ErrnoException | null, data: string) => void
   ) => void;
   mkdir: (path: string, callback: (err: NodeJS.ErrnoException | null) => void) => void;
