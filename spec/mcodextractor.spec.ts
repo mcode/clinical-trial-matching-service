@@ -217,6 +217,63 @@ describe('Missing Birthdate/ECOG/Karnofsky ExtractedMCODE Import', () => {
   });
 });
 
+describe('Missing Histology Morphology', () => {
+  let sampleData: fhir.Bundle;
+  beforeAll(() => {
+    return new Promise((resolve, reject) => {
+      const patientDataPath = path.join(__dirname, '../../spec/data/patient_data_missing_histology_morph.json');
+      fs.readFile(patientDataPath, { encoding: 'utf8' }, (error, data) => {
+        if (error) {
+          console.error('Could not read spec file');
+          reject(error);
+          return;
+        }
+        try {
+          sampleData = JSON.parse(data) as fhir.Bundle;
+          // The object we resolve to doesn't really matter
+          resolve(sampleData);
+        } catch (ex) {
+          reject(error);
+        }
+      });
+    });
+  });
+
+  it('Uses temporary Histology-Morphology', function () {
+    const extractedData = new mcode.mCODEextractor(sampleData);
+    expect(extractedData.getPrimaryCancerConditions()[0].histologyMorphologyBehavior.length).toBe(0);
+  });
+});
+
+describe('Missing Extensions for Primary Cancer Condition', () => {
+  let sampleData: fhir.Bundle;
+  beforeAll(() => {
+    return new Promise((resolve, reject) => {
+      const patientDataPath = path.join(__dirname, '../../spec/data/patient_data_missing_birthdate_invalid_ecog_karnofsky.json');
+      fs.readFile(patientDataPath, { encoding: 'utf8' }, (error, data) => {
+        if (error) {
+          console.error('Could not read spec file');
+          reject(error);
+          return;
+        }
+        try {
+          sampleData = JSON.parse(data) as fhir.Bundle;
+          // The object we resolve to doesn't really matter
+          resolve(sampleData);
+        } catch (ex) {
+          reject(error);
+        }
+      });
+    });
+  });
+
+  it('Uses temporary Histology-Morphology', function () {
+    const extractedData = new mcode.mCODEextractor(sampleData);
+    expect(extractedData.getPrimaryCancerConditions()[0].histologyMorphologyBehavior.length).toBe(0);
+  });
+  
+});
+
 describe('Missing Cancer Genetic Variant Attributes Test', () => {
   let sampleData: fhir.Bundle;
   beforeAll(() => {
