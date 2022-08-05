@@ -1658,6 +1658,17 @@ describe('ClinicalTrialsGovService', () => {
       expect(result.period).not.toBeDefined();
     })
 
+
+    it('doess not fill in period if not a real date as VariableDateStruct', () => {
+      const researchStudy = new ResearchStudyObj('id');
+      const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
+        start_date: [{ $: { type: "Actual"}, _: "Not real" }],
+        completion_date:  [{ $: { type: "Actual"}, _: "Not real" }],
+      });
+
+      expect(result.period).not.toBeDefined();
+    })
+
     it('fills in description', () => {
       expect(updatedTrial.description).toBeDefined();
     });
