@@ -30,6 +30,13 @@ type CanonicalString = string;
  */
 type DateTime = string;
 
+/**
+ * A FHIR date (versus a JavaScript Date object).
+ */
+type FHIRDate = string;
+
+type Base64Binary = string;
+
 export interface Element {
   id?: string;
   extension?: Extension[];
@@ -41,13 +48,58 @@ export interface Extension {
   url: URIString;
 }
 
+export interface BackboneElement extends Element {
+  modifierExtension?: Extension[];
+}
+
 export interface BaseResource {
   resourceType: string;
   id?: string;
+  meta?: Meta;
+  implicitRules?: URIString[];
+  language?: string;
+}
+
+export interface Meta extends Element {
+  versionId?: string;
+  lastUpdated?: string;
+  source?: URIString;
+  profile?: string[];
+  security?: Coding[];
+  tag?: Coding[];
 }
 
 export interface DomainResource extends BaseResource {
   contained?: ContainedResource[];
+}
+
+/**
+ * Values supported within an Observation and various other places that use
+ * "value[x]" in the spec. Strictly speaking, only one type of value is allowed
+ * in a valid record. It's possible to use some TypeScript magic to enforce
+ * this, however, this creates types that are only really useful for ensuring
+ * that constant JSON data typed via TypeScript is valid, and not for
+ * interacting with FHIR resources coming from outside sources.
+ */
+interface ValueType {
+  // valueQuantity?: Quantity;
+  valueCodeableConcept?: CodeableConcept;
+  valueString?: string;
+  valueBoolean?: boolean;
+  valueInteger?: number;
+  valueRange?: Range;
+  // valueRatio?: Ratio;
+  // valueSampledData?: SampledData;
+  // valueTime?: Time;
+  valueDateTime?: DateTime;
+  valuePeriod?: Period;
+}
+
+interface EffectiveType {
+  effectiveDateTime?: DateTime;
+  effectivePeriod?: Period;
+  // effectiveTiming: Timing;
+  // effectiveInstant: Instant;
 }
 
 export interface Period extends Element {
@@ -127,13 +179,71 @@ export function isBundle(o: unknown): o is Bundle {
   return other.resourceType === 'Bundle' && BUNDLE_TYPES.has(other.type) && Array.isArray(other.entry);
 }
 
+// ValueType plus parameter-specific value types
+interface ParameterValueType extends ValueType {
+  valueBase64Binary?: Base64Binary;
+  valueCanonical?: string;
+  valueCode?: string;
+  valueDate?: FHIRDate;
+  valueDecimal?: number;
+  valueId?: string;
+  // valueInstant?: Instant;
+  valueInteger?: number;
+  valueMarkdown?: MarkdownString;
+  // valueOid?: oid;
+  // valuePositiveInt?: positiveInt;
+  valueString?: string;
+  valueUnsignedInt?: number;
+  valueUri?: URIString;
+  valueUrl?: URLString;
+  // valueUuid?: uuid;
+  valueAddress?: Address;
+  // valueAge?: Age;
+  valueAnnotation?: Annotation;
+  valueAttachment?: Attachment;
+  valueCoding?: Coding;
+  valueContactPoint?: ContactPoint;
+  // valueCount?: Count;
+  // valueDistance?: Distance;
+  // valueDuration?: Duration;
+  valueHumanName?: HumanName;
+  valueIdentifier?: Identifier;
+  // valueMoney?: Money;
+  valueReference?: Reference;
+  // valueSignature?: Signature;
+  // valueTiming?: Timing;
+  valueContactDetail?: ContactDetail;
+  // valueContributor?: Contributor;
+  // valueDataRequirement?: DataRequirement;
+  // valueExpression?: Expression;
+  // valueParameterDefinition?: ParameterDefinition;
+  valueRelatedArtifact?: RelatedArtifact;
+  // valueTriggerDefinition?: TriggerDefinition;
+  // valueUsageContext?: UsageContext;
+  // valueDosage?: Dosage;
+  valueMeta?: Meta;
+}
+
+export interface Parameter extends BackboneElement, ParameterValueType {
+  name: string;
+}
+
 export interface Parameters extends BaseResource {
   resourceType: 'Parameters';
-  parameter: { name: string; valueString: string }[];
+  parameter?: Parameter[];
+  resource?: Resource;
+}
+
+export interface Coding {
+  system?: URIString;
+  version?: string;
+  code?: string;
+  display?: string;
+  userSelected?: boolean;
 }
 
 export interface Code {
-  coding: { system: URLString; code: string; display?: string }[];
+  coding: Coding[];
   text?: string;
 }
 
@@ -142,10 +252,21 @@ export interface Condition extends BaseResource {
   code: Code;
 }
 
-export interface Observation extends BaseResource {
+export interface ObservationComponent extends BackboneElement, ValueType {
+  code: CodeableConcept;
+  dataAbsentReason?: CodeableConcept;
+  interpretation?: CodeableConcept[];
+}
+
+export interface Observation extends BaseResource, EffectiveType, ValueType {
   resourceType: 'Observation';
   code: CodeableConcept;
-  valueCodeableConcept?: CodeableConcept;
+  // effective[x] via EffectiveType
+  // value[x] via ValueType
+  interpretation?: CodeableConcept[];
+  note?: Annotation[];
+  method?: CodeableConcept;
+  component?: ObservationComponent[];
 }
 
 export interface Patient extends BaseResource {
