@@ -1,5 +1,5 @@
 import { getContainedResource, ResearchStudy as ResearchStudyObj } from '../src/research-study';
-import { Address, Location, ResearchStudy, ContainedResource } from '../src/fhir-types';
+import { Address, Location, ResearchStudy, ContainedResource, PlanDefinition } from '../src/fhir-types';
 import * as ctg from '../src/clinicaltrialsgov';
 import fs from 'fs';
 import stream from 'stream';
@@ -15,7 +15,6 @@ import trialFilled from './data/complete_study.json';
 import { ClinicalStudy, StatusEnum } from '../src/clinicalstudy';
 import { createClinicalStudy } from './support/clinicalstudy-factory';
 import { createResearchStudy } from './support/researchstudy-factory';
-import { PlanDefinition } from '../dist/fhir-types';
 
 function specFilePath(specFilePath: string): string {
   return path.join(__dirname, '../../spec/data', specFilePath);
