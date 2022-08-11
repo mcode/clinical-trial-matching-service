@@ -71,6 +71,8 @@ export interface Meta extends Element {
 
 export interface DomainResource extends BaseResource {
   contained?: ContainedResource[];
+  extension?: Extension[];
+  modifierExtension?: Extension[];
 }
 
 /**
@@ -242,14 +244,11 @@ export interface Coding {
   userSelected?: boolean;
 }
 
-export interface Code {
-  coding: Coding[];
-  text?: string;
-}
-
-export interface Condition extends BaseResource {
+export interface Condition extends DomainResource {
   resourceType: 'Condition';
-  code: Code;
+  code?: CodeableConcept;
+  clinicalStatus?: CodeableConcept;
+  bodySite?: CodeableConcept[];
 }
 
 export interface ObservationComponent extends BackboneElement, ValueType {
@@ -258,7 +257,7 @@ export interface ObservationComponent extends BackboneElement, ValueType {
   interpretation?: CodeableConcept[];
 }
 
-export interface Observation extends BaseResource, EffectiveType, ValueType {
+export interface Observation extends DomainResource, EffectiveType, ValueType {
   resourceType: 'Observation';
   code: CodeableConcept;
   // effective[x] via EffectiveType
@@ -269,19 +268,22 @@ export interface Observation extends BaseResource, EffectiveType, ValueType {
   component?: ObservationComponent[];
 }
 
-export interface Patient extends BaseResource {
+export interface Patient extends DomainResource {
   resourceType: 'Patient';
   birthDate: string;
+  gender?: string;
 }
 
-export interface Procedure extends BaseResource {
+export interface Procedure extends DomainResource {
   resourceType: 'Procedure';
-  code: Code;
+  code?: CodeableConcept;
+  bodySite?: CodeableConcept[];
+  reasonReference?: Reference[];
 }
 
-export interface MedicationStatement extends BaseResource {
+export interface MedicationStatement extends DomainResource {
   resourceType: 'MedicationStatement';
-  code: Code;
+  code: CodeableConcept;
 }
 
 export interface Identifier {
@@ -293,6 +295,12 @@ export interface Identifier {
 export interface CodeableConcept {
   coding?: { system?: string; code?: string; display?: string }[];
   text?: string;
+}
+
+export interface Period {
+  start?: string;
+  end?: string;
+
 }
 
 export type ContactPointSystem = 'phone' | 'fax' | 'email' | 'pager' | 'url' | 'sms' | 'other';
@@ -332,7 +340,7 @@ export interface Reference {
 
 export type PublicationStatus = 'draft' | 'active' | 'retired' | 'unknown';
 
-export interface PlanDefinition extends BaseResource {
+export interface PlanDefinition extends DomainResource {
   resourceType: 'PlanDefinition',
   status: PublicationStatus,
   type?: CodeableConcept,
@@ -343,7 +351,7 @@ export interface PlanDefinition extends BaseResource {
 }
 
 // FHIR resources contained within ResearchStudy
-export interface Group extends BaseResource {
+export interface Group extends DomainResource {
   resourceType: 'Group';
   type?: string;
   actual?: boolean;
@@ -365,7 +373,7 @@ export interface Address {
   period?: string;
 }
 
-export interface Location extends BaseResource {
+export interface Location extends DomainResource {
   resourceType: 'Location';
   name?: string;
   address?: Address;
@@ -373,12 +381,12 @@ export interface Location extends BaseResource {
   position?: { longitude?: number; latitude?: number };
 }
 
-export interface Organization extends BaseResource {
+export interface Organization extends DomainResource {
   resourceType: 'Organization';
   name?: string;
 }
 
-export interface Practitioner extends BaseResource {
+export interface Practitioner extends DomainResource {
   resourceType: 'Practitioner';
   name?: HumanName[];
 }
@@ -458,7 +466,9 @@ export interface ResearchStudy extends DomainResource {
   objective?: Objective[];
 }
 
-export type Resource = Condition | Parameters | Observation | Patient | Procedure | MedicationStatement | ResearchStudy;
+export type Resource = Bundle | Condition | Group | Location |
+    MedicationStatement | Observation | Organization | Parameters | Patient |
+    PlanDefinition | Practitioner | Procedure | ResearchStudy;
 
 export function isResearchStudy(o: unknown): o is ResearchStudy {
   if (typeof o !== 'object' || o === null) {
