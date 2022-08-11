@@ -12,12 +12,36 @@ type URLString = string;
 export interface BaseResource {
   resourceType: string;
   id?: string;
+  meta?: {profile: string[], lastUpdated: string};
+  component?: {interpretation?: CodingList, valueCodeableConcept?: CodingList}[];
+  interpretation?: CodingList;
+  valueCodeableConcept?: CodingList;
+  code?: CodingList;
+  extension?: Extension[];
+}
+
+interface CodingList {
+  coding: Coding[];
+}
+
+interface Extension {
+  url?: string;
+  valueCodeableConcept?: CodingList;
 }
 
 export interface BundleEntry {
   resource: Resource;
   fullUrl?: URLString;
   search?: SearchResult;
+}
+
+/**
+ * Describes a Coding object.
+ */
+export interface Coding {
+  system: string;
+  code: string;
+  display?: string;
 }
 
 /**
@@ -92,6 +116,8 @@ export interface Code {
 export interface Condition extends BaseResource {
   resourceType: 'Condition';
   code: Code;
+  clinicalStatus: Code;
+  bodySite: Code;
 }
 
 export interface Observation extends BaseResource {
@@ -102,11 +128,14 @@ export interface Observation extends BaseResource {
 export interface Patient extends BaseResource {
   resourceType: 'Patient';
   birthDate: string;
+  gender?: string;
 }
 
 export interface Procedure extends BaseResource {
   resourceType: 'Procedure';
   code: Code;
+  bodySite?: CodingList[];
+  reasonReference?: Reference;
 }
 
 export interface MedicationStatement extends BaseResource {
@@ -123,6 +152,12 @@ export interface Identifier {
 export interface CodeableConcept {
   coding?: { system?: string; code?: string; display?: string }[];
   text?: string;
+}
+
+export interface Period {
+  start?: string;
+  end?: string;
+
 }
 
 export type ContactPointSystem = 'phone' | 'fax' | 'email' | 'pager' | 'url' | 'sms' | 'other';
@@ -253,6 +288,7 @@ export interface ResearchStudy extends BaseResource {
   arm?: Arm[];
   objective?: Objective[];
   enrollment?: Reference[];
+  period?: Period;
   sponsor?: Reference;
   principalInvestigator?: Reference;
   site?: Reference[];

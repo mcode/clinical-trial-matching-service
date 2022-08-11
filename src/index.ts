@@ -7,6 +7,9 @@ export * as fhir from './fhir-types';
 export * from './research-study';
 export * from './searchset';
 export * from './clinicaltrialsgov';
+export { CodeMapper, CodeSystemEnum } from './codeMapper';
+export * from './mcodeextractor';
+export { MappingLogic } from './mappinglogic';
 
 // The export { v } from "mod" forms do not appear to work yet
 import { ClinicalStudy } from './clinicalstudy';

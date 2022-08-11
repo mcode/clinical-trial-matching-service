@@ -1,0 +1,29 @@
+{
+  "TEST-1": {
+    "SNOMED": ["aa", "bb"]
+  },
+  "TEST-2": {
+    "RxNorm": ["cc", "dd"]
+  },
+  "TEST-3": {
+    "icd-10": ["ee", "ff"]
+  },
+  "TEST-4": {
+    "AJCC": ["gg", "hh"]
+  },
+  "TEST-5": {
+    "LOINC": ["ii", "jj"]
+  },
+  "TEST-6": {
+    "NIH": ["kk", "ll"]
+  },
+  "TEST-7": {
+    "NIH": ["mm", "nn"]
+  },
+  "TEST-8": {
+    "hl7": ["oo", "pp"]
+  },
+  "TEST-9": {
+    "SNOMED": ["aa", "bb"]
+  }
+}

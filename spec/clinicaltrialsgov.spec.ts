@@ -1571,6 +1571,104 @@ describe('ClinicalTrialsGovService', () => {
       }
     });
 
+    it('fills in period as VariableDate', () => {
+      const researchStudy = new ResearchStudyObj('id');
+      const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
+        start_date: ["January 2022"],
+        completion_date: ["February 2023"]
+      });
+
+      expect(result.period).toBeDefined();
+      if (result.period) {
+        expect(result.period.start).toBeDefined();
+        expect(result.period.end).toBeDefined();
+
+        expect(result.period.start).toEqual(new Date("January 2022").toISOString());
+        expect(result.period.end).toEqual(new Date("February 2023").toISOString());
+      }
+
+    })
+
+    it('fills in period as VariableDateStruct', () => {
+      const researchStudy = new ResearchStudyObj('id');
+      const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
+        start_date: [{ $: { type: "Actual"}, _: "January 2022" }],
+        completion_date:  [{ $: { type: "Actual"}, _: "February 2023" }],
+      });
+
+      expect(result.period).toBeDefined();
+      if (result.period) {
+        expect(result.period.start).toBeDefined();
+        expect(result.period.end).toBeDefined();
+
+        expect(result.period.start).toEqual(new Date("January 2022").toISOString());
+        expect(result.period.end).toEqual(new Date("February 2023").toISOString());
+      }
+    })
+
+    it('fills in start of period even without end', () => {
+      const researchStudy = new ResearchStudyObj('id');
+      const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
+        start_date: ["January 2022"],
+      });
+
+      expect(result.period).toBeDefined();
+      if (result.period) {
+        expect(result.period.start).toBeDefined();
+        expect(result.period.end).not.toBeDefined();
+
+        expect(result.period.start).toEqual(new Date("January 2022").toISOString());
+      }
+
+    })
+
+    it('fills in end of period even without start', () => {
+      const researchStudy = new ResearchStudyObj('id');
+      const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
+        completion_date: ["February 2023"]
+      });
+
+      expect(result.period).toBeDefined();
+      if (result.period) {
+        expect(result.period.start).not.toBeDefined();
+        expect(result.period.end).toBeDefined();
+
+        expect(result.period.end).toEqual(new Date("February 2023").toISOString());
+      }
+
+    })
+
+    it('does not fill in period if unknown', () => {
+      const researchStudy = new ResearchStudyObj('id');
+      const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
+        start_date: ["Unknown"],
+        completion_date: ["Unknown"]
+      });
+
+      expect(result.period).not.toBeDefined();
+    })
+
+    it('does not fill in period if not a real date', () => {
+      const researchStudy = new ResearchStudyObj('id');
+      const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
+        start_date: ["Text that is not a date"],
+        completion_date: ["Text that is not a date"]
+      });
+
+      expect(result.period).not.toBeDefined();
+    })
+
+
+    it('doess not fill in period if not a real date as VariableDateStruct', () => {
+      const researchStudy = new ResearchStudyObj('id');
+      const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
+        start_date: [{ $: { type: "Actual"}, _: "Not real" }],
+        completion_date:  [{ $: { type: "Actual"}, _: "Not real" }],
+      });
+
+      expect(result.period).not.toBeDefined();
+    })
+
     it('fills in description', () => {
       expect(updatedTrial.description).toBeDefined();
     });
