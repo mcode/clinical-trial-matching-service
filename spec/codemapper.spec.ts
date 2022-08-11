@@ -87,8 +87,8 @@ describe('Code Mapper Tests', () => {
 
   it('Check code equality.', () => {
     const code1 = {code: "gggggggg", system: "snomed"} as fhir.Coding;
-    const code2 = {code: "gggggggg", system: "snomed"} as fhir.Coding;
-    const code3 = {code: "gggggggg", system: "icd-10"} as fhir.Coding;
+    const code2 = {code: "gggggggg", system: "snomed"};
+    const code3 = {code: "gggggggg", system: "icd-10"};
 
     expect(CodeMapper.codesEqual(code1, CodeMapper.normalizeCodeSystem(code2.system), code2.code)).toBeTrue();
     expect(CodeMapper.codesEqual(code1, CodeMapper.normalizeCodeSystem(code3.system), code3.code)).toBeFalse();

@@ -5,43 +5,121 @@
  */
 
 /**
- * Mark URLs
+ * Indicates that the string value is a URL. URLs are more restrictive than URIs
+ * in FHIR.
  */
 type URLString = string;
+
+/**
+ * Indicates that the string value is a URI.
+ */
+type URIString = string;
+
+/**
+ * Marks strings that are actually Markdown.
+ */
+type MarkdownString = string;
+
+/**
+ * See http://hl7.org/fhir/datatypes.html#canonical
+ */
+type CanonicalString = string;
+
+/**
+ * FHIR DateTime.
+ */
+type DateTime = string;
+
+/**
+ * A FHIR date (versus a JavaScript Date object).
+ */
+type FHIRDate = string;
+
+type Base64Binary = string;
+
+export interface Element {
+  id?: string;
+  extension?: Extension[];
+}
+
+export interface Extension {
+  id?: string;
+  // The URL is, of course, actually a URI.
+  url: URIString;
+}
+
+export interface BackboneElement extends Element {
+  modifierExtension?: Extension[];
+}
 
 export interface BaseResource {
   resourceType: string;
   id?: string;
-  meta?: {profile: string[], lastUpdated: string};
-  component?: {interpretation?: CodingList, valueCodeableConcept?: CodingList}[];
-  interpretation?: CodingList;
-  valueCodeableConcept?: CodingList;
-  code?: CodingList;
+  meta?: Meta;
+  implicitRules?: URIString[];
+  language?: string;
+}
+
+export interface Meta extends Element {
+  versionId?: string;
+  lastUpdated?: string;
+  source?: URIString;
+  profile?: string[];
+  security?: Coding[];
+  tag?: Coding[];
+}
+
+export interface DomainResource extends BaseResource {
+  contained?: ContainedResource[];
   extension?: Extension[];
+  modifierExtension?: Extension[];
 }
 
-interface CodingList {
-  coding: Coding[];
+/**
+ * Values supported within an Observation and various other places that use
+ * "value[x]" in the spec. Strictly speaking, only one type of value is allowed
+ * in a valid record. It's possible to use some TypeScript magic to enforce
+ * this, however, this creates types that are only really useful for ensuring
+ * that constant JSON data typed via TypeScript is valid, and not for
+ * interacting with FHIR resources coming from outside sources.
+ */
+interface ValueType {
+  // valueQuantity?: Quantity;
+  valueCodeableConcept?: CodeableConcept;
+  valueString?: string;
+  valueBoolean?: boolean;
+  valueInteger?: number;
+  valueRange?: Range;
+  // valueRatio?: Ratio;
+  // valueSampledData?: SampledData;
+  // valueTime?: Time;
+  valueDateTime?: DateTime;
+  valuePeriod?: Period;
 }
 
-interface Extension {
-  url?: string;
-  valueCodeableConcept?: CodingList;
+interface EffectiveType {
+  effectiveDateTime?: DateTime;
+  effectivePeriod?: Period;
+  // effectiveTiming: Timing;
+  // effectiveInstant: Instant;
+}
+
+export interface Period extends Element {
+  start?: DateTime;
+  end?: DateTime;
+}
+
+export interface Annotation extends Element {
+  authorReference?: Reference;
+  authorString?: string;
+  time?: DateTime;
+  text: MarkdownString;
 }
 
 export interface BundleEntry {
   resource: Resource;
   fullUrl?: URLString;
   search?: SearchResult;
-}
-
-/**
- * Describes a Coding object.
- */
-export interface Coding {
-  system: string;
-  code: string;
-  display?: string;
 }
 
 /**
@@ -103,44 +181,109 @@ export function isBundle(o: unknown): o is Bundle {
   return other.resourceType === 'Bundle' && BUNDLE_TYPES.has(other.type) && Array.isArray(other.entry);
 }
 
+// ValueType plus parameter-specific value types
+interface ParameterValueType extends ValueType {
+  valueBase64Binary?: Base64Binary;
+  valueCanonical?: string;
+  valueCode?: string;
+  valueDate?: FHIRDate;
+  valueDecimal?: number;
+  valueId?: string;
+  // valueInstant?: Instant;
+  valueInteger?: number;
+  valueMarkdown?: MarkdownString;
+  // valueOid?: oid;
+  // valuePositiveInt?: positiveInt;
+  valueString?: string;
+  valueUnsignedInt?: number;
+  valueUri?: URIString;
+  valueUrl?: URLString;
+  // valueUuid?: uuid;
+  valueAddress?: Address;
+  // valueAge?: Age;
+  valueAnnotation?: Annotation;
+  valueAttachment?: Attachment;
+  valueCoding?: Coding;
+  valueContactPoint?: ContactPoint;
+  // valueCount?: Count;
+  // valueDistance?: Distance;
+  // valueDuration?: Duration;
+  valueHumanName?: HumanName;
+  valueIdentifier?: Identifier;
+  // valueMoney?: Money;
+  valueReference?: Reference;
+  // valueSignature?: Signature;
+  // valueTiming?: Timing;
+  valueContactDetail?: ContactDetail;
+  // valueContributor?: Contributor;
+  // valueDataRequirement?: DataRequirement;
+  // valueExpression?: Expression;
+  // valueParameterDefinition?: ParameterDefinition;
+  valueRelatedArtifact?: RelatedArtifact;
+  // valueTriggerDefinition?: TriggerDefinition;
+  // valueUsageContext?: UsageContext;
+  // valueDosage?: Dosage;
+  valueMeta?: Meta;
+}
+
+export interface Parameter extends BackboneElement, ParameterValueType {
+  name: string;
+}
+
 export interface Parameters extends BaseResource {
   resourceType: 'Parameters';
-  parameter: { name: string; valueString: string }[];
+  parameter?: Parameter[];
+  resource?: Resource;
 }
 
-export interface Code {
-  coding: { system: URLString; code: string; display?: string }[];
-  text?: string;
+export interface Coding {
+  system?: URIString;
+  version?: string;
+  code?: string;
+  display?: string;
+  userSelected?: boolean;
 }
 
-export interface Condition extends BaseResource {
+export interface Condition extends DomainResource {
   resourceType: 'Condition';
-  code: Code;
-  clinicalStatus: Code;
-  bodySite: Code;
+  code?: CodeableConcept;
+  clinicalStatus?: CodeableConcept;
+  bodySite?: CodeableConcept[];
 }
 
-export interface Observation extends BaseResource {
+export interface ObservationComponent extends BackboneElement, ValueType {
+  code: CodeableConcept;
+  dataAbsentReason?: CodeableConcept;
+  interpretation?: CodeableConcept[];
+}
+
+export interface Observation extends DomainResource, EffectiveType, ValueType {
   resourceType: 'Observation';
-  valueCodeableConcept: Code;
+  code: CodeableConcept;
+  // effective[x] via EffectiveType
+  // value[x] via ValueType
+  interpretation?: CodeableConcept[];
+  note?: Annotation[];
+  method?: CodeableConcept;
+  component?: ObservationComponent[];
 }
 
-export interface Patient extends BaseResource {
+export interface Patient extends DomainResource {
   resourceType: 'Patient';
   birthDate: string;
   gender?: string;
 }
 
-export interface Procedure extends BaseResource {
+export interface Procedure extends DomainResource {
   resourceType: 'Procedure';
-  code: Code;
-  bodySite?: CodingList[];
-  reasonReference?: Reference;
+  code?: CodeableConcept;
+  bodySite?: CodeableConcept[];
+  reasonReference?: Reference[];
 }
 
-export interface MedicationStatement extends BaseResource {
+export interface MedicationStatement extends DomainResource {
   resourceType: 'MedicationStatement';
-  code: Code;
+  code: CodeableConcept;
 }
 
 export interface Identifier {
@@ -197,18 +340,18 @@ export interface Reference {
 
 export type PublicationStatus = 'draft' | 'active' | 'retired' | 'unknown';
 
-export interface PlanDefinition extends BaseResource {
+export interface PlanDefinition extends DomainResource {
   resourceType: 'PlanDefinition',
   status: PublicationStatus,
   type?: CodeableConcept,
   title?: string,
   subtitle?: string,
   description?: string,
-  subjectCodeableConcept?: CodeableConcept 
+  subjectCodeableConcept?: CodeableConcept
 }
 
 // FHIR resources contained within ResearchStudy
-export interface Group extends BaseResource {
+export interface Group extends DomainResource {
   resourceType: 'Group';
   type?: string;
   actual?: boolean;
@@ -230,7 +373,7 @@ export interface Address {
   period?: string;
 }
 
-export interface Location extends BaseResource {
+export interface Location extends DomainResource {
   resourceType: 'Location';
   name?: string;
   address?: Address;
@@ -238,12 +381,12 @@ export interface Location extends BaseResource {
   position?: { longitude?: number; latitude?: number };
 }
 
-export interface Organization extends BaseResource {
+export interface Organization extends DomainResource {
   resourceType: 'Organization';
   name?: string;
 }
 
-export interface Practitioner extends BaseResource {
+export interface Practitioner extends DomainResource {
   resourceType: 'Practitioner';
   name?: HumanName[];
 }
@@ -255,6 +398,30 @@ export interface HumanName {
 }
 
 export type ContainedResource = Group | Location | Organization | Practitioner | PlanDefinition;
+
+export type RelatedArtifactType = 'documentation' | 'justification' | 'citation' | 'predecessor' | 'successor' |
+  'derived-from' | 'depends-on' | 'composed-of';
+
+export interface Attachment {
+  contentType?: string;
+  language?: string;
+  data?: string;
+  url?: URLString;
+  size?: number;
+  hash?: string;
+  title?: string;
+  creation?: string;
+}
+
+export interface RelatedArtifact {
+  type: RelatedArtifactType;
+  label?: string;
+  display?: string;
+  citation?: MarkdownString;
+  url?: URLString;
+  document?: Attachment;
+  resource?: CanonicalString;
+}
 
 /**
  * Codes from https://www.hl7.org/fhir/codesystem-research-study-status.html
@@ -272,30 +439,36 @@ export type ResearchStudyStatus =
   | 'temporarily-closed-to-accrual-and-intervention'
   | 'withdrawn';
 
-export interface ResearchStudy extends BaseResource {
+export interface ResearchStudy extends DomainResource {
   resourceType: 'ResearchStudy';
   identifier?: Identifier[];
   title?: string;
   protocol?: Reference[];
   status?: ResearchStudyStatus;
+  primaryPurposeType?: CodeableConcept;
   phase?: CodeableConcept;
   category?: CodeableConcept[];
+  focus?: CodeableConcept[];
   condition?: CodeableConcept[];
   contact?: ContactDetail[];
+  relatedArtifact?: RelatedArtifact[];
   keyword?: CodeableConcept[];
   location?: CodeableConcept[];
-  description?: string; // Should actually be markdown
-  arm?: Arm[];
-  objective?: Objective[];
+  description?: MarkdownString;
   enrollment?: Reference[];
   period?: Period;
   sponsor?: Reference;
   principalInvestigator?: Reference;
   site?: Reference[];
-  contained?: ContainedResource[];
+  reasonStopped?: CodeableConcept;
+  note?: Annotation;
+  arm?: Arm[];
+  objective?: Objective[];
 }
 
-export type Resource = Condition | Parameters | Observation | Patient | Procedure | MedicationStatement | ResearchStudy;
+export type Resource = Bundle | Condition | Group | Location |
+    MedicationStatement | Observation | Organization | Parameters | Patient |
+    PlanDefinition | Practitioner | Procedure | ResearchStudy;
 
 export function isResearchStudy(o: unknown): o is ResearchStudy {
   if (typeof o !== 'object' || o === null) {

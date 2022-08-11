@@ -153,7 +153,7 @@ describe('ExtractedMCODE Import', () => {
     expect(extractedData.getCancerGeneticVariants()[0].component.geneStudied[0].code.coding[0].code).toBe('48018-6');
     expect(
       CodeMapper.normalizeCodeSystem(
-        extractedData.getCancerGeneticVariants()[0].component.geneStudied[0].valueCodeableConcept.coding[0].system
+        extractedData.getCancerGeneticVariants()[0].component.geneStudied[0].valueCodeableConcept.coding[0].system ?? 'null'
       )
     ).toBe(CodeSystemEnum.HGNC);
     expect(extractedData.getCancerGeneticVariants()[0].component.geneStudied[0].valueCodeableConcept.coding[0].code).toBe(
@@ -271,7 +271,7 @@ describe('Missing Extensions for Primary Cancer Condition', () => {
     const extractedData = new mcode.mCODEextractor(sampleData);
     expect(extractedData.getPrimaryCancerConditions()[0].histologyMorphologyBehavior.length).toBe(0);
   });
-  
+
 });
 
 describe('Missing Cancer Genetic Variant Attributes Test', () => {

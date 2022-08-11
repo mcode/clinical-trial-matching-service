@@ -77,6 +77,11 @@ export class CodeMapper {
   extractCodeMappings(codings: Coding[]): string[] {
     const extracted_mappings: string[] = [];
     for (const code of codings) {
+      // Technically the code and system values are optional
+      if (typeof code.code !== 'string' || typeof code.system !== 'string') {
+        // Skip this code
+        continue;
+      }
       const medical_code_key = new MedicalCode(code.code, code.system).toString();
       if (this.code_map.has(medical_code_key)) {
         extracted_mappings.push(...(this.code_map.get(medical_code_key)!));
@@ -92,6 +97,10 @@ export class CodeMapper {
    * @param code The code of the code to compare to.
    */
   static codesEqual(input_coding: Coding, system: CodeSystemEnum, code: string ): boolean {
+    if (typeof input_coding.code !== 'string' || typeof input_coding.system !== 'string') {
+      // Treat as false
+      return false;
+    }
     return new MedicalCode(input_coding.code, input_coding.system).equalsMedicalCode(new MedicalCode(code, system.toString()));
   }
 

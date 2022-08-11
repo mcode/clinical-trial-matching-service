@@ -1,5 +1,5 @@
 import { getContainedResource, ResearchStudy as ResearchStudyObj } from '../src/research-study';
-import { Address, Location, ResearchStudy, ContainedResource } from '../src/fhir-types';
+import { Address, Location, ResearchStudy, ContainedResource, PlanDefinition } from '../src/fhir-types';
 import * as ctg from '../src/clinicaltrialsgov';
 import fs from 'fs';
 import stream from 'stream';
@@ -15,7 +15,6 @@ import trialFilled from './data/complete_study.json';
 import { ClinicalStudy, StatusEnum } from '../src/clinicalstudy';
 import { createClinicalStudy } from './support/clinicalstudy-factory';
 import { createResearchStudy } from './support/researchstudy-factory';
-import { PlanDefinition } from '../dist/fhir-types';
 
 function specFilePath(specFilePath: string): string {
   return path.join(__dirname, '../../spec/data', specFilePath);
@@ -983,7 +982,7 @@ describe('ClinicalTrialsGovService', () => {
     // For this set of tests, we don't want to *really* do any unzipping, so we set up a bunch of mocks on Yauzl to
     // simulate the process.
     let openSpy: jasmine.Spy<{
-      (path: string, options: yauzl.Options, callback?: (err?: Error, zipfile?: yauzl.ZipFile) => void): void;
+      (path: string, options: yauzl.Options, callback?: (err?: Error | null, zipfile?: yauzl.ZipFile) => void): void;
     }>;
     let service: ctg.ClinicalTrialsGovService;
     beforeEach(() => {
@@ -1036,7 +1035,7 @@ describe('ClinicalTrialsGovService', () => {
         let entries: yauzl.Entry[];
         let currentIndex: number;
         // To make the test easier, this is the method called with the callback
-        let openReadStream: (callback: (err?: Error, stream?: stream.Readable) => void) => void;
+        let openReadStream: (callback: (err: Error | null, stream: stream.Readable) => void) => void;
         const mockNctNumber: ctg.NCTNumber = 'NCT12345678';
 
         beforeEach(() => {
@@ -1057,11 +1056,11 @@ describe('ClinicalTrialsGovService', () => {
           // Also need to install a fake openReadStream
           mockZipFile.openReadStream = (
             entry: yauzl.Entry,
-            callbackOrOptions: yauzl.ZipFileOptions | ((err?: Error, stream?: stream.Readable) => void),
-            callbackOrNothing?: (err?: Error, stream?: stream.Readable) => void
+            callbackOrOptions: yauzl.ZipFileOptions | ((err: Error | null, stream: stream.Readable) => void),
+            callbackOrNothing?: (err: Error | null, stream: stream.Readable) => void
           ) => {
             // Don't actually care about the options
-            let callback: (err?: Error, stream?: stream.Readable) => void;
+            let callback: (err: Error | null, stream: stream.Readable) => void;
             if (callbackOrNothing) {
               callback = callbackOrNothing;
             } else if (typeof callbackOrOptions === 'function') {
@@ -1075,7 +1074,7 @@ describe('ClinicalTrialsGovService', () => {
           // By default, make it so that openReadStream returns a stream that reads the string "test"
           openReadStream = (callback) => {
             callback(
-              undefined,
+              null,
               new stream.Readable({
                 read: function () {
                   this.push(Buffer.from('test', 'utf-8'));
@@ -1108,9 +1107,9 @@ describe('ClinicalTrialsGovService', () => {
             (
               entry: yauzl.Entry,
               options: yauzl.ZipFileOptions,
-              callback: (err?: Error, stream?: stream.Readable) => void
+              callback: (err: Error | null, stream: stream.Readable) => void
             ): void;
-            (entry: yauzl.Entry, callback: (err?: Error, stream?: stream.Readable) => void): void;
+            (entry: yauzl.Entry, callback: (err: Error | null, stream: stream.Readable) => void): void;
           }>;
           beforeEach(() => {
             openReadStreamSpy = spyOn(mockZipFile, 'openReadStream');
@@ -1192,7 +1191,9 @@ describe('ClinicalTrialsGovService', () => {
 
         it('handles an entry failing to extract', () => {
           openReadStream = (callback) => {
-            callback(new Error('Simulated error'));
+            // FIXME: The current yazul types state that a stream is always provided
+            // This seems unlikely, so jam it in for now
+            (callback as unknown as (err: Error) => void)(new Error('Simulated error'));
           };
           return expectAsync(service['extractZip']('test.zip')).toBeResolved();
         });
@@ -1200,7 +1201,8 @@ describe('ClinicalTrialsGovService', () => {
         it('handles the callback being invoked incorrectly', () => {
           // Invoking the callback with nothing should never happen, but if it does, expect it to resolve anyway
           openReadStream = (callback) => {
-            callback();
+            // Intentionally invoke incorrectly
+            (callback as unknown as () => void)();
           };
           return expectAsync(service['extractZip']('test.zip')).toBeResolved();
         });

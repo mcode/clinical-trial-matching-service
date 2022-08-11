@@ -1,4 +1,3 @@
-import { fhirclient } from 'fhirclient/lib/types';
 import fhirpath from 'fhirpath';
 import * as fhir from './fhir-types';
 
@@ -382,17 +381,20 @@ export class mCODEextractor {
    * @returns
    */
   private lookup(
-    resource: fhirclient.FHIR.Resource,
+    resource: fhir.Resource,
     path: FHIRPath,
     environment?: { [key: string]: string }
-  ): fhirpath.PathLookupResult[] {
+  ): unknown[] {
+    // The FHIR client Resource type definition is wrong (sort of) - it requires
+    // that Meta references have a lastUpdated time. This is, in fact, optional,
+    // so just jam it in.
     return fhirpath.evaluate(resource, path, environment);
   }
 
   /**
    * Checks if the given profile constains a match to the given key.
    */
-  private resourceProfile(profiles: fhirpath.PathLookupResult[], key: string): boolean {
+  private resourceProfile(profiles: unknown[], key: string): boolean {
     for (const profile of profiles) {
       if ((profile as string).includes(key)) {
         return true;
