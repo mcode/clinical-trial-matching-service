@@ -42,10 +42,11 @@ export interface Element {
   extension?: Extension[];
 }
 
-export interface Extension {
+export interface Extension extends ExtensionValueType {
   id?: string;
   // The URL is, of course, actually a URI.
   url: URIString;
+  // value[x] is from ExtensionValueType
 }
 
 export interface BackboneElement extends Element {
@@ -181,8 +182,8 @@ export function isBundle(o: unknown): o is Bundle {
   return other.resourceType === 'Bundle' && BUNDLE_TYPES.has(other.type) && Array.isArray(other.entry);
 }
 
-// ValueType plus parameter-specific value types
-interface ParameterValueType extends ValueType {
+// ValueType plus common values types
+interface ExtendedValueType extends ValueType {
   valueBase64Binary?: Base64Binary;
   valueCanonical?: string;
   valueCode?: string;
@@ -223,6 +224,14 @@ interface ParameterValueType extends ValueType {
   // valueTriggerDefinition?: TriggerDefinition;
   // valueUsageContext?: UsageContext;
   // valueDosage?: Dosage;
+}
+
+// ValueType plus extension-specific value types
+interface ExtensionValueType extends ExtendedValueType {
+  valueCodeableReference?: CodeableReference;
+  // valueRatioRange?: RatioRange;
+}
+interface ParameterValueType extends ExtendedValueType {
   valueMeta?: Meta;
 }
 
@@ -295,6 +304,11 @@ export interface Identifier {
 export interface CodeableConcept {
   coding?: { system?: string; code?: string; display?: string }[];
   text?: string;
+}
+
+export interface CodeableReference {
+  concept?: CodeableConcept;
+  reference?: Reference;
 }
 
 export interface Period {
