@@ -26,7 +26,6 @@ import * as stream from 'stream';
 import { debuglog } from 'util';
 import yauzl from 'yauzl';
 import {
-  Arm,
   CodeableConcept,
   ContactDetail,
   ContactPoint,
@@ -35,8 +34,8 @@ import {
   PlanDefinition,
   Reference,
   ResearchStudy,
-  ResearchStudyStatus
-} from './fhir-types';
+  ResearchStudyArm
+} from 'fhir/r4';
 import { ClinicalStudy, isClinicalStudy, StatusEnum, VariableDateStruct } from './clinicalstudy';
 import { addContainedResource, addToContainer } from './research-study';
 
@@ -158,7 +157,7 @@ export function parseClinicalTrialXML(fileContents: string, log?: Logger): Promi
   });
 }
 
-const CLINICAL_STATUS_MAP = new Map<StatusEnum, ResearchStudyStatus>([
+const CLINICAL_STATUS_MAP = new Map<StatusEnum, ResearchStudy['status']>([
   ['Active, not recruiting', 'closed-to-accrual'],
   ['Completed', 'completed'],
   // FIXME: This does not appear to have a proper mapping
@@ -178,7 +177,7 @@ const CLINICAL_STATUS_MAP = new Map<StatusEnum, ResearchStudyStatus>([
   ['Unknown status', 'in-review']
 ]);
 
-export function convertClincalStudyStatusToFHIRStatus(status: StatusEnum): ResearchStudyStatus | undefined {
+export function convertClincalStudyStatusToFHIRStatus(status: StatusEnum): ResearchStudy['status'] | undefined {
   return CLINICAL_STATUS_MAP.get(status);
 }
 
@@ -1221,7 +1220,9 @@ export function updateResearchStudyWithClinicalStudy(
   if (categories.length > 1) result.category = categories;
   // ------- Category
 
-  if (!result.status) {
+  // Right now, the default value for a research study is "active". If CT.G
+  // knows better, then allow it to override that.
+  if (!result.status || result.status == 'active') {
     const overallStatus = study.overall_status;
     if (overallStatus) {
       const status = convertClincalStudyStatusToFHIRStatus(overallStatus[0]);
@@ -1279,7 +1280,7 @@ export function updateResearchStudyWithClinicalStudy(
   if (!result.arm) {
     if (study.arm_group) {
       for (const study_arm of study.arm_group) {
-        const arm: Arm = {
+        const arm: ResearchStudyArm = {
           ...(study_arm.arm_group_label && { name: study_arm.arm_group_label[0] }),
           ...(study_arm.arm_group_type && {
             type: {
@@ -1295,7 +1296,7 @@ export function updateResearchStudyWithClinicalStudy(
           ...(study_arm.description && { description: study_arm.description[0] })
         };
 
-        addToContainer<ResearchStudy, Arm, 'arm'>(result, 'arm', arm);
+        addToContainer<ResearchStudy, ResearchStudyArm, 'arm'>(result, 'arm', arm);
       }
     }
   }
@@ -1387,7 +1388,7 @@ export function updateResearchStudyWithClinicalStudy(
         }
       }
 
-      // Set the period object as appropriate 
+      // Set the period object as appropriate
       const period = {
           ...(study.start_date && convertToDate(study.start_date[0]) && { start: convertToDate(study.start_date[0]) }),
           ...(study.completion_date && convertToDate(study.completion_date[0]) && { end: convertToDate(study.completion_date[0]) })

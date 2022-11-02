@@ -1,4 +1,4 @@
-import { isBundle, isResearchStudy } from '../src/fhir-types';
+import { isBundle, isResearchStudy } from '../src/fhir-type-guards';
 
 describe('isBundle()', () => {
   it('returns false if given a non-bundle', () => {

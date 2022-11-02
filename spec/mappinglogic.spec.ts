@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { Bundle } from '../src/fhir-types';
+import { Bundle } from 'fhir/r4';
 import { MappingLogic } from '../src/mappinglogic';
 
 describe('Abstract Code Mapper getter tests', () => {

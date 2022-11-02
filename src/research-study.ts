@@ -1,19 +1,18 @@
 // FHIR data types supporting ResearchStudy
 
 import {
-  Arm,
-  BaseResource,
   CodeableConcept,
   ContactDetail,
   ContactPoint,
-  ContainedResource,
+  FhirResource,
   Identifier,
   Location,
-  Objective,
   Reference,
   ResearchStudy as IResearchStudy,
-  ResearchStudyStatus
-} from './fhir-types';
+  ResearchStudyArm,
+  ResearchStudyObjective,
+  Resource
+} from 'fhir/r4';
 
 /**
  * Utility function to convert a list of strings into a list of CodeableConcepts.
@@ -56,7 +55,7 @@ export function addToContainer<TContainer, TContained, K extends keyof TContaine
   (container[propertyName] as Array<TContained>).push(item);
 }
 
-export function addContainedResource(researchStudy: IResearchStudy, resource: ContainedResource): Reference {
+export function addContainedResource(researchStudy: IResearchStudy, resource: FhirResource): Reference {
   if (!researchStudy.contained)
     researchStudy.contained = [];
   researchStudy.contained.push(resource);
@@ -69,7 +68,7 @@ export function addContainedResource(researchStudy: IResearchStudy, resource: Co
  * instead create a Map<string, ContainedResource> to look them up.
  * @param id the ID of the resource to look up
  */
-export function getContainedResource(researchStudy: IResearchStudy, id: string): ContainedResource | null {
+export function getContainedResource(researchStudy: IResearchStudy, id: string): FhirResource | null {
  if (researchStudy.contained) {
    // Lookup has to be done sequentially for now
    for (const contained of researchStudy.contained) {
@@ -87,7 +86,7 @@ export function getContainedResource(researchStudy: IResearchStudy, id: string):
  * The resource must have an `id` set on it, otherwise this will raise an error.
  * @param resource the resource to create a Reference to
  */
-export function createReferenceTo(resource: BaseResource): Reference {
+export function createReferenceTo(resource: Resource): Reference {
   const reference: Reference = {};
   if (resource.id) {
     reference.reference = '#' + resource.id;
@@ -114,7 +113,7 @@ export class ResearchStudy implements IResearchStudy {
   identifier?: Identifier[];
   title?: string;
   protocol?: Reference[];
-  status?: ResearchStudyStatus;
+  status: IResearchStudy['status'] = 'active';
   phase?: CodeableConcept;
   category?: CodeableConcept[];
   condition?: CodeableConcept[];
@@ -122,13 +121,13 @@ export class ResearchStudy implements IResearchStudy {
   keyword?: CodeableConcept[];
   location?: CodeableConcept[];
   description?: string;
-  arm?: Arm[];
-  objective?: Objective[];
+  arm?: ResearchStudyArm[];
+  objective?: ResearchStudyObjective[];
   enrollment?: Reference[];
   sponsor?: Reference;
   principalInvestigator?: Reference;
   site?: Reference[];
-  contained?: ContainedResource[];
+  contained?: FhirResource[];
 
   constructor(id: string | number) {
     if (typeof id === 'number') {
@@ -156,7 +155,7 @@ export class ResearchStudy implements IResearchStudy {
    * @param resource the resource to add
    * @return a reference to the contained resource
    */
-  addContainedResource(resource: ContainedResource): Reference {
+  addContainedResource(resource: FhirResource): Reference {
     if (!this.contained)
       this.contained = [];
     this.contained.push(resource);

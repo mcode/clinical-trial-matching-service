@@ -1,18 +1,15 @@
-import {
-  BundleEntry,
-  ResearchStudy,
-  SearchEntryMode,
-  SearchResult,
-  SearchSet as SearchSetBundle,
-  isResearchStudy
-} from './fhir-types';
+import { BundleEntry, BundleEntrySearch, ResearchStudy } from 'fhir/r4';
+import { isResearchStudy } from './fhir-type-guards';
+import { SearchSet as SearchSetBundle } from './server';
 
 /**
  * Same as a BundleEntry but with the search parameters required.
  */
-export interface SearchBundleEntry extends BundleEntry {
-  search: SearchResult;
+export interface SearchBundleEntry extends BundleEntry<ResearchStudy> {
+  search: BundleEntrySearch;
 }
+
+export type SearchEntryMode = Exclude<BundleEntrySearch['mode'], undefined>;
 
 export class SearchSet implements SearchSetBundle {
   // Yes, this looks weird. Yes, this is required: otherwise the infered type is string and not the constant string.
@@ -74,7 +71,11 @@ export class SearchSet implements SearchSetBundle {
   addEntry(study: ResearchStudy, score?: number, mode?: SearchEntryMode): void;
   // This overload is sort of implied, but TypeScript needs us to give it outright
   addEntry(studyOrEntry: SearchBundleEntry | ResearchStudy): void;
-  addEntry(studyOrEntry: SearchBundleEntry | ResearchStudy, scoreOrMode: SearchEntryMode | number | null = null, mode?: SearchEntryMode): void {
+  addEntry(
+    studyOrEntry: SearchBundleEntry | ResearchStudy,
+    scoreOrMode: SearchEntryMode | number | null = null,
+    mode?: SearchEntryMode
+  ): void {
     let score = null;
     if (typeof scoreOrMode === 'string') {
       // There is no overload that allows two modes so if anyone did that they
@@ -90,7 +91,7 @@ export class SearchSet implements SearchSetBundle {
     // (See above on how there is no overload for both giving an entry and a
     // score - if you do that, you're ignoring TypeScript anyway)
     if (entry.search.score) score = entry.search.score;
-    if (score !== null && (!Number.isNaN(score))) {
+    if (score !== null && !Number.isNaN(score)) {
       // Clamp the range of the score from 0 to 1
       entry.search.score = Math.min(1, Math.max(score, 0));
     }
