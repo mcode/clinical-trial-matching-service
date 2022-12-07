@@ -1,4 +1,4 @@
-import * as fhir from "./fhir-types";
+import * as fhir from 'fhir/r4';
 import * as mcode from './mcodeextractor';
 
 /**

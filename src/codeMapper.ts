@@ -1,4 +1,4 @@
-import { Coding } from "./fhir-types";
+import { Coding } from 'fhir/r4';
 
 /**
  * Enumeration of the possible code systems.

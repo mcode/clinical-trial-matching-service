@@ -1,5 +1,5 @@
 import { getContainedResource, ResearchStudy as ResearchStudyObj } from '../src/research-study';
-import { Address, Location, ResearchStudy, ContainedResource, PlanDefinition } from '../src/fhir-types';
+import { Address, FhirResource, Location, ResearchStudy, PlanDefinition } from 'fhir/r4';
 import * as ctg from '../src/clinicaltrialsgov';
 import fs from 'fs';
 import stream from 'stream';
@@ -50,6 +50,7 @@ describe('.findNCTNumber', () => {
     expect(
       ctg.findNCTNumber({
         resourceType: 'ResearchStudy',
+        status: 'active',
         identifier: [
           {
             system: 'other',
@@ -67,6 +68,7 @@ describe('.findNCTNumber', () => {
     expect(
       ctg.findNCTNumber({
         resourceType: 'ResearchStudy',
+        status: 'active',
         identifier: [
           {
             system: 'other',
@@ -84,6 +86,7 @@ describe('.findNCTNumber', () => {
     expect(
       ctg.findNCTNumber({
         resourceType: 'ResearchStudy',
+        status: 'active',
         identifier: [
           {
             system: 'other',
@@ -101,10 +104,11 @@ describe('.findNCTNumber', () => {
     expect(
       ctg.findNCTNumber({
         resourceType: 'ResearchStudy',
+        status: 'active',
         identifier: []
       })
     ).toBeNull();
-    expect(ctg.findNCTNumber({ resourceType: 'ResearchStudy' })).toBeNull();
+    expect(ctg.findNCTNumber({ resourceType: 'ResearchStudy', status: 'active' })).toBeNull();
   });
 });
 
@@ -631,7 +635,7 @@ describe('ClinicalTrialsGovService', () => {
 
     it('does nothing if no studies have NCT IDs', () => {
       return expectAsync(
-        service.updateResearchStudies([{ resourceType: 'ResearchStudy' }]).then(() => {
+        service.updateResearchStudies([{ resourceType: 'ResearchStudy', status: 'active' }]).then(() => {
           expect(downloadTrialsSpy).not.toHaveBeenCalled();
         })
       ).toBeResolved();
@@ -1677,7 +1681,7 @@ describe('ClinicalTrialsGovService', () => {
 
     it('fills out the status', () => {
       const actual = ctg.updateResearchStudyWithClinicalStudy(
-        { resourceType: 'ResearchStudy' },
+        { resourceType: 'ResearchStudy', status: 'active' },
         {
           overall_status: ['Available']
         }
@@ -1687,19 +1691,19 @@ describe('ClinicalTrialsGovService', () => {
 
     it('leaves status alone if unavailable', () => {
       const actual = ctg.updateResearchStudyWithClinicalStudy(
-        { resourceType: 'ResearchStudy' },
+        { resourceType: 'ResearchStudy', status: 'active' },
         {
           // Lie about types
           overall_status: ['something invalid' as unknown as StatusEnum]
         }
       );
       // It shouldn't have changed it, because it can't
-      expect(actual.status).toBeUndefined();
+      expect(actual.status).toEqual('active');
     });
 
     it('fills out conditions', () => {
       const actual = ctg.updateResearchStudyWithClinicalStudy(
-        { resourceType: 'ResearchStudy' },
+        { resourceType: 'ResearchStudy', status: 'active' },
         {
           condition: ['Condition 1', 'Condition 2']
         }
@@ -1839,6 +1843,11 @@ describe('ClinicalTrialsGovService', () => {
       // Clone the trial in the dumbest but also most sensible way
       const exampleStudy: ResearchStudy = JSON.parse(JSON.stringify(trialFilled));
       ctg.updateResearchStudyWithClinicalStudy(exampleStudy, clinicalStudy);
+      // Currently active gets overwritten intentioanlly, so set the example
+      // back to its original value even if it changed
+      // (Note that the "as" *should* verify that the underlying JSON value is
+      // in fact valid at compile time. I think.)
+      exampleStudy.status = trialFilled.status as ResearchStudy['status'];
       // Nothing should have changed
       expect(exampleStudy).toEqual(trialFilled as ResearchStudy);
     });
@@ -1873,7 +1882,7 @@ describe('ClinicalTrialsGovService', () => {
     }
 
     function expectLocation(
-      resource: ContainedResource,
+      resource: FhirResource,
       expectedName?: string,
       expectedPhone?: string,
       expectedEmail?: string,
@@ -1901,7 +1910,7 @@ describe('ClinicalTrialsGovService', () => {
 
     it('fills out sites as expected', () => {
       const result = ctg.updateResearchStudyWithClinicalStudy(
-        { resourceType: 'ResearchStudy' },
+        { resourceType: 'ResearchStudy', status: 'active' },
         {
           location: [
             // Everything in location is optional, so this is valid:
@@ -1969,7 +1978,7 @@ describe('ClinicalTrialsGovService', () => {
       expect(researchStudy.description).not.toBeDefined('description');
       expect(researchStudy.phase).not.toBeDefined('phase');
       expect(researchStudy.category).not.toBeDefined('category');
-      expect(researchStudy.status).not.toBeDefined('status');
+      expect(researchStudy.status).toEqual('active');
       expect(researchStudy.condition).not.toBeDefined('condition');
       expect(researchStudy.site).not.toBeDefined('site');
     }

@@ -1,8 +1,14 @@
 import express from 'express';
 import bodyParser from 'body-parser';
-import { Bundle, SearchSet, isBundle } from './fhir-types';
+import { Bundle, ResearchStudy } from 'fhir/r4';
 import { isHttpError, restrictToHttpErrors } from './errors';
+import { isBundle } from './fhir-type-guards';
 import * as http from 'http';
+
+// SearchSet is just a bundle which is a searchset containing ResearchStudies
+export interface SearchSet<T = ResearchStudy> extends Bundle<T> {
+  type: 'searchset';
+}
 
 export type ClinicalTrialMatcher = (patientBundle: Bundle) => Promise<SearchSet>;
 
@@ -33,14 +39,12 @@ export interface Configuration {
 }
 
 function isConfiguration(o: unknown): o is Configuration {
-  if (typeof o !== 'object' || o === null)
-    return false;
+  if (typeof o !== 'object' || o === null) return false;
   // For now, an object is a configuration object if every key is a string or number
   const obj = o as Record<string | number | symbol, unknown>;
   for (const k in obj) {
     const t = typeof obj[k];
-    if (t !== 'string' && t !== 'number' && t !== 'undefined')
-      return false;
+    if (t !== 'string' && t !== 'number' && t !== 'undefined') return false;
   }
   return true;
 }
@@ -81,7 +85,11 @@ export class ClinicalTrialMatchingService {
   constructor(matcher: ClinicalTrialMatcher);
   constructor(matcher: ClinicalTrialMatcher, options: ServerOptions);
   constructor(matcher: ClinicalTrialMatcher, configuration: Configuration, options?: ServerOptions);
-  constructor(public matcher: ClinicalTrialMatcher, configurationOrOptions?: Configuration | ServerOptions, options?: ServerOptions) {
+  constructor(
+    public matcher: ClinicalTrialMatcher,
+    configurationOrOptions?: Configuration | ServerOptions,
+    options?: ServerOptions
+  ) {
     if (isConfiguration(configurationOrOptions)) {
       this.configuration = configurationOrOptions;
     } else {
@@ -159,8 +167,7 @@ export class ClinicalTrialMatchingService {
   get port(): number {
     if (typeof this.configuration.port === 'number') {
       const port = Math.floor(this.configuration.port);
-      if (port >= 0 && port <= 0xFFFF)
-        return port;
+      if (port >= 0 && port <= 0xffff) return port;
     }
     return 3000;
   }
@@ -180,7 +187,9 @@ export class ClinicalTrialMatchingService {
         } else {
           console.error('An unexpected internal server error occurred:');
           console.error(error);
-          response.status(500).send({ error: 'Internal server error', exception: Object.prototype.toString.call(error) as string });
+          response
+            .status(500)
+            .send({ error: 'Internal server error', exception: Object.prototype.toString.call(error) as string });
         }
       };
       try {

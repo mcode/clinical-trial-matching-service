@@ -1,6 +1,6 @@
 {
   "name": "clinical-trial-matching-service",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Provides a core library for interacting with the clinical-trial-matching-engine",
   "homepage": "https://github.com/mcode/clinical-trial-matching-service",
   "bugs": "https://github.com/mcode/clinical-trial-matching-service/issues",
@@ -44,6 +44,7 @@
   "devDependencies": {
     "@istanbuljs/nyc-config-typescript": "^1.0.1",
     "@types/express": "^4.17.6",
+    "@types/fhir": "^0.0.35",
     "@types/jasmine": "^3.5.10",
     "@types/mock-fs": "^4.13.0",
     "@types/node": "^18.6.3",

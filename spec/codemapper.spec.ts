@@ -1,4 +1,4 @@
-import * as fhir from '../src/fhir-types';
+import * as fhir from 'fhir/r4';
 import { CodeMapper, CodeSystemEnum } from '../src/codeMapper';
 import code_mapper_test from './data/code_mapper_test.json';
 

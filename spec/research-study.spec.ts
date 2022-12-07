@@ -3,12 +3,12 @@ import ResearchStudy, {
   createReferenceTo,
   getContainedResource
 } from '../src/research-study';
-import { BaseResource,
+import { Resource,
   ContactDetail,
   Group,
   Practitioner,
   Location
-} from '../src/fhir-types';
+} from 'fhir/r4';
 
 describe('convertStringsToCodeableConcept', () => {
   it('converts JSON to codeable concepts', () => {
@@ -36,10 +36,10 @@ describe('convertStringsToCodeableConcept', () => {
 describe('createReferenceTo', () => {
   it('handles resources with no resourceType', () => {
     // This is actually impossible within TypeScript as it ensures resourceType
-    // is set, as that's what makes something a BaseResource. However, to allow
+    // is set, as that's what makes something a Resource. However, to allow
     // us to work with JSON objects coming from outside TypeScript, it should be
     // handled.
-    const resource: BaseResource = { id: 'example' } as BaseResource;
+    const resource: Resource = { id: 'example' } as Resource;
     const reference = createReferenceTo(resource);
     expect(reference.reference).toEqual('#example');
     expect(reference.type).toBeUndefined();
@@ -48,28 +48,30 @@ describe('createReferenceTo', () => {
   it('raises an error if no ID exists on the resource being referenced', () => {
     expect(() => { createReferenceTo({ resourceType: 'ResearchStudy' }) }).toThrowError('no ID to create reference to ResearchStudy');
     // See above: this is invalid in TypeScript but a likely source of objects
-    // is JSON
-    const resource: BaseResource = { } as BaseResource;
+    // from JSON
+    const resource: Resource = { } as Resource;
     expect(() => { createReferenceTo(resource) }).toThrowError('no ID to create reference');
   });
 });
 
 describe('.getContainedResource', () => {
   it('returns null if the contained list is empty', () => {
-    expect(getContainedResource({ resourceType: 'ResearchStudy' }, 'anything')).toBeNull();
+    expect(getContainedResource({ resourceType: 'ResearchStudy', status: 'active' }, 'anything')).toBeNull();
   });
   it('returns null if the contained list does not contain a resource with the given ID', () => {
     expect(getContainedResource({
       resourceType: 'ResearchStudy',
+      status: 'active',
       contained: [
         { resourceType: 'Location', id: 'foo' }
       ]
     }, 'bar')).toBeNull();
   });
   it('returns the proper object', () => {
-    const expected: Group = { resourceType: 'Group', id: 'group' };
+    const expected: Group = { resourceType: 'Group', id: 'group', actual: false, type: 'person' };
     expect(getContainedResource({
       resourceType: 'ResearchStudy',
+      status: 'active',
       contained: [
         { resourceType: 'Location', id: 'location' },
         { resourceType: 'Organization', id: 'organization' },
@@ -84,7 +86,7 @@ describe('ResearchStudy', () => {
   it('converts to JSON properly', () => {
     const study = new ResearchStudy(1);
     // Keys should be in a consistent order, thankfully
-    expect(JSON.stringify(study)).toEqual('{"resourceType":"ResearchStudy","id":"study-1"}');
+    expect(JSON.stringify(study)).toEqual('{"resourceType":"ResearchStudy","status":"active","id":"study-1"}');
   });
 
   it('uses the passed ID', () => {
@@ -95,7 +97,7 @@ describe('ResearchStudy', () => {
     it('adds contained resources', () => {
       const researchStudy = new ResearchStudy('test');
       expect(researchStudy.contained).toBeUndefined();
-      const containedResource0: Group = { resourceType: 'Group' };
+      const containedResource0: Group = { resourceType: 'Group', actual: false, type: 'person' };
       const containedResource1: Practitioner = { resourceType: 'Practitioner' };
       researchStudy.addContainedResource(containedResource0);
       expect(researchStudy.contained).toBeDefined();

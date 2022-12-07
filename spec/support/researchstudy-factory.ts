@@ -1,5 +1,5 @@
 import { CLINICAL_TRIAL_IDENTIFIER_CODING_SYSTEM_URL } from '../../src/clinicaltrialsgov';
-import { ResearchStudy as IResearchStudy } from '../../src/fhir-types';
+import type { ResearchStudy as IResearchStudy } from 'fhir/r4';
 import { ResearchStudy } from '../../src/research-study';
 
 export function createResearchStudyObject(nctId?: string): ResearchStudy {
@@ -18,7 +18,9 @@ export function createResearchStudyObject(nctId?: string): ResearchStudy {
 export function createResearchStudy(id: string, nctId?: string): IResearchStudy {
   const result: IResearchStudy = {
     resourceType: 'ResearchStudy',
-    id: id
+    id: id,
+    // Default status to active
+    status: 'active'
   };
   if (nctId) {
     result.identifier = [

@@ -1,5 +1,5 @@
 import fhirpath from 'fhirpath';
-import * as fhir from './fhir-types';
+import * as fhir from 'fhir/r4';
 
 export type FHIRPath = string;
 
@@ -152,9 +152,9 @@ export class mCODEextractor {
     this.cancerGeneticVariant = [] as CancerGeneticVariant[];
     this.birthDate = 'N/A';
 
-    if (patientBundle != undefined) {
+    if (patientBundle != undefined && patientBundle.entry) {
       for (const entry of patientBundle.entry) {
-        if (!('resource' in entry)) {
+        if (!('resource' in entry) || (!entry.resource)) {
           // Skip bad entries
           continue;
         }
