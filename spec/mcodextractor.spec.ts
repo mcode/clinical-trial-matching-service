@@ -88,9 +88,9 @@ describe('ExtractedMCODE Import', () => {
         (marker) =>
           marker.valueCodeableConcept[0].code == '10828004' &&
           marker.valueQuantity.length == 0 &&
-          marker.valueRatio[0].numerator!.value == 1 &&
-          marker.valueRatio[0].numerator!.comparator == '>=' &&
-          marker.valueRatio[0].denominator!.value == 100 &&
+          marker.valueRatio[0].numerator?.value == 1 &&
+          marker.valueRatio[0].numerator?.comparator == '>=' &&
+          marker.valueRatio[0].denominator?.value == 100 &&
           marker.coding[0].code == '48676-1' &&
           marker.coding[1].code == '85318-4' &&
           marker.interpretation.length == 0

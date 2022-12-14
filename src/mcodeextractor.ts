@@ -172,20 +172,18 @@ export class mCODEextractor {
             id: (this.lookup(resource, 'id') as string[])[0]
           };
           if (this.lookup(resource, 'extension').length !== 0) {
-            let count = 0;
-            for (const extension of this.lookup(resource, 'extension')) {
+            this.lookup(resource, 'extension').forEach((_, index) => {
               if (
-                (this.lookup(resource, `extension[${count}].url`)[0] as string).includes(
+                (this.lookup(resource, `extension[${index}].url`)[0] as string).includes(
                   'mcode-histology-morphology-behavior'
                 )
               ) {
                 tempPrimaryCancerCondition.histologyMorphologyBehavior = this.lookup(
                   resource,
-                  `extension[${count}].valueCodeableConcept.coding`
+                  `extension[${index}].valueCodeableConcept.coding`
                 ) as unknown as fhir.Coding[];
               }
-              count++;
-            }
+            });
           }
           this.primaryCancerCondition.push(tempPrimaryCancerCondition);
         }

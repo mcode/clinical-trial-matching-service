@@ -12,10 +12,9 @@ export interface SearchBundleEntry extends BundleEntry<ResearchStudy> {
 export type SearchEntryMode = Exclude<BundleEntrySearch['mode'], undefined>;
 
 export class SearchSet implements SearchSetBundle {
-  // Yes, this looks weird. Yes, this is required: otherwise the infered type is string and not the constant string.
-  resourceType: 'Bundle' = 'Bundle';
+  resourceType = 'Bundle' as const;
   // Class attributes
-  type: 'searchset' = 'searchset';
+  type = 'searchset' as const;
   /**
    * The total number of results. As a bundle support pagination, this defaults
    * to the current number of studies, but may be overridden. (See
