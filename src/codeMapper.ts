@@ -59,10 +59,12 @@ export class CodeMapper {
       for (const system of Object.keys(obj[profile])) {
         for (const code of obj[profile][system]) {
           const code_string = new MedicalCode(code, system).toString();
-          if (!code_map.has(code_string)) {
-            code_map.set(code_string, []);
+          const existing = code_map.get(code_string);
+          if (existing) {
+            existing.push(profile);
+          } else {
+            code_map.set(code_string, [profile]);
           }
-          (code_map.get(code_string)!).push(profile);
         }
       }
     }
@@ -83,8 +85,9 @@ export class CodeMapper {
         continue;
       }
       const medical_code_key = new MedicalCode(code.code, code.system).toString();
-      if (this.code_map.has(medical_code_key)) {
-        extracted_mappings.push(...(this.code_map.get(medical_code_key)!));
+      const existing_codes = this.code_map.get(medical_code_key);
+      if (existing_codes) {
+        extracted_mappings.push(...existing_codes);
       }
     }
     return extracted_mappings;
