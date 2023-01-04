@@ -1,6 +1,6 @@
 {
   "name": "clinical-trial-matching-service",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "Provides a core library for interacting with the clinical-trial-matching-engine",
   "homepage": "https://github.com/mcode/clinical-trial-matching-service",
   "bugs": "https://github.com/mcode/clinical-trial-matching-service/issues",

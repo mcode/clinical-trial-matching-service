@@ -765,7 +765,7 @@ describe('ClinicalTrialsGovService', () => {
           expect(scope.isDone()).toBeTrue();
         })
       )
-        .toBeRejected()
+        .toBeResolved()
         .then(() => {
           // Check to make sure the new cache entries do not still exist - the failure should remove them, but not the
           // non-pending one

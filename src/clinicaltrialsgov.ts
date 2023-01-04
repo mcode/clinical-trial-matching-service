@@ -814,7 +814,8 @@ export class ClinicalTrialsGovService {
 
   /**
    * Downloads the given trials from ClinicalTrials.gov and stores them in the data directory. Note that this will
-   * always replace trials if they exist.
+   * always replace trials if they exist. Server error responses will be logged to the debug logger but are otherwise
+   * silently ignored at present, there's no way to determine if a request simply failed.
    *
    * @param ids the IDs of the trials to download
    * @returns a Promise that resolves to the path where the given IDs were downloaded
@@ -827,25 +828,9 @@ export class ClinicalTrialsGovService {
         this.cache.set(id, new CacheEntry(this, this.pathForNctNumber(id), { pending: true }));
       }
     }
-    const result = new Promise<void>((resolve, reject) => {
-      this.log('Fetching [%s]', url);
-      this.getURL(url, (response) => {
-        if (response.statusCode !== 200) {
-          this.log('Error %d %s from server', response.statusCode, response.statusMessage);
-          // Resume the response to ensure it gets cleaned up properly
-          response.resume();
-          // Assume some sort of server error
-          reject(new Error(`Server error: ${response.statusCode} ${response.statusMessage}`));
-        } else {
-          this.extractResults(response).then(resolve, reject);
-        }
-      }).on('error', (error) => {
-        this.log('Error fetching [%s]: %o', url, error);
-        reject(error);
-      });
-    });
-    // Add a catch handler
-    result.catch(() => {
+    // This function invalidates the entries given. It's used both as a catch handler for failed requests and if the
+    // server returns an error, which is otherwise handled by ignoring the IDs.
+    const invalidateEntries = () => {
       // If an error occurred within this promise, every cache entry we just loaded may be invalid.
       this.log('Invalidating cache entry IDs for: %s', ids);
       for (const id of ids) {
@@ -854,7 +839,30 @@ export class ClinicalTrialsGovService {
           this.cache.delete(id);
         }
       }
+    };
+    const result = new Promise<void>((resolve, reject) => {
+      this.log('Fetching [%s]', url);
+      this.getURL(url, (response) => {
+        if (response.statusCode !== 200) {
+          this.log('Error %d %s from server', response.statusCode, response.statusMessage);
+          // Resume the response to ensure it gets cleaned up properly
+          response.resume();
+          // Server errors should not reject the entire thing - the cache entries for this request should be invalidated
+          // as their status is now unknown.
+          invalidateEntries();
+          resolve();
+        } else {
+          this.extractResults(response).then(resolve, reject);
+        }
+      }).on('error', (error) => {
+        // This type of error is an actual network error and likely means that the backend is entirely unreachable.
+        // TODO: Should these errors cause a complete failure?
+        this.log('Error fetching [%s]: %o', url, error);
+        reject(error);
+      });
     });
+    // Add a catch handler
+    result.catch(invalidateEntries);
     // But return the root promise (otherwise we chain off the result handler)
     return result.then(() => {
       // Invalidate any IDs that are still pending ZIP
