@@ -1,6 +1,6 @@
 {
   "name": "clinical-trial-matching-service",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "Provides a core library for interacting with the clinical-trial-matching-engine",
   "homepage": "https://github.com/mcode/clinical-trial-matching-service",
   "bugs": "https://github.com/mcode/clinical-trial-matching-service/issues",
@@ -36,7 +36,7 @@
     "body-parser": "^1.19.0",
     "express": "^4.17.1",
     "fhirpath": "^3.3.0",
-    "xml2js": "^0.4.23",
+    "xml2js": "^0.5.0",
     "yauzl": "^2.10.0"
   },
   "devDependencies": {
