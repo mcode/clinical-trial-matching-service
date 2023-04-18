@@ -263,8 +263,7 @@ export class ClinicalTrialMatchingService {
       const host = this.host;
       // If within IISNode, the port will be a UNC path. Ignore configuration
       // and use the environment variable instead.
-      const iisnodePort =
-        this.ignoreEnvironment == false && process.env['IISNODE_VERSION'] ? process.env['PORT'] : undefined;
+      const iisnodePort = !this.ignoreEnvironment && process.env['IISNODE_VERSION'] ? process.env['PORT'] : undefined;
       // The following is kind of terrible, but basically, it's unclear how
       // listen checks for overloads, whether (number, undefined) is valid for
       // a host. iisnodePort is a string when under IIS and causes this to
