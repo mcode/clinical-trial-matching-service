@@ -58,6 +58,12 @@ export interface ServerOptions {
    * If given, use the given Express engine rather than creating a new one.
    */
   appEngine?: express.Application;
+  /**
+   * If set to true, ignores environment variables. Otherwise, various server
+   * wrapper environment varibles are checked to allow listen() to function
+   * from within a hosted environment.
+   */
+  ignoreEnvironment?: boolean;
 }
 
 /**
@@ -75,6 +81,7 @@ export interface ClinicalTrialMatchServiceRequest {
 export class ClinicalTrialMatchingService {
   public readonly app: express.Application;
   private readonly configuration: Configuration;
+  private readonly ignoreEnvironment: boolean;
   private _server: http.Server | null = null;
 
   /**
@@ -98,7 +105,8 @@ export class ClinicalTrialMatchingService {
       this.configuration = {};
     }
     // if called with only options, options will have been moved to the options variable
-    this.app = options && options.appEngine ? options.appEngine : express();
+    this.app = options?.appEngine ?? express();
+    this.ignoreEnvironment = options?.ignoreEnvironment ?? false;
 
     this.app.use(
       bodyParser.json({
@@ -127,8 +135,13 @@ export class ClinicalTrialMatchingService {
     let prefix: string;
     if (this.configuration.urlPrefix) {
       prefix = this.configuration.urlPrefix;
+    } else if (this.ignoreEnvironment) {
+      prefix = '/';
     } else if (process.env['PASSENGER_BASE_URI']) {
       prefix = process.env['PASSENGER_BASE_URI'];
+    } else if (process.env['IISNODE_BASE_URI']) {
+      // Also allow a separate environment variable
+      prefix = process.env['IISNODE_BASE_URI'];
     } else {
       prefix = '/';
     }
@@ -140,7 +153,7 @@ export class ClinicalTrialMatchingService {
     // Remove the trailing slash - note that this means a prefix of '/' becomes
     // the empty string, WHICH IS EXPECTED
     if (prefix.endsWith('/')) {
-      prefix = prefix.substr(0, prefix.length - 1);
+      prefix = prefix.substring(0, prefix.length - 1);
     }
 
     // Default callback
@@ -248,8 +261,19 @@ export class ClinicalTrialMatchingService {
     return new Promise((resolve, reject) => {
       const port = this.port;
       const host = this.host;
-      // It's unclear if we can pass undefined to listen
-      const server = host ? this.app.listen(port, host) : this.app.listen(port);
+      // If within IISNode, the port will be a UNC path. Ignore configuration
+      // and use the environment variable instead.
+      const iisnodePort =
+        this.ignoreEnvironment == false && process.env['IISNODE_VERSION'] ? process.env['PORT'] : undefined;
+      // The following is kind of terrible, but basically, it's unclear how
+      // listen checks for overloads, whether (number, undefined) is valid for
+      // a host. iisnodePort is a string when under IIS and causes this to
+      // listen via a named pipe.
+      const server = iisnodePort
+        ? this.app.listen(iisnodePort)
+        : host
+        ? this.app.listen(port, host)
+        : this.app.listen(port);
       this._server = server;
       server.once('error', (error: Error) => {
         reject(error);

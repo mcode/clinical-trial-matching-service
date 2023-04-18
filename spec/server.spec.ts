@@ -151,23 +151,44 @@ describe('ClinicalTrialMatchingService', () => {
       expect(postSpy.calls.argsFor(0)[0]).toEqual('/prefix/getClinicalTrial');
     });
 
-    it('binds using PASSENGER_BASE_URI if set', () => {
-      const testExpress = express();
-      const getSpy = spyOn(testExpress, 'get');
-      const postSpy = spyOn(testExpress, 'post');
-      process.env['PASSENGER_BASE_URI'] = '/prefix';
-      try {
-        new ClinicalTrialMatchingService(mockMatcher, { appEngine: testExpress });
-        // Express calls get under the hood so we only want to check the last call
-        expect(getSpy.calls.count()).toBeGreaterThanOrEqual(1);
-        // Only care about the first argument since the second one is a closure
-        expect(getSpy.calls.argsFor(getSpy.calls.count() - 1)[0]).toEqual('/prefix');
-        expect(postSpy.calls.count()).toEqual(1);
-        expect(postSpy.calls.argsFor(0)[0]).toEqual('/prefix/getClinicalTrial');
-      } finally {
-        // ensure the prefix doesn't remain set
-        delete process.env['PASSENGER_BASE_URI'];
-      }
+    ['PASSENGER_BASE_URI', 'IISNODE_BASE_URI'].forEach(envName => {
+      it(`binds using ${envName} if set`, () => {
+        const testExpress = express();
+        const getSpy = spyOn(testExpress, 'get');
+        const postSpy = spyOn(testExpress, 'post');
+        process.env[envName] = '/prefix';
+        try {
+          new ClinicalTrialMatchingService(mockMatcher, { appEngine: testExpress });
+          // Express calls get under the hood so we only want to check the last call
+          expect(getSpy.calls.count()).toBeGreaterThanOrEqual(1);
+          // Only care about the first argument since the second one is a closure
+          expect(getSpy.calls.argsFor(getSpy.calls.count() - 1)[0]).toEqual('/prefix');
+          expect(postSpy.calls.count()).toEqual(1);
+          expect(postSpy.calls.argsFor(0)[0]).toEqual('/prefix/getClinicalTrial');
+        } finally {
+          // ensure the prefix doesn't remain set
+          delete process.env[envName];
+        }
+      });
+
+      it(`ignores ${envName} if ignoreEnvironment is true`, () => {
+        const testExpress = express();
+        const getSpy = spyOn(testExpress, 'get');
+        const postSpy = spyOn(testExpress, 'post');
+        process.env[envName] = '/prefix';
+        try {
+          new ClinicalTrialMatchingService(mockMatcher, { appEngine: testExpress, ignoreEnvironment: true });
+          // Express calls get under the hood so we only want to check the last call
+          expect(getSpy.calls.count()).toBeGreaterThanOrEqual(1);
+          // Only care about the first argument since the second one is a closure
+          expect(getSpy.calls.argsFor(getSpy.calls.count() - 1)[0]).toEqual('/');
+          expect(postSpy.calls.count()).toEqual(1);
+          expect(postSpy.calls.argsFor(0)[0]).toEqual('/getClinicalTrial');
+        } finally {
+          // ensure the prefix doesn't remain set
+          delete process.env[envName];
+        }
+      });
     });
 
     it('works with no configuration', () => {
@@ -249,6 +270,24 @@ describe('ClinicalTrialMatchingService', () => {
       });
       await testService.listen();
       expect(listenSpy).toHaveBeenCalledOnceWith(3000, '127.0.0.1');
+    });
+
+    it('uses IISNode environment variables if set', async () => {
+      const testService = new ClinicalTrialMatchingService(mockMatcher, { host: '127.0.0.1', port: 3000 });
+      const fakeServer = new MockServer();
+      const listenSpy: jasmine.Spy = spyOn(testService.app, 'listen');
+      listenSpy.and.callFake(() => {
+        return fakeServer.listen();
+      });
+      process.env['IISNODE_VERSION'] = '0.2.26';
+      process.env['PORT'] = '\\\\?\\pipe\\some-long-guid';
+      try {
+        await testService.listen();
+        expect(listenSpy).toHaveBeenCalledOnceWith('\\\\?\\pipe\\some-long-guid');
+      } finally {
+        delete process.env['IISNODE_VERSION'];
+        delete process.env['PORT'];
+      }
     });
   });
 });
