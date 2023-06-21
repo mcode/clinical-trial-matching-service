@@ -820,7 +820,7 @@ export class ClinicalTrialsGovService {
    * @returns a Promise that resolves to the path where the given IDs were downloaded
    */
   protected downloadTrials(ids: string[]): Promise<void> {
-    const url = 'https://clinicaltrials.gov/ct2/download_studies?term=' + ids.join('+OR+');
+    const url = 'https://classic.clinicaltrials.gov/ct2/download_studies?term=' + ids.join('+OR+');
     // Now that we're starting to download clinical trials, immediately create pending entries for them.
     for (const id of ids) {
       if (!this.cache.has(id)) {
