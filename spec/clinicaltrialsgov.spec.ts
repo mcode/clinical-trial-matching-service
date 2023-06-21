@@ -744,7 +744,7 @@ describe('ClinicalTrialsGovService', () => {
     let downloader: ctg.ClinicalTrialsGovService;
     const nctIDs = ['NCT00000001', 'NCT00000002', 'NCT00000003'];
     beforeEach(() => {
-      scope = nock('https://clinicaltrials.gov');
+      scope = nock('https://classic.clinicaltrials.gov');
       interceptor = scope.get('/ct2/download_studies?term=' + nctIDs.join('+OR+'));
       return ctg.createClinicalTrialsGovService(dataDirPath, { cleanInterval: 0, fs: cacheFS }).then((service) => {
         downloader = service;
