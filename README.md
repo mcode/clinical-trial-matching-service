@@ -35,6 +35,26 @@ service.listen().catch(err => {
 });
 ```
 
+## A Note on Dependencies
+
+Assuming the implementation is in TypeScript, there are a few dependencies that need to match. The first is TypeScript itself. In theory, it doesn't need to match directly, but it's safest if it does. This library is currently built using TypeScript 5.1.6.
+
+Type dependencies currently can't be expressed in `package.json`: that is, libraries that this uses for their types (i.e., anything in `@types`), rather than any code. The same versions should be used in the `devDependencies` of any packages implementing them. The most noteable is the `@types/fhir` library, used for FHIR object types. The library currently uses version 0.0.37, this dependency should be copied into implementations as well. The same `express` types should be used as well, since wrappers need to interact with the Express.js request and response objects. The current `@types/express` used is 4.17.17. Note that the `express` dependency is a `dependency`, meaning it's pulled to packages that depend on it. The problem is solely with the types.
+
+(The types that are necessary for implementing wrappers could also be added to `dependencies` but they'd only serve to bloat the production run-time. They aren't needed except when building this library via TypeScript and any wrapper that uses this library and TypeScript. In theory, a wrapper could use plain JavaScript and not require them at all.)
+
+The following configuration should be in the `devDependencies` of any wrapper that uses this library:
+
+```json
+"devDependencies": {
+  "@types/express": "^4.17.17",
+  "@types/fhir": "^0.0.37",
+  "typescript": "^5.1.6"
+}
+```
+
+Wrappers may work even if the versions don't match exactly, but it's best to try and ensure they remain in sync.
+
 ## Configuring the service
 
 The `ClinicalTrialMatchingService` can optionally take a `Configuration` object that describes the server's configuration.
