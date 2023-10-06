@@ -1,5 +1,6 @@
 # Do not package TypeScript source
 /src
+/ctg-oas-v2.yaml
 
 # Skip tests
 /.nyc_output

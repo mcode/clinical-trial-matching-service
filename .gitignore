@@ -2,6 +2,9 @@
 /dist
 /dist-spec
 
+# Ignore generated code
+/src/ctg-api
+
 # Ignore Instanbul coverage files
 /.nyc_output
 /coverage

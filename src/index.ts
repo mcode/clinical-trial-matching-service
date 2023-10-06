@@ -11,7 +11,7 @@ export * from './mcodeextractor';
 export { MappingLogic } from './mappinglogic';
 
 // The export { v } from "mod" forms do not appear to work yet
-import { ClinicalStudy } from './clinicalstudy';
+import { Study } from './ctg-api';
 import BasicHttpError, { HttpError, ServerError, ClientError } from './errors';
 import ClinicalTrialMatchingService, { ClinicalTrialMatcher, Configuration } from './server';
 
@@ -20,7 +20,7 @@ export * from './env';
 
 export default ClinicalTrialMatchingService;
 export {
-  ClinicalStudy,
+  Study,
   ClinicalTrialMatcher,
   ClinicalTrialMatchingService,
   Configuration as ServiceConfiguration,
