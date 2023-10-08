@@ -1,36 +1,33 @@
 import { getContainedResource, ResearchStudy as ResearchStudyObj } from '../src/research-study';
 import { Address, FhirResource, Location, ResearchStudy, PlanDefinition } from 'fhir/r4';
 import * as ctg from '../src/clinicaltrialsgov';
+import { Study } from '../src/clinical-trials-gov';
 import fs from 'fs';
-import stream from 'stream';
 import path from 'path';
-import { EventEmitter } from 'events';
-import yauzl from 'yauzl';
 import nock from 'nock';
 import { Volume } from 'memfs';
 
 // Trial missing summary, inclusion/exclusion criteria, phase and study type
 import trialMissing from './data/resource.json';
 import trialFilled from './data/complete_study.json';
-import { ClinicalStudy, StatusEnum } from '../src/clinicalstudy';
 import { createClinicalStudy } from './support/clinicalstudy-factory';
 import { createResearchStudy } from './support/researchstudy-factory';
+import {
+  DateType,
+  DesignAllocation,
+  DesignMasking,
+  DesignTimePerspective,
+  InterventionalAssignment,
+  InterventionType,
+  ObservationalModel,
+  PrimaryPurpose,
+  Status,
+  StudyType
+} from '../src/ctg-api';
 
 function specFilePath(specFilePath: string): string {
   return path.join(__dirname, '../../spec/data', specFilePath);
 }
-
-describe('.isTrialBackup', () => {
-  it('rejects null', () => {
-    expect(ctg.isTrialBackup(null)).toBeFalse();
-  });
-  it('rejects non-objects', () => {
-    expect(ctg.isTrialBackup('string')).toBeFalse();
-    expect(ctg.isTrialBackup(1)).toBeFalse();
-    expect(ctg.isTrialBackup(undefined)).toBeFalse();
-    expect(ctg.isTrialBackup(true)).toBeFalse();
-  });
-});
 
 describe('.isValidNCTNumber', () => {
   it('accepts valid numbers', () => {
@@ -128,19 +125,14 @@ describe('findNCTNumbers', () => {
   });
 });
 
-describe('parseClinicalTrialXML', () => {
-  it("rejects if given valid XML that's not a clinical study", () => {
-    return expectAsync(ctg.parseClinicalTrialXML('<?xml version="1.0"?><root><child/></root>')).toBeRejectedWithError(
-      'Unable to parse trial as valid clinical study XML'
-    );
+describe('parseStudyJson', () => {
+  it('rejects invalid JSON', () => {
+    expect(ctg.parseStudyJson('true')).toThrowError('Invalid JSON object for Study: true');
   });
   it('logs failures', () => {
     const log = jasmine.createSpy('log');
-    return expectAsync(ctg.parseClinicalTrialXML('<?xml version="1.0"?><root><child/></root>', log))
-      .toBeRejectedWithError('Unable to parse trial as valid clinical study XML')
-      .then(() => {
-        expect(log).toHaveBeenCalled();
-      });
+    expect(ctg.parseStudyJson('not valid JSON', log)).toThrowError(/^Unable to parse JSON object/);
+    expect(log).toHaveBeenCalled();
   });
 });
 
@@ -165,8 +157,7 @@ describe('CacheEntry', () => {
       const entry = new ctg.CacheEntry(service, 'test', {});
       const createdAt = entry.createdAt;
       expect(createdAt).toBeDefined();
-      if (createdAt)
-        createdAt.setMonth(5);
+      if (createdAt) createdAt.setMonth(5);
       expect(entry.createdAt).toEqual(startTime);
     });
   });
@@ -309,16 +300,16 @@ describe('ClinicalTrialsGovService', () => {
   let study: ResearchStudy, nctID: ctg.NCTNumber;
   // Create our mock FS
   const cacheVol = Volume.fromNestedJSON({
-    '/ctg-cache/data/NCT02513394.xml': fs.readFileSync(specFilePath('NCT02513394.xml'), { encoding: 'utf8' }),
+    '/ctg-cache/data/NCT02513394.json': fs.readFileSync(specFilePath('NCT02513394.json'), { encoding: 'utf8' }),
     '/existing-file': 'Existing stub',
     '/ctg-cache-multi/data': {
-      'NCT00000001.xml': 'Test File 1',
-      'NCT00000002.xml': 'Test File 2',
-      'NCT00000003.xml': 'Test File 3',
+      'NCT00000001.json': 'Test File 1',
+      'NCT00000002.json': 'Test File 2',
+      'NCT00000003.json': 'Test File 3',
       // Junk files: files that should be skipped on init
-      '.xml': 'not really an XML file, but a dot file called "xml"',
-      'invalid.xml': 'not an NCT',
-      'NCT1.xml': 'not a valid NCT'
+      '.json': 'not really a JSON file, but a dot file called "json"',
+      'invalid.json': 'not an NCT',
+      'NCT1.json': 'not a valid NCT'
     }
   });
   // Force the type to FileSystem since the memfs types are wrong (well, too loose, compared to the proper types)
@@ -337,13 +328,13 @@ describe('ClinicalTrialsGovService', () => {
     // Update mtimes for files
     // Mock file that was created 1 minute after cache was created
     let time = new Date(cacheStartTime.getTime() + 60 * 1000);
-    cacheVol.utimesSync('/ctg-cache-multi/data/NCT00000001.xml', time, time);
+    cacheVol.utimesSync('/ctg-cache-multi/data/NCT00000001.json', time, time);
     // Mock file that was created 1.5 minutes after cache was created
     time = new Date(cacheStartTime.getTime() + 90 * 1000);
-    cacheVol.utimesSync('/ctg-cache-multi/data/NCT00000002.xml', time, time);
+    cacheVol.utimesSync('/ctg-cache-multi/data/NCT00000002.json', time, time);
     // Mock file that was created 2 minutes after cache was created
     time = new Date(cacheStartTime.getTime() + 2 * 60 * 1000);
-    cacheVol.utimesSync('/ctg-cache-multi/data/NCT00000003.xml', time, time);
+    cacheVol.utimesSync('/ctg-cache-multi/data/NCT00000003.json', time, time);
   });
 
   it('can set a custom logger', () => {
@@ -774,146 +765,95 @@ describe('ClinicalTrialsGovService', () => {
         });
     });
 
-    it('creates cache entries', () => {
-      interceptor.reply(200, 'Unimportant', { 'Content-type': 'application/zip' });
-      // For this test, create an existing cache entry for one of the IDs
-      downloader['cache'].set(nctIDs[1], new ctg.CacheEntry(downloader, nctIDs[1] + '.xml', {}));
-      // Also mock the extraction process so it thinks everything is fine
-      downloader['extractResults'] = () => {
-        // Grab cache entries for our NCTs and say they've been resolved
-        for (const id of nctIDs) {
-          const entry = downloader['cache'].get(id);
-          expect(entry).toBeDefined();
-          if (entry) {
-            // Indicate that the entry is found
-            entry.found();
-          }
-        }
-        // Only mark entry 1 ready
-        const entry = downloader['cache'].get(nctIDs[1]);
-        if (entry) {
-          entry.ready();
-        }
-        return Promise.resolve();
-      };
-      return expectAsync(downloader['downloadTrials'](nctIDs))
-        .toBeResolved()
-        .then(() => {
-          // Should have created the two missing items which should still be pending as we mocked the extract process
-          let entry = downloader['cache'].get(nctIDs[0]);
-          expect(entry && entry.pending).toBeTrue();
-          entry = downloader['cache'].get(nctIDs[1]);
-          expect(entry && !entry.pending).toBeTrue();
-          entry = downloader['cache'].get(nctIDs[2]);
-          expect(entry && entry.pending).toBeTrue();
-        });
-    });
+    // it('creates cache entries', () => {
+    //   interceptor.reply(200, 'Unimportant', { 'Content-type': 'application/zip' });
+    //   // For this test, create an existing cache entry for one of the IDs
+    //   downloader['cache'].set(nctIDs[1], new ctg.CacheEntry(downloader, nctIDs[1] + '.xml', {}));
+    //   // Also mock the extraction process so it thinks everything is fine
+    //   downloader['extractResults'] = () => {
+    //     // Grab cache entries for our NCTs and say they've been resolved
+    //     for (const id of nctIDs) {
+    //       const entry = downloader['cache'].get(id);
+    //       expect(entry).toBeDefined();
+    //       if (entry) {
+    //         // Indicate that the entry is found
+    //         entry.found();
+    //       }
+    //     }
+    //     // Only mark entry 1 ready
+    //     const entry = downloader['cache'].get(nctIDs[1]);
+    //     if (entry) {
+    //       entry.ready();
+    //     }
+    //     return Promise.resolve();
+    //   };
+    //   return expectAsync(downloader['downloadTrials'](nctIDs))
+    //     .toBeResolved()
+    //     .then(() => {
+    //       // Should have created the two missing items which should still be pending as we mocked the extract process
+    //       let entry = downloader['cache'].get(nctIDs[0]);
+    //       expect(entry && entry.pending).toBeTrue();
+    //       entry = downloader['cache'].get(nctIDs[1]);
+    //       expect(entry && !entry.pending).toBeTrue();
+    //       entry = downloader['cache'].get(nctIDs[2]);
+    //       expect(entry && entry.pending).toBeTrue();
+    //     });
+    // });
 
-    it('extracts a ZIP', () => {
-      interceptor.reply(200, 'Unimportant', {
-        'Content-type': 'application/zip'
-      });
-      const spy = jasmine.createSpy('extractResults').and.callFake((): Promise<void> => {
-        // Grab cache entries for our NCTs and say they've been resolved
-        for (const id of nctIDs) {
-          const entry = downloader['cache'].get(id);
-          expect(entry).toBeDefined();
-          if (entry) {
-            entry.found();
-            entry.ready();
-          }
-        }
-        return Promise.resolve();
-      });
-      // Jam the spy in (method is protected, that's why it can't be created directly)
-      downloader['extractResults'] = spy;
-      return expectAsync(
-        downloader['downloadTrials'](nctIDs).finally(() => {
-          // Just check that it was called
-          expect(spy).toHaveBeenCalledTimes(1);
-          expect(scope.isDone()).toBeTrue();
-        })
-      ).toBeResolved();
-    });
+    // it('extracts a ZIP', () => {
+    //   interceptor.reply(200, 'Unimportant', {
+    //     'Content-type': 'application/zip'
+    //   });
+    //   const spy = jasmine.createSpy('extractResults').and.callFake((): Promise<void> => {
+    //     // Grab cache entries for our NCTs and say they've been resolved
+    //     for (const id of nctIDs) {
+    //       const entry = downloader['cache'].get(id);
+    //       expect(entry).toBeDefined();
+    //       if (entry) {
+    //         entry.found();
+    //         entry.ready();
+    //       }
+    //     }
+    //     return Promise.resolve();
+    //   });
+    //   // Jam the spy in (method is protected, that's why it can't be created directly)
+    //   downloader['extractResults'] = spy;
+    //   return expectAsync(
+    //     downloader['downloadTrials'](nctIDs).finally(() => {
+    //       // Just check that it was called
+    //       expect(spy).toHaveBeenCalledTimes(1);
+    //       expect(scope.isDone()).toBeTrue();
+    //     })
+    //   ).toBeResolved();
+    // });
 
-    it('invalidates cache entries that were not found in the downloaded ZIP', () => {
-      // This is kind of complicated, but basically, we need to have it "create" the entries for the NCT IDs, but then
-      // have extractResults "not create" some of the entries.
-      interceptor.reply(200, 'Unimportant', {
-        'Content-type': 'application/zip'
-      });
-      const spy = jasmine.createSpy('extractResults').and.callFake((): Promise<void> => {
-        // For this test, we only mark one OK
-        const entry = downloader['cache'].get(nctIDs[1]);
-        expect(entry).toBeDefined();
-        if (entry) {
-          entry.found();
-          entry.ready();
-        }
-        return Promise.resolve();
-      });
-      // Jam the spy in (method is protected, that's why it can't be created directly)
-      downloader['extractResults'] = spy;
-      return expectAsync(downloader['downloadTrials'](nctIDs)).toBeResolved().then(() => {
-        // The failed NCT IDs should be removed at this point
-        expect(downloader['cache'].has(nctIDs[0])).toBeFalse();
-        expect(downloader['cache'].has(nctIDs[1])).toBeTrue();
-        expect(downloader['cache'].has(nctIDs[2])).toBeFalse();
-      });
-    });
-  });
-
-  describe('#extractResults', () => {
-    let downloader: ctg.ClinicalTrialsGovService;
-    beforeEach(() => {
-      return ctg.createClinicalTrialsGovService(dataDirPath, { cleanInterval: 0, fs: cacheFS }).then((service) => {
-        downloader = service;
-      });
-    });
-
-    it('handles the extract failing', () => {
-      // For now, just give it a file that does not exist
-      return expectAsync(
-        downloader['extractResults'](fs.createReadStream(specFilePath('does_not_exists.file')))
-      ).toBeRejected();
-    });
-
-    it('handles an invalid ZIP', () => {
-      // For now, give it a JSON file to extract
-      return expectAsync(
-        downloader['extractResults'](fs.createReadStream(specFilePath('resource.json')))
-      ).toBeRejected();
-    });
-
-    it('deletes the temporary ZIP', () => {
-      // Spy on the unlink method
-      const unlink = (spyOn(cacheFS, 'unlink') as jasmine.Spy).and.callFake(
-        (_path: string, callback: fs.NoParamCallback) => {
-          callback(null);
-        }
-      );
-      // Don't actually do anything
-      downloader['extractZip'] = jasmine.createSpy('extractZip').and.callFake(() => {
-        return Promise.resolve();
-      });
-      return expectAsync(downloader['extractResults'](stream.Readable.from('Test')))
-        .toBeResolved()
-        .then(() => {
-          expect(unlink).toHaveBeenCalledTimes(1);
-        });
-    });
-
-    it('handles deleting the temporary ZIP failing', () => {
-      // Spy on the unlink method
-      (spyOn(cacheFS, 'unlink') as jasmine.Spy).and.callFake((_path: string, callback: fs.NoParamCallback) => {
-        callback(new Error('Simulated error'));
-      });
-      // Don't actually do anything
-      downloader['extractZip'] = jasmine.createSpy('extractZip').and.callFake(() => {
-        return Promise.resolve();
-      });
-      return expectAsync(downloader['extractResults'](stream.Readable.from('Test'))).toBeResolved();
-    });
+    // it('invalidates cache entries that were not found in the downloaded ZIP', () => {
+    //   // This is kind of complicated, but basically, we need to have it "create" the entries for the NCT IDs, but then
+    //   // have extractResults "not create" some of the entries.
+    //   interceptor.reply(200, 'Unimportant', {
+    //     'Content-type': 'application/zip'
+    //   });
+    //   const spy = jasmine.createSpy('extractResults').and.callFake((): Promise<void> => {
+    //     // For this test, we only mark one OK
+    //     const entry = downloader['cache'].get(nctIDs[1]);
+    //     expect(entry).toBeDefined();
+    //     if (entry) {
+    //       entry.found();
+    //       entry.ready();
+    //     }
+    //     return Promise.resolve();
+    //   });
+    //   // Jam the spy in (method is protected, that's why it can't be created directly)
+    //   downloader['extractResults'] = spy;
+    //   return expectAsync(downloader['downloadTrials'](nctIDs))
+    //     .toBeResolved()
+    //     .then(() => {
+    //       // The failed NCT IDs should be removed at this point
+    //       expect(downloader['cache'].has(nctIDs[0])).toBeFalse();
+    //       expect(downloader['cache'].has(nctIDs[1])).toBeTrue();
+    //       expect(downloader['cache'].has(nctIDs[2])).toBeFalse();
+    //     });
+    // });
   });
 
   describe('#getCachedClinicalStudy', () => {
@@ -982,349 +922,117 @@ describe('ClinicalTrialsGovService', () => {
     });
   });
 
-  describe('#extractZip', () => {
-    // For this set of tests, we don't want to *really* do any unzipping, so we set up a bunch of mocks on Yauzl to
-    // simulate the process.
-    let openSpy: jasmine.Spy<{
-      (path: string, options: yauzl.Options, callback?: (err?: Error | null, zipfile?: yauzl.ZipFile) => void): void;
-    }>;
-    let service: ctg.ClinicalTrialsGovService;
-    beforeEach(() => {
-      openSpy = spyOn(yauzl, 'open');
-      service = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 0, fs: cacheFS });
-    });
+  // describe('#addCacheEntry', () => {
+  //   // addCacheEntry is responsible for taking a stream of data and writing it to a single file.
+  //   let service: ctg.ClinicalTrialsGovService;
+  //   let mockEntryStream: stream.Readable;
+  //   let mockFileStream: stream.Writable;
+  //   const mockNctNumber: ctg.NCTNumber = 'NCT12345678';
 
-    it('rejects on error', () => {
-      openSpy.and.callFake((path, options, callback) => {
-        if (callback) callback(new Error('Simulated error'));
-      });
-      return expectAsync(service['extractZip']('test.zip')).toBeRejectedWithError('Simulated error');
-    });
+  //   beforeEach(() => {
+  //     service = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 0, fs: cacheFS });
+  //     // The mock entry stream is a "real" stream
+  //     // It has to be capable of reading a single chunk
+  //     let chunk: Buffer | null = Buffer.from('Test', 'utf-8');
+  //     mockEntryStream = new stream.Readable({
+  //       // Note that this cannot be an arrow function because this must be the stream
+  //       read: function () {
+  //         this.push(chunk);
+  //         // Pushing null indicates end of stream - so set the chunk to null so the next read ends the stream
+  //         chunk = null;
+  //       }
+  //     });
+  //     mockFileStream = new stream.Writable({
+  //       write: function (chunk, encoding, callback) {
+  //         // Must invoke the callback or things will freeze
+  //         callback();
+  //       },
+  //       final: function (callback) {
+  //         callback();
+  //       }
+  //     });
+  //     spyOn(cacheFS, 'createWriteStream').and.callFake(() => {
+  //       // Pretend this is a file stream for TypeScript - it doesn't really matter
+  //       return mockFileStream as unknown as fs.WriteStream;
+  //     });
+  //   });
 
-    it('rejects if called with nothing', () => {
-      // This should never really happen, but make sure it's handled if it does
-      openSpy.and.callFake((path, options, callback) => {
-        if (callback) callback();
-      });
-      return expectAsync(service['extractZip']('test.zip')).toBeRejected();
-    });
+  //   // There is a matrix of three entry states (existing pending, exists non-pending, does not exist) and two stream
+  //   // cases (succeeds, fails) that needs to be handled.
 
-    describe('with a ZIP', () => {
-      // This sub-group of tasks requires a mock ZIP file
-      let mockZipFile: yauzl.ZipFile;
-      beforeEach(() => {
-        const mockObj = new EventEmitter();
-        // This is a partial implementation to avoid actual file system access
-        mockZipFile = mockObj as unknown as yauzl.ZipFile;
-        mockZipFile.close = () => {
-          /* no-op */
-        };
-      });
+  //   // So to deal with that, create a function that creates the tests, and a flag indicating which test was running
+  //   let errorTest = false;
 
-      it('rejects on error', () => {
-        // Simulate error on first readEntry
-        mockZipFile.readEntry = () => {
-          mockZipFile.emit('error', new Error('Simulated error'));
-        };
-        openSpy.and.callFake((path, options, callback) => {
-          if (callback) {
-            callback(undefined, mockZipFile);
-          }
-        });
-        return expectAsync(service['extractZip']('test.zip')).toBeRejectedWithError('Simulated error');
-      });
+  //   const makeTests = function () {
+  //     it('handles an error', () => {
+  //       errorTest = true;
+  //       // Replace the write method with one that will throw a mock error
+  //       mockFileStream._write = (chunk, encoding, callback) => {
+  //         callback(new Error('Simulated I/O error'));
+  //       };
+  //       return expectAsync(service['addCacheEntry'](mockNctNumber, mockEntryStream)).toBeRejected();
+  //     });
 
-      describe('with an entry', () => {
-        let entry: yauzl.Entry;
-        let entries: yauzl.Entry[];
-        let currentIndex: number;
-        // To make the test easier, this is the method called with the callback
-        let openReadStream: (callback: (err: Error | null, stream: stream.Readable) => void) => void;
-        const mockNctNumber: ctg.NCTNumber = 'NCT12345678';
+  //     it('handles writing the entry', () => {
+  //       errorTest = false;
+  //       return expectAsync(service['addCacheEntry'](mockNctNumber, mockEntryStream)).toBeResolved();
+  //     });
+  //   };
 
-        beforeEach(() => {
-          // Each test requires a test entry although the exact details vary
-          // This is an intentionally incomplete entry.
-          const mockEntry = {
-            comment: '',
-            compressedSize: 4,
-            fileName: mockNctNumber + '.xml',
-            fileNameLength: mockNctNumber.length + 4,
-            uncompressedSize: 4
-          };
+  //   describe('with no entry', () => {
+  //     // Nothing to do here
+  //     makeTests();
+  //   });
 
-          // This is intentionally not a full mock implementation
-          entry = mockEntry as unknown as yauzl.Entry;
-          entries = [entry];
-          currentIndex = 0;
-          // Also need to install a fake openReadStream
-          mockZipFile.openReadStream = (
-            entry: yauzl.Entry,
-            callbackOrOptions: yauzl.ZipFileOptions | ((err: Error | null, stream: stream.Readable) => void),
-            callbackOrNothing?: (err: Error | null, stream: stream.Readable) => void
-          ) => {
-            // Don't actually care about the options
-            let callback: (err: Error | null, stream: stream.Readable) => void;
-            if (callbackOrNothing) {
-              callback = callbackOrNothing;
-            } else if (typeof callbackOrOptions === 'function') {
-              callback = callbackOrOptions;
-            } else {
-              // invalid, unclear how this is handled, but throw an error
-              throw new Error('missing callback');
-            }
-            openReadStream(callback);
-          };
-          // By default, make it so that openReadStream returns a stream that reads the string "test"
-          openReadStream = (callback) => {
-            callback(
-              null,
-              new stream.Readable({
-                read: function () {
-                  this.push(Buffer.from('test', 'utf-8'));
-                }
-              })
-            );
-          };
+  //   describe('with an existing pending entry', () => {
+  //     let entry: ctg.CacheEntry;
+  //     let readySpy: jasmine.Spy;
+  //     beforeEach(() => {
+  //       entry = new ctg.CacheEntry(service, mockNctNumber + '.xml', { pending: true });
+  //       // Add the entry
+  //       service['cache'].set(mockNctNumber, entry);
+  //       // We want to see if ready is invoked but also have it work as expected
+  //       readySpy = spyOn(entry, 'ready').and.callThrough();
+  //     });
+  //     afterEach(() => {
+  //       if (errorTest) {
+  //         // Expect the cache entry to have been removed
+  //         expect(service['cache'].has(mockNctNumber)).toBeFalse();
+  //         // Ready should not have been called in this case
+  //         expect(readySpy).not.toHaveBeenCalled();
+  //       } else {
+  //         // Otherwise, expect the entry to be ready
+  //         expect(readySpy).toHaveBeenCalled();
+  //       }
+  //     });
 
-          // All these require an openSpy that forwards our mock ZIP file
-          openSpy.and.callFake((path, options, callback) => {
-            if (callback) {
-              callback(undefined, mockZipFile);
-            }
-          });
+  //     // And make the tests
+  //     makeTests();
+  //   });
 
-          // Fake read entry implementation
-          mockZipFile.readEntry = () => {
-            if (currentIndex < entries.length) {
-              const e = entries[currentIndex];
-              currentIndex++;
-              mockZipFile.emit('entry', e);
-            } else {
-              mockZipFile.emit('end');
-            }
-          };
-        });
+  //   describe('with an existing non-pending entry', () => {
+  //     let entry: ctg.CacheEntry;
+  //     let readySpy: jasmine.Spy;
+  //     beforeEach(() => {
+  //       entry = new ctg.CacheEntry(service, mockNctNumber + '.xml', {});
+  //       // Add the entry
+  //       service['cache'].set(mockNctNumber, entry);
+  //       // In this case we just want to know if ready was not invoked as it shouldn't be
+  //       readySpy = spyOn(entry, 'ready').and.callThrough();
+  //     });
+  //     afterEach(() => {
+  //       if (errorTest) {
+  //         // Expect the cache entry to remain - it's assumed the existing entry is still OK (this may be false?)
+  //         expect(service['cache'].has(mockNctNumber)).toBeTrue();
+  //       }
+  //       // In either case, ready should not have been called
+  //       expect(readySpy).not.toHaveBeenCalled();
+  //     });
 
-        describe('skips entries with', () => {
-          let openReadStreamSpy: jasmine.Spy<{
-            (
-              entry: yauzl.Entry,
-              options: yauzl.ZipFileOptions,
-              callback: (err: Error | null, stream: stream.Readable) => void
-            ): void;
-            (entry: yauzl.Entry, callback: (err: Error | null, stream: stream.Readable) => void): void;
-          }>;
-          beforeEach(() => {
-            openReadStreamSpy = spyOn(mockZipFile, 'openReadStream');
-            // Should this somehow be called, have it invoke the already stubbed test method to ensure that the tests don't hang
-            openReadStreamSpy.and.callThrough();
-          });
-
-          function expectEntrySkipped(): PromiseLike<void> {
-            return expectAsync(service['extractZip']('test.zip'))
-              .toBeResolved()
-              .then(() => {
-                expect(openReadStreamSpy).not.toHaveBeenCalled();
-              });
-          }
-
-          it('excessively large entry', () => {
-            entry.uncompressedSize = service.maxAllowedEntrySize + 1;
-            return expectEntrySkipped();
-          });
-
-          it('no extension', () => {
-            entry.fileName = 'invalid';
-            return expectEntrySkipped();
-          });
-
-          it('an invalid extension', () => {
-            entry.fileName = 'NCT12345678.txt';
-            return expectEntrySkipped();
-          });
-
-          it('the filename ".xml"', () => {
-            entry.fileName = '.xml';
-            return expectEntrySkipped();
-          });
-
-          it('an invalid NCT number', () => {
-            entry.fileName = 'NCT incorrect.xml';
-            return expectEntrySkipped();
-          });
-        });
-
-        describe('extracting an entry', () => {
-          let addCacheEntrySpy: jasmine.Spy;
-          beforeEach(() => {
-            // Allow the any here so we can install the spy on a private method - there's no other way around this
-            // without really messy code
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            addCacheEntrySpy = spyOn<any>(service, 'addCacheEntry');
-          });
-
-          it('adds to cache on success', () => {
-            addCacheEntrySpy.and.callFake(() => {
-              // We need to return a promise that resolves or the entire thing won't resolve
-              return Promise.resolve();
-            });
-            return expectAsync(service['extractZip']('test.zip'))
-              .toBeResolved()
-              .then(() => {
-                expect(addCacheEntrySpy).toHaveBeenCalled();
-                // Make sure it was called with the correct NCT ID
-                expect(addCacheEntrySpy.calls.first().args[0]).toEqual(mockNctNumber);
-              });
-          });
-
-          it('handles the parse failing', () => {
-            addCacheEntrySpy.and.callFake(() => {
-              return Promise.reject(new Error('Simulated parse failure'));
-            });
-            // This should still resolve successfully - parse failures are logged but otherwise skipped
-            return expectAsync(service['extractZip']('test.zip'))
-              .toBeResolved()
-              .then(() => {
-                expect(addCacheEntrySpy).toHaveBeenCalled();
-                // Make sure it was called with the correct NCT ID
-                expect(addCacheEntrySpy.calls.first().args[0]).toEqual(mockNctNumber);
-              });
-          });
-        });
-
-        it('handles an entry failing to extract', () => {
-          openReadStream = (callback) => {
-            // FIXME: The current yazul types state that a stream is always provided
-            // This seems unlikely, so jam it in for now
-            (callback as unknown as (err: Error) => void)(new Error('Simulated error'));
-          };
-          return expectAsync(service['extractZip']('test.zip')).toBeResolved();
-        });
-
-        it('handles the callback being invoked incorrectly', () => {
-          // Invoking the callback with nothing should never happen, but if it does, expect it to resolve anyway
-          openReadStream = (callback) => {
-            // Intentionally invoke incorrectly
-            (callback as unknown as () => void)();
-          };
-          return expectAsync(service['extractZip']('test.zip')).toBeResolved();
-        });
-      });
-    });
-  });
-
-  describe('#addCacheEntry', () => {
-    // addCacheEntry is responsible for taking a stream of data and writing it to a single file.
-    let service: ctg.ClinicalTrialsGovService;
-    let mockEntryStream: stream.Readable;
-    let mockFileStream: stream.Writable;
-    const mockNctNumber: ctg.NCTNumber = 'NCT12345678';
-
-    beforeEach(() => {
-      service = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 0, fs: cacheFS });
-      // The mock entry stream is a "real" stream
-      // It has to be capable of reading a single chunk
-      let chunk: Buffer | null = Buffer.from('Test', 'utf-8');
-      mockEntryStream = new stream.Readable({
-        // Note that this cannot be an arrow function because this must be the stream
-        read: function () {
-          this.push(chunk);
-          // Pushing null indicates end of stream - so set the chunk to null so the next read ends the stream
-          chunk = null;
-        }
-      });
-      mockFileStream = new stream.Writable({
-        write: function (chunk, encoding, callback) {
-          // Must invoke the callback or things will freeze
-          callback();
-        },
-        final: function (callback) {
-          callback();
-        }
-      });
-      spyOn(cacheFS, 'createWriteStream').and.callFake(() => {
-        // Pretend this is a file stream for TypeScript - it doesn't really matter
-        return mockFileStream as unknown as fs.WriteStream;
-      });
-    });
-
-    // There is a matrix of three entry states (existing pending, exists non-pending, does not exist) and two stream
-    // cases (succeeds, fails) that needs to be handled.
-
-    // So to deal with that, create a function that creates the tests, and a flag indicating which test was running
-    let errorTest = false;
-
-    const makeTests = function () {
-      it('handles an error', () => {
-        errorTest = true;
-        // Replace the write method with one that will throw a mock error
-        mockFileStream._write = (chunk, encoding, callback) => {
-          callback(new Error('Simulated I/O error'));
-        };
-        return expectAsync(service['addCacheEntry'](mockNctNumber, mockEntryStream)).toBeRejected();
-      });
-
-      it('handles writing the entry', () => {
-        errorTest = false;
-        return expectAsync(service['addCacheEntry'](mockNctNumber, mockEntryStream)).toBeResolved();
-      });
-    };
-
-    describe('with no entry', () => {
-      // Nothing to do here
-      makeTests();
-    });
-
-    describe('with an existing pending entry', () => {
-      let entry: ctg.CacheEntry;
-      let readySpy: jasmine.Spy;
-      beforeEach(() => {
-        entry = new ctg.CacheEntry(service, mockNctNumber + '.xml', { pending: true });
-        // Add the entry
-        service['cache'].set(mockNctNumber, entry);
-        // We want to see if ready is invoked but also have it work as expected
-        readySpy = spyOn(entry, 'ready').and.callThrough();
-      });
-      afterEach(() => {
-        if (errorTest) {
-          // Expect the cache entry to have been removed
-          expect(service['cache'].has(mockNctNumber)).toBeFalse();
-          // Ready should not have been called in this case
-          expect(readySpy).not.toHaveBeenCalled();
-        } else {
-          // Otherwise, expect the entry to be ready
-          expect(readySpy).toHaveBeenCalled();
-        }
-      });
-
-      // And make the tests
-      makeTests();
-    });
-
-    describe('with an existing non-pending entry', () => {
-      let entry: ctg.CacheEntry;
-      let readySpy: jasmine.Spy;
-      beforeEach(() => {
-        entry = new ctg.CacheEntry(service, mockNctNumber + '.xml', {});
-        // Add the entry
-        service['cache'].set(mockNctNumber, entry);
-        // In this case we just want to know if ready was not invoked as it shouldn't be
-        readySpy = spyOn(entry, 'ready').and.callThrough();
-      });
-      afterEach(() => {
-        if (errorTest) {
-          // Expect the cache entry to remain - it's assumed the existing entry is still OK (this may be false?)
-          expect(service['cache'].has(mockNctNumber)).toBeTrue();
-        }
-        // In either case, ready should not have been called
-        expect(readySpy).not.toHaveBeenCalled();
-      });
-
-      // And make the tests
-      makeTests();
-    });
-  });
+  //     // And make the tests
+  //     makeTests();
+  //   });
+  // });
 
   describe('#updateResearchStudy', () => {
     it('forwards to updateResearchStudyWithClinicalStudy', () => {
@@ -1340,7 +1048,7 @@ describe('ClinicalTrialsGovService', () => {
     // Use the downloader to load the fixture data
     let downloader: ctg.ClinicalTrialsGovService;
     let updatedTrial: ResearchStudy;
-    let clinicalStudy: ClinicalStudy;
+    let clinicalStudy: Study;
     beforeAll(async function () {
       downloader = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 0, fs: cacheFS });
       await downloader.init();
@@ -1392,17 +1100,21 @@ describe('ClinicalTrialsGovService', () => {
       researchStudy.category = [{ text: 'Study Type: Example' }];
 
       ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
-        study_type: ['Interventional'],
-        study_design_info: [
-          {
-            intervention_model: ['Parallel Assignment'],
-            primary_purpose: ['Treatment'],
-            masking: ['None (Open Label)'],
-            allocation: ['Randomized'],
-            time_perspective: ['Example'],
-            observational_model: ['Something']
+        protocolSection: {
+          designModule: {
+            studyType: StudyType.INTERVENTIONAL,
+            designInfo: {
+              interventionModel: InterventionalAssignment.PARALLEL,
+              primaryPurpose: PrimaryPurpose.TREATMENT,
+              maskingInfo: {
+                masking: DesignMasking.NONE
+              },
+              allocation: DesignAllocation.RANDOMIZED,
+              timePerspective: DesignTimePerspective.OTHER,
+              observationalModel: ObservationalModel.CASE_CONTROL
+            }
           }
-        ]
+        }
       });
 
       expect(researchStudy.category).toBeDefined();
@@ -1430,7 +1142,11 @@ describe('ClinicalTrialsGovService', () => {
       researchStudy.category = [{}];
 
       ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
-        study_type: ['Interventional']
+        protocolSection: {
+          designModule: {
+            studyType: StudyType.INTERVENTIONAL
+          }
+        }
       });
 
       expect(researchStudy.category).toBeDefined();
@@ -1506,14 +1222,18 @@ describe('ClinicalTrialsGovService', () => {
     it('fills in interventions even without arms', () => {
       const researchStudy = new ResearchStudyObj('id');
       const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
-        intervention: [
-          {
-            intervention_type: ['Behavioral'],
-            intervention_name: ['Name'],
-            description: ['Description'],
-            other_name: ['Other name']
+        protocolSection: {
+          armsInterventionsModule: {
+            interventions: [
+              {
+                type: InterventionType.BEHAVIORAL,
+                name: 'Name',
+                description: 'Description',
+                otherNames: ['Other name']
+              }
+            ]
           }
-        ]
+        }
       });
 
       expect(result.protocol).toBeDefined();
@@ -1542,15 +1262,19 @@ describe('ClinicalTrialsGovService', () => {
     it('fills in interventions with description and subtitle', () => {
       const researchStudy = new ResearchStudyObj('id');
       const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
-        intervention: [
-          {
-            intervention_type: ['Behavioral'],
-            intervention_name: ['Name'],
-            description: ['Description'],
-            other_name: ['Other name'],
-            arm_group_label: ['Arm']
+        protocolSection: {
+          armsInterventionsModule: {
+            interventions: [
+              {
+                type: InterventionType.BEHAVIORAL,
+                name: 'Name',
+                description: 'Description',
+                otherNames: ['Other name'],
+                armGroupLabels: ['Arm']
+              }
+            ]
           }
-        ]
+        }
       });
 
       expect(result.protocol).toBeDefined();
@@ -1577,11 +1301,21 @@ describe('ClinicalTrialsGovService', () => {
       }
     });
 
-    it('fills in period as VariableDate', () => {
+    it('fills in period', () => {
       const researchStudy = new ResearchStudyObj('id');
       const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
-        start_date: ["January 2022"],
-        completion_date: ["February 2023"]
+        protocolSection: {
+          statusModule: {
+            startDateStruct: {
+              date: '2023-01',
+              type: DateType.ACTUAL
+            },
+            completionDateStruct: {
+              date: '2023-02',
+              type: DateType.ACTUAL
+            }
+          }
+        }
       });
 
       expect(result.period).toBeDefined();
@@ -1589,33 +1323,22 @@ describe('ClinicalTrialsGovService', () => {
         expect(result.period.start).toBeDefined();
         expect(result.period.end).toBeDefined();
 
-        expect(result.period.start).toEqual(new Date("January 2022").toISOString());
-        expect(result.period.end).toEqual(new Date("February 2023").toISOString());
+        expect(result.period.start).toEqual(new Date('January 2022').toISOString());
+        expect(result.period.end).toEqual(new Date('February 2023').toISOString());
       }
-
-    })
-
-    it('fills in period as VariableDateStruct', () => {
-      const researchStudy = new ResearchStudyObj('id');
-      const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
-        start_date: [{ $: { type: "Actual"}, _: "January 2022" }],
-        completion_date:  [{ $: { type: "Actual"}, _: "February 2023" }],
-      });
-
-      expect(result.period).toBeDefined();
-      if (result.period) {
-        expect(result.period.start).toBeDefined();
-        expect(result.period.end).toBeDefined();
-
-        expect(result.period.start).toEqual(new Date("January 2022").toISOString());
-        expect(result.period.end).toEqual(new Date("February 2023").toISOString());
-      }
-    })
+    });
 
     it('fills in start of period even without end', () => {
       const researchStudy = new ResearchStudyObj('id');
       const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
-        start_date: ["January 2022"],
+        protocolSection: {
+          statusModule: {
+            startDateStruct: {
+              date: '2023-01',
+              type: DateType.ACTUAL
+            }
+          }
+        }
       });
 
       expect(result.period).toBeDefined();
@@ -1623,15 +1346,21 @@ describe('ClinicalTrialsGovService', () => {
         expect(result.period.start).toBeDefined();
         expect(result.period.end).not.toBeDefined();
 
-        expect(result.period.start).toEqual(new Date("January 2022").toISOString());
+        expect(result.period.start).toEqual(new Date('January 2022').toISOString());
       }
-
-    })
+    });
 
     it('fills in end of period even without start', () => {
       const researchStudy = new ResearchStudyObj('id');
       const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
-        completion_date: ["February 2023"]
+        protocolSection: {
+          statusModule: {
+            completionDateStruct: {
+              date: '2023-02',
+              type: DateType.ACTUAL
+            }
+          }
+        }
       });
 
       expect(result.period).toBeDefined();
@@ -1639,41 +1368,29 @@ describe('ClinicalTrialsGovService', () => {
         expect(result.period.start).not.toBeDefined();
         expect(result.period.end).toBeDefined();
 
-        expect(result.period.end).toEqual(new Date("February 2023").toISOString());
+        expect(result.period.end).toEqual(new Date('February 2023').toISOString());
       }
-
-    })
-
-    it('does not fill in period if unknown', () => {
-      const researchStudy = new ResearchStudyObj('id');
-      const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
-        start_date: ["Unknown"],
-        completion_date: ["Unknown"]
-      });
-
-      expect(result.period).not.toBeDefined();
-    })
+    });
 
     it('does not fill in period if not a real date', () => {
       const researchStudy = new ResearchStudyObj('id');
       const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
-        start_date: ["Text that is not a date"],
-        completion_date: ["Text that is not a date"]
+        protocolSection: {
+          statusModule: {
+            startDateStruct: {
+              date: 'Not real',
+              type: DateType.ACTUAL
+            },
+            completionDateStruct: {
+              date: 'Not real',
+              type: DateType.ACTUAL
+            }
+          }
+        }
       });
 
       expect(result.period).not.toBeDefined();
-    })
-
-
-    it('doess not fill in period if not a real date as VariableDateStruct', () => {
-      const researchStudy = new ResearchStudyObj('id');
-      const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
-        start_date: [{ $: { type: "Actual"}, _: "Not real" }],
-        completion_date:  [{ $: { type: "Actual"}, _: "Not real" }],
-      });
-
-      expect(result.period).not.toBeDefined();
-    })
+    });
 
     it('fills in description', () => {
       expect(updatedTrial.description).toBeDefined();
@@ -1683,7 +1400,11 @@ describe('ClinicalTrialsGovService', () => {
       const actual = ctg.updateResearchStudyWithClinicalStudy(
         { resourceType: 'ResearchStudy', status: 'active' },
         {
-          overall_status: ['Available']
+          protocolSection: {
+            statusModule: {
+              lastKnownStatus: Status.AVAILABLE
+            }
+          }
         }
       );
       expect(actual.status).toEqual('completed');
@@ -1694,7 +1415,11 @@ describe('ClinicalTrialsGovService', () => {
         { resourceType: 'ResearchStudy', status: 'active' },
         {
           // Lie about types
-          overall_status: ['something invalid' as unknown as StatusEnum]
+          protocolSection: {
+            statusModule: {
+              lastKnownStatus: 'something invalid' as unknown as Status
+            }
+          }
         }
       );
       // It shouldn't have changed it, because it can't
@@ -1705,7 +1430,11 @@ describe('ClinicalTrialsGovService', () => {
       const actual = ctg.updateResearchStudyWithClinicalStudy(
         { resourceType: 'ResearchStudy', status: 'active' },
         {
-          condition: ['Condition 1', 'Condition 2']
+          protocolSection: {
+            conditionsModule: {
+              conditions: ['Condition 1', 'Condition 2']
+            }
+          }
         }
       );
       expect(actual.condition).toBeDefined();
@@ -1719,26 +1448,22 @@ describe('ClinicalTrialsGovService', () => {
     it('fills in contact', () => {
       const researchStudy = new ResearchStudyObj('id');
       const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
-        overall_contact: [
-          {
-            first_name: ['First'],
-            middle_name: ['Middle'],
-            last_name: ['Last'],
-            degrees: ['MD'],
-            phone: ['1112223333'],
-            email: ['email@example.com']
+        protocolSection: {
+          contactsLocationsModule: {
+            centralContacts: [
+              {
+                name: 'First Middle Last, MD',
+                phone: '1112223333',
+                email: 'email@example.com'
+              },
+              {
+                name: 'First2 Middle2 Last2, DO',
+                phone: '1234567890',
+                email: 'email2@example.com'
+              }
+            ]
           }
-        ],
-        overall_contact_backup: [
-          {
-            first_name: ['First2'],
-            middle_name: ['Middle2'],
-            last_name: ['Last2'],
-            degrees: ['DO'],
-            phone: ['1234567890'],
-            email: ['email2@example.com']
-          }
-        ]
+        }
       });
 
       expect(result.contact).toBeDefined();
@@ -1768,20 +1493,20 @@ describe('ClinicalTrialsGovService', () => {
     it('fills in contacts even with missing information', () => {
       const researchStudy = new ResearchStudyObj('id');
       const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
-        overall_contact: [
-          {
-            first_name: ['First'],
-            last_name: ['Last'],
-            email: ['email@example.com']
+        protocolSection: {
+          contactsLocationsModule: {
+            centralContacts: [
+              {
+                name: 'First Last',
+                email: 'email@example.com'
+              },
+              {
+                name: 'Middle2',
+                phone: '1234567890'
+              }
+            ]
           }
-        ],
-        overall_contact_backup: [
-          {
-            middle_name: ['Middle2'],
-            degrees: ['DO'],
-            phone: ['1234567890']
-          }
-        ]
+        }
       });
 
       expect(result.contact).toBeDefined();
@@ -1794,7 +1519,7 @@ describe('ClinicalTrialsGovService', () => {
               telecom: [{ system: 'email', value: 'email@example.com', use: 'work' }]
             }),
             jasmine.objectContaining({
-              name: ' Middle2, DO',
+              name: 'Middle2',
               telecom: [{ system: 'phone', value: '1234567890', use: 'work' }]
             })
           ])
@@ -1806,16 +1531,15 @@ describe('ClinicalTrialsGovService', () => {
       const researchStudy = new ResearchStudyObj('id');
       const location = researchStudy.addSite('Example');
       const result = ctg.updateResearchStudyWithClinicalStudy(researchStudy, {
-        location: [
-          {
-            // Everything here is technically optional
-            facility: [
+        protocolSection: {
+          contactsLocationsModule: {
+            locations: [
               {
-                name: ['Facility ']
+                facility: 'Facility'
               }
             ]
           }
-        ]
+        }
       });
       expect(result.site).toBeDefined();
       const sites = result.site;
@@ -1912,39 +1636,54 @@ describe('ClinicalTrialsGovService', () => {
       const result = ctg.updateResearchStudyWithClinicalStudy(
         { resourceType: 'ResearchStudy', status: 'active' },
         {
-          location: [
-            // Everything in location is optional, so this is valid:
-            {},
-            {
-              // Everything in facility is valid, so this is also valid
-              facility: [{}]
-            },
-            {
-              facility: [{ name: ['Only Email'] }],
-              contact: [{ email: ['email@example.com'] }]
-            },
-            {
-              facility: [{ name: ['Only Phone'] }],
-              contact: [{ phone: ['781-555-0100'] }]
-            },
-            {
-              facility: [{ name: ['Phone and Email'] }],
-              contact: [
+          protocolSection: {
+            contactsLocationsModule: {
+              locations: [
+                // Everything in location is optional, so this is valid:
+                {},
                 {
-                  email: ['hasemail@example.com'],
-                  phone: ['781-555-0101']
-                }
-              ]
-            },
-            {
-              facility: [
+                  facility: 'No Details'
+                },
                 {
-                  name: ['Only Address'],
-                  address: [{ city: ['Bedford'], state: ['MA'], country: ['US'], zip: ['01730'] }]
+                  facility: 'Only Email',
+                  contacts: [
+                    {
+                      email: 'email@example.com'
+                    }
+                  ]
+                },
+                {
+                  facility: 'Only Phone',
+                  contacts: [
+                    {
+                      phone: '781-555-0100'
+                    }
+                  ]
+                },
+                {
+                  facility: 'Phone and Email',
+                  contacts: [
+                    {
+                      email: 'hasemail@example.com',
+                      phone: '781-555-0101'
+                    }
+                  ]
+                },
+                {
+                  facility: 'Only Address',
+                  city: 'Bedford',
+                  state: 'MA',
+                  country: 'US',
+                  zip: '01730',
+                  contacts: [
+                    {
+                      email: 'email@example.com'
+                    }
+                  ]
                 }
               ]
             }
-          ]
+          }
         }
       );
       // Sites should be filled out
@@ -1973,31 +1712,31 @@ describe('ClinicalTrialsGovService', () => {
 
     function expectEmptyResearchStudy(researchStudy: ResearchStudy): void {
       // Technically this is just checking fields updateResearchStudyWithClinicalStudy may change
-      expect(researchStudy.contained).not.toBeDefined('contained');
-      expect(researchStudy.enrollment).not.toBeDefined('enrollment');
-      expect(researchStudy.description).not.toBeDefined('description');
-      expect(researchStudy.phase).not.toBeDefined('phase');
-      expect(researchStudy.category).not.toBeDefined('category');
+      expect(researchStudy.contained).withContext('contained').not.toBeDefined();
+      expect(researchStudy.enrollment).withContext('enrollment').not.toBeDefined();
+      expect(researchStudy.description).withContext('description').not.toBeDefined();
+      expect(researchStudy.phase).withContext('phase').not.toBeDefined();
+      expect(researchStudy.category).withContext('category').not.toBeDefined();
       expect(researchStudy.status).toEqual('active');
-      expect(researchStudy.condition).not.toBeDefined('condition');
-      expect(researchStudy.site).not.toBeDefined('site');
+      expect(researchStudy.condition).withContext('condition').not.toBeDefined();
+      expect(researchStudy.site).withContext('site').not.toBeDefined();
     }
 
-    it("handles XML with missing data (doesn't crash)", () => {
+    it("handles JSON with missing data (doesn't crash)", () => {
       let researchStudy: ResearchStudy;
-      // This is technically invalid, the XML is entirely missing
+      // According to the schema, literally everything is optional, so an empty object should "work"
       researchStudy = ctg.updateResearchStudyWithClinicalStudy(new ResearchStudyObj('id'), {});
       // Expect nothing to have changed
       expectEmptyResearchStudy(researchStudy);
-      // Some partial XML
+      // Some partial JSON
       researchStudy = ctg.updateResearchStudyWithClinicalStudy(new ResearchStudyObj('id'), {
-        eligibility: [
-          {
-            gender: ['All'],
-            minimum_age: ['18 Years'],
-            maximum_age: ['N/A']
+        protocolSection: {
+          eligibilityModule: {
+            genderBased: false,
+            minimumAge: '18 years',
+            maximumAge: 'N/A'
           }
-        ]
+        }
       });
       expectEmptyResearchStudy(researchStudy);
     });

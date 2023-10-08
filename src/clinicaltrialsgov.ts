@@ -171,6 +171,10 @@ export function convertClincalStudyStatusToFHIRStatus(status: Status): ResearchS
   return CLINICAL_STATUS_MAP.get(status);
 }
 
+function convertToTitleCase(str: string): string {
+  return str.replace(/\b(\w+)\b/g, (s) => s.substring(0, 1) + s.substring(1).toLowerCase()).replace(/_/g, ' ');
+}
+
 function convertArrayToCodeableConcept(trialConditions: string[]): CodeableConcept[] {
   const fhirConditions: CodeableConcept[] = [];
   for (const condition of trialConditions) {
@@ -541,7 +545,7 @@ export class ClinicalTrialsGovService {
 
   /**
    * The maximum allowed entry size before it is rejected. Default is 128MB, which is hopefully well more than necessary
-   * for any reasonable clinical trial XML.
+   * for any reasonable clinical trial JSON.
    */
   maxAllowedEntrySize = 128 * 1024 * 1024;
 
@@ -591,14 +595,14 @@ export class ClinicalTrialsGovService {
   async init(): Promise<void> {
     this.log('Using %s as cache dir for clinicaltrials.gov data', this.dataDir);
     const baseDirExisted = !(await mkdir(this.fs, this.dataDir));
-    // The XML
-    const xmlDirExisted = !(await mkdir(this.fs, this.cacheDataDir));
-    if (baseDirExisted && xmlDirExisted) {
+    // The directory containing cached studies
+    const dataDirExisted = !(await mkdir(this.fs, this.cacheDataDir));
+    if (baseDirExisted && dataDirExisted) {
       // If both directories existed, it's necessary to restore the cache directory
       await this.restoreCacheFromFS();
       this.log('Restored existing cache data.');
     } else {
-      this.log(baseDirExisted ? 'Created XML directory for storing result' : 'Created new cache directory');
+      this.log(baseDirExisted ? 'Created data directory for storing result' : 'Created new cache directory');
     }
     // Once started, run the cache cleanup every _cleanupIntervalMillis
     this.setCleanupTimeout();
@@ -665,7 +669,7 @@ export class ClinicalTrialsGovService {
             // can't be parsed.
             const baseName = file.substring(0, dotIdx);
             const extension = file.substring(dotIdx + 1);
-            if (isValidNCTNumber(baseName) && extension === 'xml') {
+            if (isValidNCTNumber(baseName) && extension === 'json') {
               promises.push(this.createCacheEntry(baseName, path.join(this.cacheDataDir, file)));
             }
           }
@@ -888,7 +892,7 @@ export class ClinicalTrialsGovService {
   private pathForNctNumber(nctNumber: NCTNumber): string {
     // FIXME: It's probably best not to use the NCT number as the sole part of the filename. See
     // removeExpiredCacheEntries for details.
-    return path.join(this.cacheDataDir, nctNumber + '.xml');
+    return path.join(this.cacheDataDir, nctNumber + '.json');
   }
 
   private addCacheEntry(nctNumber: NCTNumber, contents: string): Promise<void> {
@@ -989,9 +993,7 @@ export function createClinicalTrialsGovService(
  * Mapping as defined by https://www.hl7.org/fhir/researchstudy-mappings.html#clinicaltrials-gov
  *
  * @param result the research study to update
- * @param study the clinical study to use to update (this takes a partial as the ClinicalStudy type describes the XML
- * as the schema defines it, so this is designed to handle invalid XML that's missing information that should be
- * required)
+ * @param study the clinical study to use to update
  */
 export function updateResearchStudyWithClinicalStudy(
   result: ResearchStudy,
@@ -1061,8 +1063,7 @@ export function updateResearchStudyWithClinicalStudy(
     }
 
     if (designInfo.primaryPurpose && !types.includes('Primary Purpose')) {
-      // FIXME: Convert to title case
-      categories.push({ text: 'Primary Purpose: ' + designInfo.primaryPurpose });
+      categories.push({ text: 'Primary Purpose: ' + convertToTitleCase(designInfo.primaryPurpose) });
     }
 
     if (designInfo.maskingInfo?.maskingDescription && !types.includes('Masking')) {
@@ -1070,18 +1071,15 @@ export function updateResearchStudyWithClinicalStudy(
     }
 
     if (designInfo.allocation && !types.includes('Allocation')) {
-      // FIXME: Convert to title case
-      categories.push({ text: 'Allocation: ' + designInfo.allocation });
+      categories.push({ text: 'Allocation: ' + convertToTitleCase(designInfo.allocation) });
     }
 
     if (designInfo.timePerspective && !types.includes('Time Perspective')) {
-      // FIXME: Convert to title case
-      categories.push({ text: 'Time Perspective: ' + designInfo.timePerspective });
+      categories.push({ text: 'Time Perspective: ' + convertToTitleCase(designInfo.timePerspective) });
     }
 
     if (designInfo.observationalModel && !types.includes('Observation Model')) {
-      // FIXME: Convert to title case
-      categories.push({ text: 'Observation Model: ' + designInfo.observationalModel });
+      categories.push({ text: 'Observation Model: ' + convertToTitleCase(designInfo.observationalModel) });
     }
   }
 
