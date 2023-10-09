@@ -7,6 +7,12 @@ import { debuglog } from 'util';
 // Re-export the study type
 export { Study };
 
+/**
+ * The default endpoint if none is specified: the clinicaltrials.gov v2 API
+ * endpoint.
+ */
+export const DEFAULT_ENDPOINT = 'https://clinicaltrials.gov/api/v2';
+
 type Logger = (message: string, ...param: unknown[]) => void;
 
 /**
@@ -26,7 +32,7 @@ export class ClinicalTrialsGovAPI {
       debuglog('ctgov-api', (log) => {
         this._log = log;
       });
-    this._endpoint = options?.endpoint ?? 'https://clinicaltrials.gov/api/v2';
+    this._endpoint = options?.endpoint ?? DEFAULT_ENDPOINT;
   }
 
   /**

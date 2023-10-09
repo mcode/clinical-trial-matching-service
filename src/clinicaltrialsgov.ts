@@ -16,27 +16,15 @@
  * This will fill out whatever can be filled out within the given studies.
  */
 
-import fs from 'fs';
+import fs, { WriteFileOptions } from 'fs';
 import path from 'path';
 import * as https from 'https';
 // Needed for types:
 import * as http from 'http';
 import { debuglog } from 'util';
-import {
-  CodeableConcept,
-  ContactDetail,
-  ContactPoint,
-  Group,
-  Location,
-  PlanDefinition,
-  Reference,
-  ResearchStudy,
-  ResearchStudyArm
-} from 'fhir/r4';
+import { ResearchStudy } from 'fhir/r4';
 import { ClinicalTrialsGovAPI, Study } from './clinical-trials-gov';
-import { Status } from './ctg-api';
-import { addContainedResource, addToContainer } from './research-study';
-import { WriteFileOptions } from 'fs';
+import { updateResearchStudyWithClinicalStudy } from './study-fhir-converter';
 
 /**
  * Logger type from the NodeJS utilities. (The TypeScript definitions for Node
@@ -124,7 +112,8 @@ export function findNCTNumbers(studies: ResearchStudy[]): Map<NCTNumber, Researc
  * Attempts to parse the given string as a Study JSON object.
  * @param fileContents the contents of the file as a string
  * @param log an optional logger
- * @returns a promise that resolves to the parsed object or null
+ * @returns a promise that resolves to the parsed object or null if the study
+ * could not be parsed
  */
 export function parseStudyJson(fileContents: string, log?: Logger): Study | null {
   try {
@@ -147,42 +136,6 @@ export function parseStudyJson(fileContents: string, log?: Logger): Study | null
   }
 }
 
-const CLINICAL_STATUS_MAP = new Map<Status, ResearchStudy['status']>([
-  [Status.ACTIVE_NOT_RECRUITING, 'closed-to-accrual'],
-  [Status.COMPLETED, 'completed'],
-  // FIXME: This does not appear to have a proper mapping
-  [Status.ENROLLING_BY_INVITATION, 'active'],
-  [Status.NOT_YET_RECRUITING, 'approved'],
-  [Status.RECRUITING, 'active'],
-  [Status.SUSPENDED, 'temporarily-closed-to-accrual'],
-  [Status.TERMINATED, 'administratively-completed'],
-  [Status.WITHDRAWN, 'withdrawn'],
-  [Status.AVAILABLE, 'completed'],
-  [Status.NO_LONGER_AVAILABLE, 'closed-to-accrual'],
-  [Status.TEMPORARILY_NOT_AVAILABLE, 'temporarily-closed-to-accrual'],
-  [Status.APPROVED_FOR_MARKETING, 'completed'],
-  // FIXME: This does not appear to have a proper mapping
-  [Status.WITHHELD, 'in-review'],
-  // FIXME: This does not appear to have a proper mapping
-  [Status.UNKNOWN, 'in-review']
-]);
-
-export function convertClincalStudyStatusToFHIRStatus(status: Status): ResearchStudy['status'] | undefined {
-  return CLINICAL_STATUS_MAP.get(status);
-}
-
-function convertToTitleCase(str: string): string {
-  return str.replace(/\b(\w+)\b/g, (s) => s.substring(0, 1) + s.substring(1).toLowerCase()).replace(/_/g, ' ');
-}
-
-function convertArrayToCodeableConcept(trialConditions: string[]): CodeableConcept[] {
-  const fhirConditions: CodeableConcept[] = [];
-  for (const condition of trialConditions) {
-    fhirConditions.push({ text: condition });
-  }
-  return fhirConditions;
-}
-
 /**
  * Subset of the Node.js fs module necessary to handle the cache file system, allowing it to be overridden if
  * necessary.
@@ -196,7 +149,12 @@ export interface FileSystem {
   mkdir: (path: string, callback: (err: NodeJS.ErrnoException | null) => void) => void;
   readdir: (path: string, callback: (err: NodeJS.ErrnoException | null, files: string[]) => void) => void;
   stat: (path: string, callback: (err: NodeJS.ErrnoException | null, stat: fs.Stats) => void) => void;
-  writeFile: (file: string, data: Buffer | string, options: WriteFileOptions, callback: (err: Error | null) => void) => void;
+  writeFile: (
+    file: string,
+    data: Buffer | string,
+    options: WriteFileOptions,
+    callback: (err: Error | null) => void
+  ) => void;
   unlink: (path: string, callback: (err: NodeJS.ErrnoException | null) => void) => void;
 }
 
@@ -577,7 +535,7 @@ export class ClinicalTrialsGovService {
    */
   constructor(public readonly dataDir: string, options?: ClinicalTrialsGovServiceOptions) {
     this.cacheDataDir = path.join(dataDir, 'data');
-    const log = options ? options.log : null;
+    const log = options ? options.log : undefined;
     // If no log was given, create it
     this.log = log ?? debuglog('ctgovservice');
     // Default expiration timeout to an hour
@@ -585,7 +543,7 @@ export class ClinicalTrialsGovService {
     // Default cleanup interval to an hour
     this.cleanupInterval = options?.cleanInterval ?? 60 * 60 * 1000;
     this.fs = options?.fs ?? fs;
-    this.service = new ClinicalTrialsGovAPI();
+    this.service = new ClinicalTrialsGovAPI({ logger: this.log });
   }
 
   /**
@@ -799,12 +757,12 @@ export class ClinicalTrialsGovService {
       }
     }
     // Now that we have the IDs, we can split them into download requests
-    const promises: Promise<void>[] = [];
+    const promises: Promise<boolean>[] = [];
     for (let start = 0; start < ids.length; start += this.maxTrialsPerRequest) {
       promises.push(this.downloadTrials(ids.slice(start, Math.min(start + this.maxTrialsPerRequest, ids.length))));
     }
     return Promise.all(promises).then(() => {
-      // This exists solely to turn the result from an array of nothing into a single nothing
+      // This exists solely to turn the result from an array of success/fails into a single nothing
     });
   }
 
@@ -813,9 +771,11 @@ export class ClinicalTrialsGovService {
    * always replace trials if they exist.
    *
    * @param ids the IDs of the trials to download
-   * @returns a Promise that resolves to the path where the given IDs were downloaded
+   * @returns true if the request succeeded, false if it failed for some reason - the exact reason can be logged but
+   * is otherwise silently eaten
    */
-  protected async downloadTrials(ids: string[]): Promise<void> {
+  protected async downloadTrials(ids: string[]): Promise<boolean> {
+    let success = false;
     // Now that we're starting to download clinical trials, immediately create pending entries for them.
     for (const id of ids) {
       if (!this.cache.has(id)) {
@@ -825,15 +785,12 @@ export class ClinicalTrialsGovService {
     try {
       const studies = await this.service.fetchStudies(ids);
       for (const study of studies) {
-        // Grab the NCT ID of this study
-        const nctId = study.protocolSection?.identificationModule?.nctId;
-        // TODO: Handle aliases?
-        if (nctId) {
-          await this.addCacheEntry(nctId, JSON.stringify(study));
-        }
+        await this.addCacheEntry(study);
       }
+      success = true;
     } catch (ex) {
       // If an error occurred while fetching studies, every cache entry we just loaded may be invalid.
+      this.log('Error while fetching trials: %o', ex);
       this.log('Invalidating cache entry IDs for: %s', ids);
       for (const id of ids) {
         const entry = this.cache.get(id);
@@ -851,6 +808,7 @@ export class ClinicalTrialsGovService {
         this.cache.delete(id);
       }
     }
+    return success;
   }
 
   /**
@@ -864,28 +822,6 @@ export class ClinicalTrialsGovService {
   }
 
   /**
-   * Internal method to create a temporary file within the data directory. Temporary files created via this method are
-   * not automatically deleted and need to be cleaned up by the caller.
-   */
-  private createTemporaryFileName(): string {
-    // For now, temporary files are always "temp-[DATE]-[PID]-[TEMPID]" where [TEMPID] is an incrementing internal ID.
-    // This means that temp files should never collide across processes or within a process. However, if a temporary
-    // file is created and then the server is restarted and it somehow manages to get the same PID, a collision can
-    // happen in that case.
-    const now = new Date();
-    return [
-      'temp-',
-      now.getUTCFullYear(),
-      (now.getUTCMonth() + 1).toString().padStart(2, '0'),
-      now.getUTCDate().toString().padStart(2, '0'),
-      '-',
-      process.pid,
-      '-',
-      this.tempId++
-    ].join('');
-  }
-
-  /**
    * Create a path to the data file that stores data about a cache entry.
    * @param nctNumber the NCT number
    */
@@ -895,19 +831,30 @@ export class ClinicalTrialsGovService {
     return path.join(this.cacheDataDir, nctNumber + '.json');
   }
 
-  private addCacheEntry(nctNumber: NCTNumber, contents: string): Promise<void> {
-    const filename = path.join(this.cacheDataDir, nctNumber + '.json');
+  private addCacheEntry(study: Study): Promise<void> {
+    // See if we can locate an NCT number for this study.
+    const nctNumber = study.protocolSection?.identificationModule?.nctId;
+    if (typeof nctNumber !== 'string') {
+      this.log(
+        'Ignoring study object from server: unable to locate an NCT ID for it! (protocolSection.identificationModule.nctId missing or not a string)'
+      );
+      return Promise.resolve();
+    }
+    const filename = this.pathForNctNumber(nctNumber);
     // The cache entry should already exist
     const entry = this.cache.get(nctNumber);
     // Tell the entry that we are writing data
     if (entry) {
       entry.found();
+    } else {
+      this.log('No cache entry for %s! NOT writing it to cache! (Got back a different NCT number?)', nctNumber);
+      return Promise.resolve();
     }
     return new Promise<void>((resolve, reject) => {
       // This indicates whether no error was raised - close can get called anyway, and it's slightly cleaner to just
       // mark that an error happened and ignore the close handler if it did.
       // (This also potentially allows us to do additional cleanup on close if an error happened.)
-      this.fs.writeFile(filename, contents, 'utf8', (err) => {
+      this.fs.writeFile(filename, JSON.stringify(study), 'utf8', (err) => {
         if (err) {
           this.log('Unable to create file [%s]: %o', filename, err);
           // If the cache entry exists in pending mode, delete it - we failed to create this entry
@@ -984,278 +931,4 @@ export function createClinicalTrialsGovService(
   options?: ClinicalTrialsGovServiceOptions
 ): Promise<ClinicalTrialsGovService> {
   return ClinicalTrialsGovService.create(dataDir, options);
-}
-
-/**
- * Updates a research study with data from a clinical study off the ClinicalTrials.gov website. This will only update
- * fields that do not have data, it will not overwrite any existing data.
- *
- * Mapping as defined by https://www.hl7.org/fhir/researchstudy-mappings.html#clinicaltrials-gov
- *
- * @param result the research study to update
- * @param study the clinical study to use to update
- */
-export function updateResearchStudyWithClinicalStudy(
-  result: ResearchStudy,
-  study: Study
-): ResearchStudy {
-  const protocolSection = study.protocolSection;
-  // If there is no protocol section, we can't do anything.
-  if (!protocolSection) {
-    return result;
-  }
-  if (!result.enrollment) {
-    const eligibility = protocolSection.eligibilityModule;
-    if (eligibility) {
-      const criteria = eligibility.eligibilityCriteria;
-      if (criteria) {
-        const group: Group = { resourceType: 'Group', id: 'group' + result.id, type: 'person', actual: false };
-        const reference = addContainedResource(result, group);
-        reference.display = criteria;
-        result.enrollment = [reference];
-      }
-    }
-  }
-
-  if (!result.description) {
-    const briefSummary = protocolSection.descriptionModule?.briefSummary;
-    if (briefSummary) {
-      result.description = briefSummary;
-    }
-  }
-
-  if (!result.phase) {
-    const phase = protocolSection.designModule?.phases;
-    if (phase && phase.length > 0) {
-      // For now, just grab whatever the first phase is
-      result.phase = {
-        coding: [
-          {
-            system: 'http://terminology.hl7.org/CodeSystem/research-study-phase',
-            code: phase[0],
-            display: phase[0]
-          }
-        ],
-        text: phase[0]
-      };
-    }
-  }
-
-  // ------- Category
-  // Since we may not have all of the Study design in the result, we need to do a merge of data
-  const studyType = study.protocolSection?.designModule?.studyType;
-  const categories: CodeableConcept[] = result.category ? result.category : [];
-
-  // We need to determine what categories have already been declared.
-  const types = categories.map((item) => {
-    const sep = item.text?.split(':');
-    return sep ? sep[0] : '';
-  });
-
-  if (studyType && !types.includes('Study Type')) {
-    categories.push({ text: 'Study Type: ' + studyType[0] });
-  }
-
-  const designInfo = protocolSection.designModule?.designInfo;
-  if (designInfo) {
-    if (designInfo.interventionModelDescription && !types.includes('Intervention Model')) {
-      categories.push({ text: 'Intervention Model: ' + designInfo.interventionModelDescription });
-    }
-
-    if (designInfo.primaryPurpose && !types.includes('Primary Purpose')) {
-      categories.push({ text: 'Primary Purpose: ' + convertToTitleCase(designInfo.primaryPurpose) });
-    }
-
-    if (designInfo.maskingInfo?.maskingDescription && !types.includes('Masking')) {
-      categories.push({ text: 'Masking: ' + designInfo.maskingInfo?.maskingDescription });
-    }
-
-    if (designInfo.allocation && !types.includes('Allocation')) {
-      categories.push({ text: 'Allocation: ' + convertToTitleCase(designInfo.allocation) });
-    }
-
-    if (designInfo.timePerspective && !types.includes('Time Perspective')) {
-      categories.push({ text: 'Time Perspective: ' + convertToTitleCase(designInfo.timePerspective) });
-    }
-
-    if (designInfo.observationalModel && !types.includes('Observation Model')) {
-      categories.push({ text: 'Observation Model: ' + convertToTitleCase(designInfo.observationalModel) });
-    }
-  }
-
-  if (categories.length > 1) result.category = categories;
-  // ------- Category
-
-  // Right now, the default value for a research study is "active". If CT.G
-  // knows better, then allow it to override that.
-  if (!result.status || result.status == 'active') {
-    const overallStatus = protocolSection.statusModule?.lastKnownStatus;
-    if (overallStatus) {
-      const status = convertClincalStudyStatusToFHIRStatus(overallStatus);
-      if (typeof status !== 'undefined') result.status = status;
-    }
-  }
-
-  if (!result.condition) {
-    if (protocolSection.conditionsModule?.conditions) {
-      result.condition = convertArrayToCodeableConcept(protocolSection.conditionsModule?.conditions);
-    }
-  }
-
-  if (!result.site) {
-    const locations = protocolSection.contactsLocationsModule?.locations;
-    if (locations) {
-      let index = 0;
-      for (const location of locations) {
-        const fhirLocation: Location = { resourceType: 'Location', id: 'location-' + index++ };
-        if (location) {
-          if (location.facility) fhirLocation.name = location.facility;
-          if (location.city && location.country) {
-            // Also add the address information
-            fhirLocation.address = { use: 'work', city: location.city, country: location.country };
-            if (location.state) {
-              fhirLocation.address.state = location.state;
-            }
-            if (location.zip) {
-              fhirLocation.address.postalCode = location.zip;
-            }
-          }
-        }
-        if (location.contacts) {
-          for (const contact of location.contacts) {
-            if (contact.email) {
-              addToContainer<Location, ContactPoint, 'telecom'>(fhirLocation, 'telecom', {
-                system: 'email',
-                value: contact.email,
-                use: 'work'
-              });
-            }
-            if (contact.phone) {
-              addToContainer<Location, ContactPoint, 'telecom'>(fhirLocation, 'telecom', {
-                system: 'phone',
-                value: contact.phone,
-                use: 'work'
-              });
-            }
-          }
-        }
-        addToContainer<ResearchStudy, Reference, 'site'>(result, 'site', addContainedResource(result, fhirLocation));
-      }
-    }
-  }
-
-  if (!result.arm) {
-    const armGroups = protocolSection.armsInterventionsModule?.armGroups;
-    if (armGroups) {
-      for (const studyArm of armGroups) {
-        const label = studyArm.label;
-        if (label) {
-          const arm: ResearchStudyArm = {
-            name: label,
-            ...(studyArm.type && {
-              type: {
-                coding: [
-                  {
-                    code: studyArm.type,
-                    display: studyArm.type
-                  }
-                ],
-                text: studyArm.type
-              }
-            }),
-            ...(studyArm.description && { description: studyArm.description[0] })
-          };
-
-          addToContainer<ResearchStudy, ResearchStudyArm, 'arm'>(result, 'arm', arm);
-        }
-      }
-    }
-  }
-
-  if (!result.protocol) {
-    const interventions = protocolSection.armsInterventionsModule?.interventions;
-    if (interventions) {
-      let index = 0;
-      for (const intervention of interventions) {
-        if (intervention.armGroupLabels) {
-          for (const armGroupLabel of intervention.armGroupLabels) {
-            let plan: PlanDefinition = { resourceType: 'PlanDefinition', status: 'unknown', id: 'plan-' + index++ };
-
-            plan = {
-              ...plan,
-              ...(intervention.description && { description: intervention.description }),
-              ...(intervention.name && { title: intervention.name }),
-              ...(intervention.otherNames && intervention.otherNames.length > 0 && { subtitle: intervention.otherNames[0] }),
-              ...(intervention.type && { type: { text: intervention.type } }),
-              ...{ subjectCodeableConcept: { text: armGroupLabel } }
-            };
-
-            addToContainer<ResearchStudy, Reference, 'protocol'>(
-              result,
-              'protocol',
-              addContainedResource(result, plan)
-            );
-          }
-        } else {
-          let plan: PlanDefinition = { resourceType: 'PlanDefinition', status: 'unknown', id: 'plan-' + index++ };
-
-          plan = {
-            ...plan,
-            ...(intervention.description && { description: intervention.description }),
-            ...(intervention.name && { title: intervention.name }),
-            ...(intervention.otherNames && intervention.otherNames.length > 0 && { subtitle: intervention.otherNames[0] }),
-            ...(intervention.type && { type: { text: intervention.type } })
-          };
-
-          addToContainer<ResearchStudy, Reference, 'protocol'>(result, 'protocol', addContainedResource(result, plan));
-        }
-      }
-    }
-  }
-
-  if (!result.contact) {
-    const contacts = protocolSection.contactsLocationsModule?.centralContacts;
-
-    if (contacts) {
-      for (const contact of contacts) {
-        if (contact != undefined) {
-          const contactName = contact.name;
-          if (contactName) {
-            const fhirContact: ContactDetail = { name: contactName };
-            if (contact.email) {
-              addToContainer<ContactDetail, ContactPoint, 'telecom'>(fhirContact, 'telecom', {
-                system: 'email',
-                value: contact.email,
-                use: 'work'
-              });
-            }
-            if (contact.phone) {
-              addToContainer<ContactDetail, ContactPoint, 'telecom'>(fhirContact, 'telecom', {
-                system: 'phone',
-                value: contact.phone,
-                use: 'work'
-              });
-            }
-            addToContainer<ResearchStudy, ContactDetail, 'contact'>(result, 'contact', fhirContact);
-          }
-        }
-      }
-    }
-  }
-
-  if (!result.period) {
-    const startDate = protocolSection.statusModule?.startDateStruct?.date;
-    const completionDate = protocolSection.statusModule?.completionDateStruct?.date;
-    if (startDate || completionDate) {
-      // Set the period object as appropriate
-      const period = {
-          ...(startDate && { start: startDate }),
-          ...(completionDate && { end: completionDate })
-      };
-
-      if (Object.keys(period).length != 0) result.period = period;
-    }
-  }
-
-  return result;
 }
