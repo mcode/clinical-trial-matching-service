@@ -118,9 +118,8 @@ export function findNCTNumbers(studies: ResearchStudy[]): Map<NCTNumber, Researc
 export function parseStudyJson(fileContents: string, log?: Logger): Study | null {
   try {
     const json = JSON.parse(fileContents);
-    if (json === null) {
-      return null;
-    } else if (typeof json === 'object') {
+    if (typeof json === 'object' && !Array.isArray(json)) {
+      // "null" is currently "valid" - a cached failure?
       return json as Study;
     } else {
       if (log) {
@@ -851,9 +850,6 @@ export class ClinicalTrialsGovService {
       return Promise.resolve();
     }
     return new Promise<void>((resolve, reject) => {
-      // This indicates whether no error was raised - close can get called anyway, and it's slightly cleaner to just
-      // mark that an error happened and ignore the close handler if it did.
-      // (This also potentially allows us to do additional cleanup on close if an error happened.)
       this.fs.writeFile(filename, JSON.stringify(study), 'utf8', (err) => {
         if (err) {
           this.log('Unable to create file [%s]: %o', filename, err);

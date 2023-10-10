@@ -9,10 +9,7 @@ import { Volume } from 'memfs';
 import trialMissing from './data/resource.json';
 import { createClinicalStudy } from './support/clinicalstudy-factory';
 import { createResearchStudy } from './support/researchstudy-factory';
-import {
-  PagedStudies,
-  Study,
-} from '../src/ctg-api';
+import { PagedStudies, Study } from '../src/ctg-api';
 
 function specFilePath(specFilePath: string): string {
   return path.join(__dirname, '../../spec/data', specFilePath);
@@ -28,6 +25,58 @@ describe('.isValidNCTNumber', () => {
     expect(ctg.isValidNCTNumber('NCT123456789')).toBeFalse();
     expect(ctg.isValidNCTNumber('blatantly wrong')).toBeFalse();
     expect(ctg.isValidNCTNumber('')).toBeFalse();
+  });
+});
+
+describe('.parseStudyJson', () => {
+  let loggerSpy: jasmine.Spy<(message: string, ...rest: unknown[])=>void>;
+  let study: Study | null | undefined;
+  beforeEach(() => {
+    loggerSpy = jasmine.createSpy('log');
+    study = undefined;
+  });
+
+  const makeTests = (testData: string, loggerShouldBeCalled: boolean) => {
+    it ('without a logger', () => {
+      study = ctg.parseStudyJson(testData);
+    });
+
+    it('with a logger', () => {
+      study = ctg.parseStudyJson(testData, loggerSpy);
+      if (loggerShouldBeCalled) {
+        expect(loggerSpy).toHaveBeenCalled();
+      } else {
+        expect(loggerSpy).not.toHaveBeenCalled();
+      }
+    });
+  }
+
+  describe('parses valid study JSON', () => {
+    const testJsonString = fs.readFileSync(specFilePath('NCT02513394.json'), 'utf8');
+
+    afterEach(() => {
+      expect(study).toBeDefined();
+      expect(study).not.toBeNull();
+    });
+
+    makeTests(testJsonString, false);
+  });
+
+  describe('handles invalid contents', () => {
+    afterEach(() => {
+      expect(study).toBeDefined();
+      expect(study).toBeNull();
+    });
+
+    describe('(not JSON)', () => {
+      makeTests('this is not JSON', true);
+    });
+    describe('(JSON is "null")', () => {
+      makeTests('null', false);
+    });
+    describe('(JSON is not an object)', () => {
+      makeTests('[{}]', true);
+    });
   });
 });
 
@@ -868,117 +917,109 @@ describe('ClinicalTrialsGovService', () => {
     });
   });
 
-  // describe('#addCacheEntry', () => {
-  //   // addCacheEntry is responsible for taking a stream of data and writing it to a single file.
-  //   let service: ctg.ClinicalTrialsGovService;
-  //   let mockEntryStream: stream.Readable;
-  //   let mockFileStream: stream.Writable;
-  //   const mockNctNumber: ctg.NCTNumber = 'NCT12345678';
+  describe('#addCacheEntry', () => {
+    // addCacheEntry is responsible for saving a single Study object to a file
+    // There is a matrix of three entry states (existing pending, exists non-pending, does not exist) and two stream
+    // cases (succeeds, fails) that needs to be handled.
+    let service: ctg.ClinicalTrialsGovService;
+    // Error to use
+    let writeError: Error | null;
+    let writeFileSpy: jasmine.Spy;
+    const mockNctNumber = 'NCT12345678';
+    const testStudy: Study = { protocolSection: { identificationModule: { nctId: mockNctNumber } } };
 
-  //   beforeEach(() => {
-  //     service = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 0, fs: cacheFS });
-  //     // The mock entry stream is a "real" stream
-  //     // It has to be capable of reading a single chunk
-  //     let chunk: Buffer | null = Buffer.from('Test', 'utf-8');
-  //     mockEntryStream = new stream.Readable({
-  //       // Note that this cannot be an arrow function because this must be the stream
-  //       read: function () {
-  //         this.push(chunk);
-  //         // Pushing null indicates end of stream - so set the chunk to null so the next read ends the stream
-  //         chunk = null;
-  //       }
-  //     });
-  //     mockFileStream = new stream.Writable({
-  //       write: function (chunk, encoding, callback) {
-  //         // Must invoke the callback or things will freeze
-  //         callback();
-  //       },
-  //       final: function (callback) {
-  //         callback();
-  //       }
-  //     });
-  //     spyOn(cacheFS, 'createWriteStream').and.callFake(() => {
-  //       // Pretend this is a file stream for TypeScript - it doesn't really matter
-  //       return mockFileStream as unknown as fs.WriteStream;
-  //     });
-  //   });
+    beforeEach(() => {
+      service = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 0, fs: cacheFS });
 
-  //   // There is a matrix of three entry states (existing pending, exists non-pending, does not exist) and two stream
-  //   // cases (succeeds, fails) that needs to be handled.
+      writeError = null;
+      writeFileSpy = spyOn(cacheFS, 'writeFile').and.callFake((file, data, options, callback) => {
+        // Just need to invoke the callback to pretend this has completed.
+        callback(writeError);
+      });
+    });
 
-  //   // So to deal with that, create a function that creates the tests, and a flag indicating which test was running
-  //   let errorTest = false;
+    const makeTests = function () {
+      it('handles an error', async () => {
+        writeError = new Error('Test error');
+        await expectAsync(service['addCacheEntry'](testStudy)).toBeRejected();
+      });
 
-  //   const makeTests = function () {
-  //     it('handles an error', () => {
-  //       errorTest = true;
-  //       // Replace the write method with one that will throw a mock error
-  //       mockFileStream._write = (chunk, encoding, callback) => {
-  //         callback(new Error('Simulated I/O error'));
-  //       };
-  //       return expectAsync(service['addCacheEntry'](mockNctNumber, mockEntryStream)).toBeRejected();
-  //     });
+      it('handles writing the entry', async () => {
+        writeError = null;
+        await service['addCacheEntry'](testStudy);
+        expect(writeFileSpy).toHaveBeenCalled();
+      });
+    };
 
-  //     it('handles writing the entry', () => {
-  //       errorTest = false;
-  //       return expectAsync(service['addCacheEntry'](mockNctNumber, mockEntryStream)).toBeResolved();
-  //     });
-  //   };
+    it('with no entry resolves without writing anything', async () => {
+      // Make sure that nothing happens when doing this
+      await service['addCacheEntry'](testStudy);
+      expect(writeFileSpy).not.toHaveBeenCalled();
+    });
 
-  //   describe('with no entry', () => {
-  //     // Nothing to do here
-  //     makeTests();
-  //   });
+    it('with a missing NCT number resolves without writing anything', async () => {
+      // Everything in the object is optional
+      await service['addCacheEntry']({});
+      expect(writeFileSpy).not.toHaveBeenCalled();
+      // For completeness sake:
+      await service['addCacheEntry']({ protocolSection: {} });
+      expect(writeFileSpy).not.toHaveBeenCalled();
+      await service['addCacheEntry']({ protocolSection: { identificationModule: {} } });
+      expect(writeFileSpy).not.toHaveBeenCalled();
+      // And finally assume something invalid was sent
+      await service['addCacheEntry']({ protocolSection: { identificationModule: { nctId: 12 as unknown as string } } });
+      expect(writeFileSpy).not.toHaveBeenCalled();
+    });
 
-  //   describe('with an existing pending entry', () => {
-  //     let entry: ctg.CacheEntry;
-  //     let readySpy: jasmine.Spy;
-  //     beforeEach(() => {
-  //       entry = new ctg.CacheEntry(service, mockNctNumber + '.xml', { pending: true });
-  //       // Add the entry
-  //       service['cache'].set(mockNctNumber, entry);
-  //       // We want to see if ready is invoked but also have it work as expected
-  //       readySpy = spyOn(entry, 'ready').and.callThrough();
-  //     });
-  //     afterEach(() => {
-  //       if (errorTest) {
-  //         // Expect the cache entry to have been removed
-  //         expect(service['cache'].has(mockNctNumber)).toBeFalse();
-  //         // Ready should not have been called in this case
-  //         expect(readySpy).not.toHaveBeenCalled();
-  //       } else {
-  //         // Otherwise, expect the entry to be ready
-  //         expect(readySpy).toHaveBeenCalled();
-  //       }
-  //     });
+    describe('with an existing pending entry', () => {
+      let entry: ctg.CacheEntry;
+      let readySpy: jasmine.Spy;
+      beforeEach(() => {
+        entry = new ctg.CacheEntry(service, mockNctNumber + '.json', { pending: true });
+        // Add the entry
+        service['cache'].set(mockNctNumber, entry);
+        // We want to see if ready is invoked but also have it work as expected
+        readySpy = spyOn(entry, 'ready').and.callThrough();
+      });
+      afterEach(() => {
+        if (writeError != null) {
+          // Expect the cache entry to have been removed
+          expect(service['cache'].has(mockNctNumber)).toBeFalse();
+          // Ready should not have been called in this case
+          expect(readySpy).not.toHaveBeenCalled();
+        } else {
+          // Otherwise, expect the entry to be ready
+          expect(readySpy).toHaveBeenCalled();
+        }
+      });
 
-  //     // And make the tests
-  //     makeTests();
-  //   });
+      // And make the tests
+      makeTests();
+    });
 
-  //   describe('with an existing non-pending entry', () => {
-  //     let entry: ctg.CacheEntry;
-  //     let readySpy: jasmine.Spy;
-  //     beforeEach(() => {
-  //       entry = new ctg.CacheEntry(service, mockNctNumber + '.xml', {});
-  //       // Add the entry
-  //       service['cache'].set(mockNctNumber, entry);
-  //       // In this case we just want to know if ready was not invoked as it shouldn't be
-  //       readySpy = spyOn(entry, 'ready').and.callThrough();
-  //     });
-  //     afterEach(() => {
-  //       if (errorTest) {
-  //         // Expect the cache entry to remain - it's assumed the existing entry is still OK (this may be false?)
-  //         expect(service['cache'].has(mockNctNumber)).toBeTrue();
-  //       }
-  //       // In either case, ready should not have been called
-  //       expect(readySpy).not.toHaveBeenCalled();
-  //     });
+    describe('with an existing non-pending entry', () => {
+      let entry: ctg.CacheEntry;
+      let readySpy: jasmine.Spy;
+      beforeEach(() => {
+        entry = new ctg.CacheEntry(service, mockNctNumber + '.xml', {});
+        // Add the entry
+        service['cache'].set(mockNctNumber, entry);
+        // In this case we just want to know if ready was not invoked as it shouldn't be
+        readySpy = spyOn(entry, 'ready').and.callThrough();
+      });
+      afterEach(() => {
+        if (writeError != null) {
+          // Expect the cache entry to remain - it's assumed the existing entry is still OK (this may be false?)
+          expect(service['cache'].has(mockNctNumber)).toBeTrue();
+        }
+        // In either case, ready should not have been called
+        expect(readySpy).not.toHaveBeenCalled();
+      });
 
-  //     // And make the tests
-  //     makeTests();
-  //   });
-  // });
+      // And make the tests
+      makeTests();
+    });
+  });
 
   describe('#updateResearchStudy', () => {
     it('forwards to updateResearchStudyWithClinicalStudy', () => {

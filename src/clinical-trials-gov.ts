@@ -1,3 +1,6 @@
+/**
+ * Module for invoking the Clinical Trials.gov API.
+ */
 import type { IncomingMessage } from 'http';
 import https from 'https';
 import { PagedStudies, Study } from './ctg-api';
