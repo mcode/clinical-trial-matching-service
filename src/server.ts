@@ -200,9 +200,13 @@ export class ClinicalTrialMatchingService {
         } else {
           console.error('An unexpected internal server error occurred:');
           console.error(error);
+          let returnedError = 'Unknown error';
+          if (error instanceof Error) {
+            returnedError = error.toString();
+          }
           response
             .status(500)
-            .send({ error: 'Internal server error', exception: Object.prototype.toString.call(error) as string });
+            .send({ error: 'Internal server error', exception: returnedError });
         }
       };
       try {
