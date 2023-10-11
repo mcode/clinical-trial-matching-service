@@ -21,7 +21,7 @@
   },
   "scripts": {
     "build": "npm run build:openapi && npm run build:ts",
-    "build:openapi": "openapi -c node -i ctg-oas-v2.yaml -o src/ctg-api --exportCore false --exportServices false",
+    "build:openapi": "openapi -c node -i ctg-oas-v2.yaml -o src/ctg-api --indent 2 --exportCore false --exportServices false",
     "build:ts": "tsc",
     "build:tests": "tsc --build tsconfig.test.json",
     "coverage": "npm run-script build:tests && nyc --require ts-node/register --reporter=lcovonly jasmine",
