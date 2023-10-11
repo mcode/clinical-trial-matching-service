@@ -1,5 +1,5 @@
-import fs from 'fs';
-import path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import * as fhir from 'fhir/r4';
 import {CodeMapper, CodeSystemEnum} from '../src/codeMapper';
 import * as mcode from '../src/mcodeextractor';

@@ -1,12 +1,12 @@
 import { ResearchStudy } from 'fhir/r4';
 import * as ctg from '../src/clinicaltrialsgov';
-import fs from 'fs';
-import path from 'path';
-import nock from 'nock';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as nock from 'nock';
 import { Volume } from 'memfs';
 
 // Trial missing summary, inclusion/exclusion criteria, phase and study type
-import trialMissing from './data/resource.json';
+import * as trialMissing from './data/resource.json';
 import { createClinicalStudy } from './support/clinicalstudy-factory';
 import { createResearchStudy } from './support/researchstudy-factory';
 import { PagedStudies, Study } from '../src/ctg-api';

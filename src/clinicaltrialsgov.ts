@@ -16,14 +16,15 @@
  * This will fill out whatever can be filled out within the given studies.
  */
 
-import fs, { WriteFileOptions } from 'fs';
-import path from 'path';
-import * as https from 'https';
+import * as fs from 'node:fs';
+import { WriteFileOptions } from 'node:fs';
+import * as path from 'node:path';
+import * as https from 'node:https';
 // Needed for types:
-import * as http from 'http';
+import type * as http from 'http';
 import { debuglog } from 'util';
 import { ResearchStudy } from 'fhir/r4';
-import { ClinicalTrialsGovAPI, Study } from './clinical-trials-gov';
+import { ClinicalTrialsGovAPI, Study } from './clinicaltrialsgov-api';
 import { updateResearchStudyWithClinicalStudy } from './study-fhir-converter';
 
 /**

@@ -1,6 +1,6 @@
 import * as fhir from 'fhir/r4';
 import { CodeMapper, CodeSystemEnum } from '../src/codeMapper';
-import code_mapper_test from './data/code_mapper_test.json';
+import * as code_mapper_test from './data/code_mapper_test.json';
 
 describe('Code Mapper Tests', () => {
   const codeMapper = new CodeMapper(code_mapper_test);

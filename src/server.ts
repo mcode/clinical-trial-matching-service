@@ -1,5 +1,5 @@
-import express from 'express';
-import bodyParser from 'body-parser';
+import * as express from 'express';
+import * as bodyParser from 'body-parser';
 import { Bundle, ResearchStudy } from 'fhir/r4';
 import { isHttpError, restrictToHttpErrors } from './errors';
 import { isBundle } from './fhir-type-guards';

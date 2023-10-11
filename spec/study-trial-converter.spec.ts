@@ -16,9 +16,9 @@ import {
 } from '../src/ctg-api';
 
 // Trial missing summary, inclusion/exclusion criteria, phase and study type
-import sampleStudy from './data/NCT02513394.json';
-import trialMissing from './data/resource.json';
-import trialFilled from './data/complete_study.json';
+import * as sampleStudy from './data/NCT02513394.json';
+import * as trialMissing from './data/resource.json';
+import * as trialFilled from './data/complete_study.json';
 
 describe('filling out a partial trial', () => {
   // Use the downloader to load the fixture data

@@ -1,7 +1,7 @@
-import express from 'express';
-import http from 'http';
+import * as express from 'express';
+import * as http from 'node:http';
 
-import request from 'supertest';
+import * as request from 'supertest';
 
 import ClinicalTrialMatchingService from '../src/server';
 import SearchSet from '../src/searchset';
