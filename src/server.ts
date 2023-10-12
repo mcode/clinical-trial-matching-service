@@ -1,5 +1,5 @@
-import express from 'express';
-import bodyParser from 'body-parser';
+import * as express from 'express';
+import * as bodyParser from 'body-parser';
 import { Bundle, ResearchStudy } from 'fhir/r4';
 import { isHttpError, restrictToHttpErrors } from './errors';
 import { isBundle } from './fhir-type-guards';
@@ -200,9 +200,13 @@ export class ClinicalTrialMatchingService {
         } else {
           console.error('An unexpected internal server error occurred:');
           console.error(error);
+          let returnedError = 'Unknown error';
+          if (error instanceof Error) {
+            returnedError = error.toString();
+          }
           response
             .status(500)
-            .send({ error: 'Internal server error', exception: Object.prototype.toString.call(error) as string });
+            .send({ error: 'Internal server error', exception: returnedError });
         }
       };
       try {

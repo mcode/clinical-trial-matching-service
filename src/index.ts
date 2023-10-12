@@ -9,9 +9,12 @@ export * from './clinicaltrialsgov';
 export { CodeMapper, CodeSystemEnum } from './codeMapper';
 export * from './mcodeextractor';
 export { MappingLogic } from './mappinglogic';
+export { Study } from './ctg-api';
+export { ClinicalTrialsGovAPI } from './clinicaltrialsgov-api';
+export { updateResearchStudyWithClinicalStudy } from './study-fhir-converter';
 
-// The export { v } from "mod" forms do not appear to work yet
-import { ClinicalStudy } from './clinicalstudy';
+// The export { v } from "mod" forms do not appear to work for types yet, so
+// they have to be imported and then exported...
 import BasicHttpError, { HttpError, ServerError, ClientError } from './errors';
 import ClinicalTrialMatchingService, { ClinicalTrialMatcher, Configuration } from './server';
 
@@ -20,7 +23,6 @@ export * from './env';
 
 export default ClinicalTrialMatchingService;
 export {
-  ClinicalStudy,
   ClinicalTrialMatcher,
   ClinicalTrialMatchingService,
   Configuration as ServiceConfiguration,

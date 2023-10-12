@@ -1,6 +1,6 @@
 {
   "name": "clinical-trial-matching-service",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "description": "Provides a core library for interacting with the clinical-trial-matching-engine",
   "homepage": "https://github.com/mcode/clinical-trial-matching-service",
   "bugs": "https://github.com/mcode/clinical-trial-matching-service/issues",
@@ -20,7 +20,8 @@
     "url": "mcode/clinical-trial-matching-service"
   },
   "scripts": {
-    "build": "npm run build:ts",
+    "build": "npm run build:openapi && npm run build:ts",
+    "build:openapi": "openapi -c node -i ctg-oas-v2.yaml -o src/ctg-api --indent 2 --exportCore false --exportServices false",
     "build:ts": "tsc",
     "build:tests": "tsc --build tsconfig.test.json",
     "coverage": "npm run-script build:tests && nyc --require ts-node/register --reporter=lcovonly jasmine",
@@ -36,19 +37,17 @@
     "body-parser": "^1.19.0",
     "express": "^4.17.1",
     "fhirpath": "^3.3.0",
-    "xml2js": "^0.6.0",
-    "yauzl": "^2.10.0"
+    "node-fetch": "^2.7.0"
   },
   "devDependencies": {
     "@istanbuljs/nyc-config-typescript": "^1.0.1",
     "@types/express": "^4.17.17",
     "@types/fhir": "^0.0.37",
-    "@types/jasmine": "^4.3.1",
+    "@types/jasmine": "^5.1.0",
     "@types/mock-fs": "^4.13.0",
     "@types/node": "^18.6.3",
+    "@types/node-fetch": "^2.6.6",
     "@types/supertest": "^2.0.9",
-    "@types/xml2js": "^0.4.5",
-    "@types/yauzl": "^2.10.0",
     "@typescript-eslint/eslint-plugin": "^6.1.0",
     "@typescript-eslint/parser": "^6.1.0",
     "eslint": "^8.29.0",
@@ -56,6 +55,7 @@
     "memfs": "^4.2.0",
     "nock": "^13.0.4",
     "nyc": "^15.1.0",
+    "openapi-typescript-codegen": "^0.25.0",
     "source-map-support": "^0.5.19",
     "supertest": "^6.0.1",
     "ts-node": "^10.9.1",

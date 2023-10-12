@@ -1,2 +1,5 @@
 /dist
 /dist-spec
+
+# Ignore generated code
+/src/ctg-api

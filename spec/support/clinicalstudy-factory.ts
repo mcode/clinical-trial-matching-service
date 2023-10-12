@@ -1,29 +1,29 @@
-import { ClinicalStudy } from '../../src/clinicalstudy';
+import { Status, Study, StudyType } from '../../src/ctg-api';
 
 /**
  * Simple factory method for creating demo data.
  * @param nctId the NCT ID to use
  */
-export function createClinicalStudy(nctId = 'NCT12345678'): ClinicalStudy {
+export function createClinicalStudy(nctId = 'NCT12345678'): Study {
   return {
-    required_header: [{ download_date: ['test'], link_text: ['link'], url: ['http://www.example.com/'] }],
-    id_info: [
-      {
-        nct_id: [nctId]
+    protocolSection: {
+      identificationModule: {
+        nctId: nctId
+      },
+      statusModule: {
+        overallStatus: Status.AVAILABLE
+      },
+      designModule: {
+        studyType: StudyType.OBSERVATIONAL
+      },
+      descriptionModule: {
+        briefSummary: 'Title'
+      },
+      sponsorCollaboratorsModule: {
+        leadSponsor: {
+          name: 'Agency'
+        }
       }
-    ],
-    brief_title: ['Title'],
-    sponsors: [
-      {
-        lead_sponsor: [
-          {
-            agency: ['Agency']
-          }
-        ]
-      }
-    ],
-    source: ['test'],
-    overall_status: ['Available'],
-    study_type: ['Observational']
+    }
   };
 }

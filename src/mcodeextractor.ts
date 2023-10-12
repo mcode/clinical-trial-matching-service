@@ -1,4 +1,4 @@
-import fhirpath from 'fhirpath';
+import * as fhirpath from 'fhirpath';
 import * as fhir from 'fhir/r4';
 
 export type FHIRPath = string;

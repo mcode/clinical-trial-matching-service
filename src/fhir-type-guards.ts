@@ -28,3 +28,15 @@ export function isResearchStudy(o: unknown): o is ResearchStudy {
   }
   return (o as ResearchStudy).resourceType === 'ResearchStudy';
 }
+
+/**
+ * Determines if the given string is a valid FHIR date.
+ * @param str the date string to check
+ */
+export function isFhirDate(str: string): boolean {
+  // This RegExp is from the FHIR spec itself:
+  // http://hl7.org/fhir/R4/datatypes.html#dateTime
+  return /^([0-9]([0-9]([0-9][1-9]|[1-9]0)|[1-9]00)|[1-9]000)(-(0[1-9]|1[0-2])(-(0[1-9]|[1-2][0-9]|3[0-1])(T([01][0-9]|2[0-3]):[0-5][0-9]:([0-5][0-9]|60)(\.[0-9]+)?(Z|(\+|-)((0[0-9]|1[0-3]):[0-5][0-9]|14:00)))?)?)?$/.test(
+    str
+  );
+}
