@@ -1,4 +1,5 @@
 import { ClinicalTrialsGovAPI, isPagedStudies, DEFAULT_ENDPOINT, Study } from '../src/clinicaltrialsgov-api';
+import { createClinicalStudy } from './support/clinicalstudy-factory';
 import * as nock from 'nock';
 
 describe('.isPagedStudes', () => {
@@ -37,6 +38,10 @@ describe('ClinicalTrialsGovAPI', () => {
       api = new ClinicalTrialsGovAPI({ endpoint: 'https://clinicaltrials.gov/api/v2' });
     });
 
+    afterEach(() => {
+      scope.done();
+    });
+
     it('raises an error if the result does not return JSON', async () => {
       interceptor.reply(200, "something that isn't JSON");
       await expectAsync(api.fetchStudies(['NCT12345678'])).toBeRejected();
@@ -55,16 +60,36 @@ describe('ClinicalTrialsGovAPI', () => {
     });
 
     it('returns studies', async () => {
-      const testStudy: Study = {
-        protocolSection: {
-          identificationModule: {
-            nctId: 'NCT12345678'
-          }
-        }
-      };
+      const testStudy = createClinicalStudy('NCT12345678');
       interceptor.reply(200, JSON.stringify({ studies: [testStudy] }), { 'Content-Type': 'application/json' });
       const studies = await api.fetchStudies(['NCT12345678']);
       expect(studies).toEqual([testStudy]);
+    });
+
+    it('merges studies together into a single result', async () => {
+      const testStudyPage1: Study[] = [createClinicalStudy('NCT00000001'), createClinicalStudy('NCT00000002')];
+      const testStudyPage2: Study[] = [createClinicalStudy('NCT00000003'), createClinicalStudy('NCT00000004')];
+      // Default interceptor doesn't work for this
+      nock.removeInterceptor(interceptor);
+      scope.get('/api/v2/studies?filter.ids=NCT00000001,NCT00000002,NCT00000003,NCT00000004&pageSize=2').reply(
+        200,
+        JSON.stringify({
+          studies: testStudyPage1,
+          nextPageToken: 'asampletoken'
+        })
+      );
+      scope
+        .get(
+          '/api/v2/studies?filter.ids=NCT00000001,NCT00000002,NCT00000003,NCT00000004&pageSize=2&pageToken=asampletoken'
+        )
+        .reply(
+          200,
+          JSON.stringify({
+            studies: testStudyPage2
+          })
+        );
+      const studies = await api.fetchStudies(['NCT00000001', 'NCT00000002', 'NCT00000003', 'NCT00000004'], 2);
+      expect(studies).toEqual(testStudyPage1.concat(testStudyPage2));
     });
   });
 });

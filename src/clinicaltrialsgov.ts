@@ -19,9 +19,6 @@
 import * as fs from 'node:fs';
 import { WriteFileOptions } from 'node:fs';
 import * as path from 'node:path';
-import * as https from 'node:https';
-// Needed for types:
-import type * as http from 'http';
 import { debuglog } from 'util';
 import { ResearchStudy } from 'fhir/r4';
 import { ClinicalTrialsGovAPI, Study } from './clinicaltrialsgov-api';
@@ -449,7 +446,7 @@ export class ClinicalTrialsGovService {
   private _maxTrialsPerRequest = 128;
   /**
    * The maximum number of trials to attempt to download in a single request. Each NCT ID increases the URI size by
-   * effectively 15 bytes: essentially each NCT ID becomes '+OR+NCT12345678'. The request path "counts" as a header and
+   * effectively 12 bytes: essentially each NCT ID becomes ',NCT12345678'. The request path "counts" as a header and
    * has to be smaller than maxHeaderSize given to the client. By default, this uses the default client, so the client
    * should be the default HTTPS client. In theory this would support around 500 per request, instead this defaults to
    * 128 which is a nice round number. (In binary, at least.)
@@ -783,7 +780,7 @@ export class ClinicalTrialsGovService {
       }
     }
     try {
-      const studies = await this.service.fetchStudies(ids);
+      const studies = await this.service.fetchStudies(ids, this._maxTrialsPerRequest);
       for (const study of studies) {
         await this.addCacheEntry(study);
       }
@@ -809,16 +806,6 @@ export class ClinicalTrialsGovService {
       }
     }
     return success;
-  }
-
-  /**
-   * Provides a method that can be overridden to alter how a web request is
-   * made. Defaults to simply calling https.get directly.
-   * @param url the URL to get
-   * @param callback the callback
-   */
-  protected getURL(url: string, callback: (res: http.IncomingMessage) => void): http.ClientRequest {
-    return https.get(url, callback);
   }
 
   /**

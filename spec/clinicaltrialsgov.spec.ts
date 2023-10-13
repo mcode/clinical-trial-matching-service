@@ -772,13 +772,17 @@ describe('ClinicalTrialsGovService', () => {
     const nctIDs = ['NCT00000001', 'NCT00000002', 'NCT00000003'];
     beforeEach(async () => {
       scope = nock('https://clinicaltrials.gov');
-      interceptor = scope.get('/api/v2/studies?filter.ids=' + nctIDs.join(','));
+      interceptor = scope.get(`/api/v2/studies?filter.ids=${nctIDs.join(',')}&pageSize=128`);
       // Need to intercept the writeFile method
       spyOn(cacheFS, 'writeFile').and.callFake((_file, _data, _options, callback) => {
         // For these, always pretend it succeeded
         callback(null);
       });
       downloader = await ctg.createClinicalTrialsGovService(dataDirPath, { cleanInterval: 0, fs: cacheFS });
+    });
+
+    afterEach(() => {
+      scope.done();
     });
 
     it('handles failures from https.get', async () => {
@@ -790,13 +794,12 @@ describe('ClinicalTrialsGovService', () => {
       interceptor.reply(404, 'Unknown');
       // Pretend the middle entry exists
       downloader['cache'].set(nctIDs[1], new ctg.CacheEntry(downloader, nctIDs[1] + '.json', {}));
-      expect(await downloader['downloadTrials'](nctIDs)).toBeFalse();
-      expect(scope.isDone()).toBeTrue();
+      expect(await downloader['downloadTrials'](nctIDs)).withContext('downloader indicates failure').toBeFalse();
       // Check to make sure the new cache entries do not still exist - the failure should remove them, but not the
       // non-pending one
-      expect(downloader['cache'].has(nctIDs[0])).toBeFalse();
-      expect(downloader['cache'].has(nctIDs[1])).toBeTrue();
-      expect(downloader['cache'].has(nctIDs[2])).toBeFalse();
+      expect(downloader['cache'].has(nctIDs[0])).withContext('cache entry 0').toBeFalse();
+      expect(downloader['cache'].has(nctIDs[1])).withContext('cache entry 1').toBeTrue();
+      expect(downloader['cache'].has(nctIDs[2])).withContext('cache entry 2').toBeFalse();
     });
 
     it('creates cache entries', async () => {
