@@ -8,8 +8,10 @@ import {
   DesignTimePerspective,
   InterventionalAssignment,
   InterventionType,
+  Location as StudyLocation,
   ObservationalModel,
   PrimaryPurpose,
+  RecruitmentStatus,
   Status,
   Study,
   StudyType
@@ -268,6 +270,20 @@ describe('filling out a partial trial', () => {
         );
       }
     }
+  });
+
+  it('falls back on the intervention model description if no intervention model is given', () => {
+    const researchStudy = new ResearchStudyObj('id');
+    const result = updateResearchStudyWithClinicalStudy(researchStudy, {
+      protocolSection: {
+        designModule: {
+          designInfo: {
+            interventionModelDescription: 'Test intervention'
+          }
+        }
+      }
+    });
+    expect(result.category).toEqual([{ text: 'Intervention Model: Test intervention' }]);
   });
 
   it('fills in period', () => {
@@ -579,7 +595,8 @@ describe('filling out a partial trial', () => {
     expectedName?: string,
     expectedPhone?: string,
     expectedEmail?: string,
-    expectedAddress?: Address
+    expectedAddress?: Address,
+    expectedStatus?: Location['status']
   ) {
     if (resource.resourceType === 'Location') {
       const location = resource as Location;
@@ -595,6 +612,9 @@ describe('filling out a partial trial', () => {
         expect(location.address).toEqual(expectedAddress);
       } else {
         expect(location.address).not.toBeDefined();
+      }
+      if (expectedStatus) {
+        expect(location.status).toEqual(expectedStatus);
       }
     } else {
       fail(`Expected Location, got ${resource.resourceType}`);
@@ -640,6 +660,7 @@ describe('filling out a partial trial', () => {
               },
               {
                 facility: 'Only Address',
+                status: RecruitmentStatus.RECRUITING,
                 city: 'Bedford',
                 state: 'MA',
                 country: 'US',
@@ -663,13 +684,20 @@ describe('filling out a partial trial', () => {
       expectLocation(result.contained[2], 'Only Email', undefined, 'email@example.com');
       expectLocation(result.contained[3], 'Only Phone', '781-555-0100');
       expectLocation(result.contained[4], 'Phone and Email', '781-555-0101', 'hasemail@example.com');
-      expectLocation(result.contained[5], 'Only Address', undefined, undefined, {
-        use: 'work',
-        city: 'Bedford',
-        state: 'MA',
-        postalCode: '01730',
-        country: 'US'
-      });
+      expectLocation(
+        result.contained[5],
+        'Only Address',
+        undefined,
+        undefined,
+        {
+          use: 'work',
+          city: 'Bedford',
+          state: 'MA',
+          postalCode: '01730',
+          country: 'US'
+        },
+        'active'
+      );
     }
   });
 
@@ -698,6 +726,15 @@ describe('filling out a partial trial', () => {
           genderBased: false,
           minimumAge: '18 years',
           maximumAge: 'N/A'
+        }
+      }
+    });
+    expectEmptyResearchStudy(researchStudy);
+    // Some bad JSON that shouldn't cause issues
+    researchStudy = updateResearchStudyWithClinicalStudy(new ResearchStudyObj('id'), {
+      protocolSection: {
+        contactsLocationsModule: {
+          locations: [undefined as unknown as StudyLocation]
         }
       }
     });

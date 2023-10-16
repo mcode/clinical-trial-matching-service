@@ -1,4 +1,4 @@
-import { Phase, Status, Study } from './ctg-api';
+import { Phase, RecruitmentStatus, Status, Study } from './ctg-api';
 import {
   CodeableConcept,
   ContactDetail,
@@ -14,12 +14,12 @@ import { isFhirDate } from './fhir-type-guards';
 import { addContainedResource, addToContainer } from './research-study';
 
 const PHASE_MAP = new Map<Phase, string>([
-  [Phase.NA, 'n-a' ],
-  [Phase.EARLY_PHASE1, 'early-phase-1' ],
-  [Phase.PHASE1, 'phase-1' ],
-  [Phase.PHASE2, 'phase-2' ],
-[Phase.PHASE3, 'phase-3'],
-[Phase.PHASE4, 'phase-4']
+  [Phase.NA, 'n-a'],
+  [Phase.EARLY_PHASE1, 'early-phase-1'],
+  [Phase.PHASE1, 'phase-1'],
+  [Phase.PHASE2, 'phase-2'],
+  [Phase.PHASE3, 'phase-3'],
+  [Phase.PHASE4, 'phase-4']
 ]);
 
 export function convertToResearchStudyPhase(phase: Phase): string | undefined {
@@ -48,6 +48,22 @@ const CLINICAL_STATUS_MAP = new Map<Status, ResearchStudy['status']>([
 
 export function convertClincalStudyStatusToFHIRStatus(status: Status): ResearchStudy['status'] | undefined {
   return CLINICAL_STATUS_MAP.get(status);
+}
+
+const LOCATION_STATUS_MAP = new Map<RecruitmentStatus, Location['status']>([
+  [RecruitmentStatus.ACTIVE_NOT_RECRUITING, 'active'],
+  [RecruitmentStatus.COMPLETED, 'inactive'],
+  [RecruitmentStatus.ENROLLING_BY_INVITATION, 'active'],
+  [RecruitmentStatus.NOT_YET_RECRUITING, 'inactive'],
+  [RecruitmentStatus.RECRUITING, 'active'],
+  [RecruitmentStatus.SUSPENDED, 'suspended'],
+  [RecruitmentStatus.TERMINATED, 'inactive'],
+  [RecruitmentStatus.WITHDRAWN, 'inactive'],
+  [RecruitmentStatus.AVAILABLE, 'active']
+]);
+
+export function convertRecruitmentStatusToLocationStatus(status: RecruitmentStatus): Location['status'] | undefined {
+  return LOCATION_STATUS_MAP.get(status);
 }
 
 function convertToTitleCase(str: string): string {
@@ -140,7 +156,7 @@ export function updateResearchStudyWithClinicalStudy(result: ResearchStudy, stud
   if (designInfo) {
     if (!types.includes('Intervention Model')) {
       if (designInfo.interventionModel) {
-        categories.push({ text: 'Intervention Model: ' + convertToTitleCase(designInfo.interventionModel)});
+        categories.push({ text: 'Intervention Model: ' + convertToTitleCase(designInfo.interventionModel) });
       } else if (designInfo.interventionModelDescription) {
         categories.push({ text: 'Intervention Model: ' + designInfo.interventionModelDescription });
       }
@@ -172,7 +188,7 @@ export function updateResearchStudyWithClinicalStudy(result: ResearchStudy, stud
     }
   }
 
-  if (categories.length > 1) result.category = categories;
+  if (categories.length >= 1) result.category = categories;
   // ------- Category
 
   // Right now, the default value for a research study is "active". If CT.G
@@ -196,8 +212,9 @@ export function updateResearchStudyWithClinicalStudy(result: ResearchStudy, stud
     if (locations) {
       let index = 0;
       for (const location of locations) {
-        const fhirLocation: Location = { resourceType: 'Location', id: 'location-' + index++ };
-        if (location) {
+        if (typeof location === 'object' && location != null) {
+          const fhirLocation: Location = { resourceType: 'Location', id: 'location-' + index++ };
+          if (location.status) fhirLocation.status = convertRecruitmentStatusToLocationStatus(location.status);
           if (location.facility) fhirLocation.name = location.facility;
           if (location.city && location.country) {
             // Also add the address information
@@ -209,26 +226,34 @@ export function updateResearchStudyWithClinicalStudy(result: ResearchStudy, stud
               fhirLocation.address.postalCode = location.zip;
             }
           }
-        }
-        if (location.contacts) {
-          for (const contact of location.contacts) {
-            if (contact.email) {
-              addToContainer<Location, ContactPoint, 'telecom'>(fhirLocation, 'telecom', {
-                system: 'email',
-                value: contact.email,
-                use: 'work'
-              });
-            }
-            if (contact.phone) {
-              addToContainer<Location, ContactPoint, 'telecom'>(fhirLocation, 'telecom', {
-                system: 'phone',
-                value: contact.phone,
-                use: 'work'
-              });
+          // If we have an exact GPS coordinate, add that, too
+          const geoPoint = location.geoPoint;
+          if (geoPoint && typeof geoPoint.lat === 'number' && typeof geoPoint.lon === 'number') {
+            fhirLocation.position = {
+              longitude: geoPoint.lon,
+              latitude: geoPoint.lat
+            };
+          }
+          if (location.contacts) {
+            for (const contact of location.contacts) {
+              if (contact.email) {
+                addToContainer<Location, ContactPoint, 'telecom'>(fhirLocation, 'telecom', {
+                  system: 'email',
+                  value: contact.email,
+                  use: 'work'
+                });
+              }
+              if (contact.phone) {
+                addToContainer<Location, ContactPoint, 'telecom'>(fhirLocation, 'telecom', {
+                  system: 'phone',
+                  value: contact.phone,
+                  use: 'work'
+                });
+              }
             }
           }
+          addToContainer<ResearchStudy, Reference, 'site'>(result, 'site', addContainedResource(result, fhirLocation));
         }
-        addToContainer<ResearchStudy, Reference, 'site'>(result, 'site', addContainedResource(result, fhirLocation));
       }
     }
   }
