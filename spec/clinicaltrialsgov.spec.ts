@@ -273,10 +273,60 @@ describe('CacheEntry', () => {
       return expectAsync(promise).toBeResolved();
     });
   });
+  describe('#load', () => {
+    it('uses the existing load promise if invoked twice', () => {
+      const entry = new ctg.CacheEntry(service, 'test', {pending: true});
+      // This test involves calling load on an entry twice while it hasn't
+      // been resolved
+      // This spy is used to ensure everything resolves at the end
+      const testStudy = createClinicalStudy('01234567');
+      spyOn(entry, 'readFile').and.callFake(() => Promise.resolve(testStudy));
+      // Invoke load twice, as if it's coming from two different sources.
+      const promise1 = expectAsync(entry.load()).toBeResolvedTo(testStudy);
+      const promise2 = expectAsync(entry.load()).toBeResolvedTo(testStudy);
+      // Now flag the entry as ready
+      entry.ready();
+      // This should make the two other promises resolve. Return them to Jasmine
+      // to end the test
+      return Promise.all([promise1, promise2]);
+    });
+  });
+  describe('#fail', () => {
+    // These tests are for instances when an entry fails between when a read has
+    // started but before it has ended.
+    let readSpy: jasmine.Spy;
+    let entry: ctg.CacheEntry;
+    beforeEach(() => {
+      entry = new ctg.CacheEntry(service, 'test', {pending: true});
+      // This spy exists solely to create a promise that won't resolve
+      readSpy = spyOn(entry, 'readFile').and.callFake(() => Promise.reject('should not be invoked'));
+    });
+    it('handles failures while waiting for a file to be read', () => {
+      const loadPromise = entry.load();
+      // We have now triggered a load request, meaning that there is now a
+      // Promise waiting for the entry to be ready before attempting to read it
+      // Read spy should not be invoked
+      expect(readSpy).not.toHaveBeenCalled();
+      // Now fail the entry
+      entry.fail('test error');
+      return expectAsync(loadPromise).toBeRejectedWithError('test error');
+    });
+    it('rejects with the error object given', () => {
+      const loadPromise = entry.load();
+      // We have now triggered a load request, meaning that there is now a
+      // Promise waiting for the entry to be ready before attempting to read it
+      // Read spy should not be invoked
+      expect(readSpy).not.toHaveBeenCalled();
+      // Now fail the entry
+      const error = new Error('expected error object');
+      entry.fail(error);
+      return expectAsync(loadPromise).toBeRejectedWith(error);
+    });
+  });
   describe('#readFile()', () => {
     it('rejects with an error if it fails', () => {
       const readFileSpy = spyOn(fs, 'readFile') as unknown as jasmine.Spy<
-        (path: string, options: { encoding?: string }, callback: (err?: Error, data?: Buffer) => void) => void
+        (path: string, options: { encoding?: string }, callback: (err?: Error, data?: string) => void) => void
       >;
       readFileSpy.and.callFake((path, options, callback) => {
         callback(new Error('Simulated error'));
@@ -286,13 +336,24 @@ describe('CacheEntry', () => {
     });
     it('resolves to null if the file is empty', () => {
       const readFileSpy = spyOn(fs, 'readFile') as unknown as jasmine.Spy<
-        (path: string, options: { encoding?: string }, callback: (err?: Error, data?: Buffer) => void) => void
+        (path: string, options: { encoding?: string }, callback: (err?: Error, data?: string) => void) => void
       >;
       readFileSpy.and.callFake((path, options, callback) => {
-        callback(undefined, Buffer.alloc(0));
+        callback(undefined, '');
       });
       const testEntry = new ctg.CacheEntry(service, 'test', {});
       return expectAsync(testEntry.readFile()).toBeResolvedTo(null);
+    });
+    it('reads the file contents if the file exists', () => {
+      const expectedStudy = createClinicalStudy('73577357');
+      const readFileSpy = spyOn(fs, 'readFile') as unknown as jasmine.Spy<
+        (path: string, options: { encoding?: string }, callback: (err?: Error, data?: string) => void) => void
+      >;
+      readFileSpy.and.callFake((path, options, callback) => {
+        callback(undefined, JSON.stringify(expectedStudy));
+      });
+      const testEntry = new ctg.CacheEntry(service, 'test', {});
+      return expectAsync(testEntry.readFile()).toBeResolvedTo(expectedStudy);
     });
   });
   describe('#remove()', () => {

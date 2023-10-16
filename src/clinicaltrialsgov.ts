@@ -291,10 +291,10 @@ export class CacheEntry {
         // TODO (maybe): Add a timeout?
         // There's no way to prove it to TypeScript, but the executor function in the Promise runs immediately when the
         // Promise is created. So create useless no-op funcs to avoid "may be undefined" errors.
-        let resolveFunc: () => void = () => {
+        let resolveFunc: () => void = /* istanbul ignore next */ () => {
             /* no-op */
           },
-          rejectFunc: (e: Error) => void = () => {
+          rejectFunc: (e: Error) => void = /* istanbul ignore next */ () => {
             /* no-op */
           };
         promise = new Promise<void>((resolve, reject) => {
