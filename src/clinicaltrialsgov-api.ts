@@ -58,14 +58,23 @@ export class ClinicalTrialsGovAPI {
    * @param nctIds the NCT IDs to fetch
    * @returns a promise that resolves to the list of studies
    */
-  async fetchStudies(nctIds: string[]): Promise<Study[]> {
-    const result = await this.getUrl(`${this._endpoint}/studies?filter.ids=${nctIds.join(',')}`);
-    if (isPagedStudies(result)) {
-      // FIXME: Deal with pages!
-      return result.studies;
-    } else {
-      throw new Error('Server returned a success response, but the result could not be parsed.');
+  async fetchStudies(nctIds: string[], pageSize?: number): Promise<Study[]> {
+    let url = `${this._endpoint}/studies?filter.ids=${nctIds.join(',')}`;
+    if (pageSize && pageSize > 0) {
+      url += `&pageSize=${pageSize}`;
     }
+    const studies: Study[] = [];
+    let nextPageToken: string | undefined;
+    do {
+      const result = await this.getUrl(nextPageToken ? `${url}&pageToken=${nextPageToken}` : url);
+      if (isPagedStudies(result)) {
+        studies.push(...result.studies);
+        nextPageToken = result.nextPageToken;
+      } else {
+        throw new Error('Server returned a success response, but the result could not be parsed.');
+      }
+    } while (nextPageToken);
+    return studies;
   }
 
   async getUrl(url: string): Promise<unknown> {

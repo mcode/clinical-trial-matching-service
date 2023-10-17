@@ -273,10 +273,60 @@ describe('CacheEntry', () => {
       return expectAsync(promise).toBeResolved();
     });
   });
+  describe('#load', () => {
+    it('uses the existing load promise if invoked twice', () => {
+      const entry = new ctg.CacheEntry(service, 'test', {pending: true});
+      // This test involves calling load on an entry twice while it hasn't
+      // been resolved
+      // This spy is used to ensure everything resolves at the end
+      const testStudy = createClinicalStudy('01234567');
+      spyOn(entry, 'readFile').and.callFake(() => Promise.resolve(testStudy));
+      // Invoke load twice, as if it's coming from two different sources.
+      const promise1 = expectAsync(entry.load()).toBeResolvedTo(testStudy);
+      const promise2 = expectAsync(entry.load()).toBeResolvedTo(testStudy);
+      // Now flag the entry as ready
+      entry.ready();
+      // This should make the two other promises resolve. Return them to Jasmine
+      // to end the test
+      return Promise.all([promise1, promise2]);
+    });
+  });
+  describe('#fail', () => {
+    // These tests are for instances when an entry fails between when a read has
+    // started but before it has ended.
+    let readSpy: jasmine.Spy;
+    let entry: ctg.CacheEntry;
+    beforeEach(() => {
+      entry = new ctg.CacheEntry(service, 'test', {pending: true});
+      // This spy exists solely to create a promise that won't resolve
+      readSpy = spyOn(entry, 'readFile').and.callFake(() => Promise.reject('should not be invoked'));
+    });
+    it('handles failures while waiting for a file to be read', () => {
+      const loadPromise = entry.load();
+      // We have now triggered a load request, meaning that there is now a
+      // Promise waiting for the entry to be ready before attempting to read it
+      // Read spy should not be invoked
+      expect(readSpy).not.toHaveBeenCalled();
+      // Now fail the entry
+      entry.fail('test error');
+      return expectAsync(loadPromise).toBeRejectedWithError('test error');
+    });
+    it('rejects with the error object given', () => {
+      const loadPromise = entry.load();
+      // We have now triggered a load request, meaning that there is now a
+      // Promise waiting for the entry to be ready before attempting to read it
+      // Read spy should not be invoked
+      expect(readSpy).not.toHaveBeenCalled();
+      // Now fail the entry
+      const error = new Error('expected error object');
+      entry.fail(error);
+      return expectAsync(loadPromise).toBeRejectedWith(error);
+    });
+  });
   describe('#readFile()', () => {
     it('rejects with an error if it fails', () => {
       const readFileSpy = spyOn(fs, 'readFile') as unknown as jasmine.Spy<
-        (path: string, options: { encoding?: string }, callback: (err?: Error, data?: Buffer) => void) => void
+        (path: string, options: { encoding?: string }, callback: (err?: Error, data?: string) => void) => void
       >;
       readFileSpy.and.callFake((path, options, callback) => {
         callback(new Error('Simulated error'));
@@ -286,13 +336,24 @@ describe('CacheEntry', () => {
     });
     it('resolves to null if the file is empty', () => {
       const readFileSpy = spyOn(fs, 'readFile') as unknown as jasmine.Spy<
-        (path: string, options: { encoding?: string }, callback: (err?: Error, data?: Buffer) => void) => void
+        (path: string, options: { encoding?: string }, callback: (err?: Error, data?: string) => void) => void
       >;
       readFileSpy.and.callFake((path, options, callback) => {
-        callback(undefined, Buffer.alloc(0));
+        callback(undefined, '');
       });
       const testEntry = new ctg.CacheEntry(service, 'test', {});
       return expectAsync(testEntry.readFile()).toBeResolvedTo(null);
+    });
+    it('reads the file contents if the file exists', () => {
+      const expectedStudy = createClinicalStudy('73577357');
+      const readFileSpy = spyOn(fs, 'readFile') as unknown as jasmine.Spy<
+        (path: string, options: { encoding?: string }, callback: (err?: Error, data?: string) => void) => void
+      >;
+      readFileSpy.and.callFake((path, options, callback) => {
+        callback(undefined, JSON.stringify(expectedStudy));
+      });
+      const testEntry = new ctg.CacheEntry(service, 'test', {});
+      return expectAsync(testEntry.readFile()).toBeResolvedTo(expectedStudy);
     });
   });
   describe('#remove()', () => {
@@ -772,13 +833,17 @@ describe('ClinicalTrialsGovService', () => {
     const nctIDs = ['NCT00000001', 'NCT00000002', 'NCT00000003'];
     beforeEach(async () => {
       scope = nock('https://clinicaltrials.gov');
-      interceptor = scope.get('/api/v2/studies?filter.ids=' + nctIDs.join(','));
+      interceptor = scope.get(`/api/v2/studies?filter.ids=${nctIDs.join(',')}&pageSize=128`);
       // Need to intercept the writeFile method
       spyOn(cacheFS, 'writeFile').and.callFake((_file, _data, _options, callback) => {
         // For these, always pretend it succeeded
         callback(null);
       });
       downloader = await ctg.createClinicalTrialsGovService(dataDirPath, { cleanInterval: 0, fs: cacheFS });
+    });
+
+    afterEach(() => {
+      scope.done();
     });
 
     it('handles failures from https.get', async () => {
@@ -790,13 +855,12 @@ describe('ClinicalTrialsGovService', () => {
       interceptor.reply(404, 'Unknown');
       // Pretend the middle entry exists
       downloader['cache'].set(nctIDs[1], new ctg.CacheEntry(downloader, nctIDs[1] + '.json', {}));
-      expect(await downloader['downloadTrials'](nctIDs)).toBeFalse();
-      expect(scope.isDone()).toBeTrue();
+      expect(await downloader['downloadTrials'](nctIDs)).withContext('downloader indicates failure').toBeFalse();
       // Check to make sure the new cache entries do not still exist - the failure should remove them, but not the
       // non-pending one
-      expect(downloader['cache'].has(nctIDs[0])).toBeFalse();
-      expect(downloader['cache'].has(nctIDs[1])).toBeTrue();
-      expect(downloader['cache'].has(nctIDs[2])).toBeFalse();
+      expect(downloader['cache'].has(nctIDs[0])).withContext('cache entry 0').toBeFalse();
+      expect(downloader['cache'].has(nctIDs[1])).withContext('cache entry 1').toBeTrue();
+      expect(downloader['cache'].has(nctIDs[2])).withContext('cache entry 2').toBeFalse();
     });
 
     it('creates cache entries', async () => {
