@@ -358,14 +358,17 @@ export class mCODEextractor {
         this.secondaryCancerCondition
       );
       const reasonReference = procedure.reasonReference;
-      for (const condition of conditions) {
-        if (condition.id === reasonReference.reference) {
-          const reasonReferenceResult = {
-            reference: reasonReference.reference,
-            display: reasonReference.display,
-            meta_profile: condition.meta_profile
-          } as ReasonReference;
-          procedure.reasonReference = reasonReferenceResult;
+      // reason can be undefined if reasonReference was missing/empty
+      if (reasonReference) {
+        for (const condition of conditions) {
+          if (condition.id === reasonReference.reference) {
+            const reasonReferenceResult = {
+              reference: reasonReference.reference,
+              display: reasonReference.display,
+              meta_profile: condition.meta_profile
+            } as ReasonReference;
+            procedure.reasonReference = reasonReferenceResult;
+          }
         }
       }
     }
