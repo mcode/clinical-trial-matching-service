@@ -2,32 +2,16 @@ import { Coding } from 'fhir/r4';
 
 /**
  * Enumeration of the possible code systems.
- * Source: https://masteringjs.io/tutorials/fundamentals/enum
  */
-export class CodeSystemEnum {
-
-  static ICD10 = new CodeSystemEnum("ICD10");
-  static SNOMED = new CodeSystemEnum("SNOMED");
-  static RXNORM = new CodeSystemEnum("RXNORM");
-  static AJCC = new CodeSystemEnum("AJCC");
-  static LOINC = new CodeSystemEnum("LOINC");
-  static NIH = new CodeSystemEnum("NIH");
-  static HGNC = new CodeSystemEnum("HGNC");
-  static HL7 = new CodeSystemEnum("HL7");
-
-  system: string;
-
-  /**
-   * Constructor
-   * @param system The system name.
-   */
-  constructor(system: string) {
-    this.system = system;
-  }
-
-  toString(): string {
-    return this.system;
-  }
+export enum CodeSystemEnum {
+  ICD10 = "ICD10",
+  SNOMED = "SNOMED",
+  RXNORM = "RXNORM",
+  AJCC = "AJCC",
+  LOINC = "LOINC",
+  NIH = "NIH",
+  HGNC = "HGNC",
+  HL7 = "HL7"
 }
 
 /**

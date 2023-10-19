@@ -18,44 +18,44 @@ export abstract class MappingLogic {
     this.extractedMcode = new mcode.mCODEextractor(patientBundle);
   }
 
-  /**
+  /*
    * Extracted mCODE getters.
    */
-  protected getExtractedPrimaryCancerConditions(): mcode.PrimaryCancerCondition[] {
-    return this.extractedMcode.getPrimaryCancerConditions();
+  protected get extractedPrimaryCancerConditions(): mcode.PrimaryCancerCondition[] {
+    return this.extractedMcode.primaryCancerConditions;
   }
-  protected getExtractedSecondaryCancerConditions(): mcode.SecondaryCancerCondition[] {
-    return this.extractedMcode.getSecondaryCancerConditions();
+  protected get extractedSecondaryCancerConditions(): mcode.SecondaryCancerCondition[] {
+    return this.extractedMcode.secondaryCancerConditions;
   }
-  protected getExtractedTNMclinicalStageGroup(): fhir.Coding[] {
-    return this.extractedMcode.getTNMclinicalStageGroup();
+  protected get extractedTNMClinicalStageGroup(): fhir.Coding[] {
+    return this.extractedMcode.TNMClinicalStageGroups;
   }
-  protected getExtractedTNMpathologicalStageGroup(): fhir.Coding[] {
-    return this.extractedMcode.getTNMpathologicalStageGroup();
+  protected get extractedTNMPathologicalStageGroup(): fhir.Coding[] {
+    return this.extractedMcode.TNMPathologicalStageGroups;
   }
-  protected getExtractedBirthDate(): string {
-    return this.extractedMcode.getBirthDate();
+  protected get extractedBirthDate(): string {
+    return this.extractedMcode.birthDate;
   }
-  protected getExtractedTumorMarkers(): mcode.TumorMarker[] {
-    return this.extractedMcode.getTumorMarkers();
+  protected get extractedTumorMarkers(): mcode.TumorMarker[] {
+    return this.extractedMcode.tumorMarkers;
   }
-  protected getExtractedCancerGeneticVariants(): mcode.CancerGeneticVariant[] {
-    return this.extractedMcode.getCancerGeneticVariants();
+  protected get extractedCancerGeneticVariants(): mcode.CancerGeneticVariant[] {
+    return this.extractedMcode.cancerGeneticVariants;
   }
-  protected getExtractedCancerRelatedRadiationProcedures(): mcode.CancerRelatedRadiationProcedure[] {
-    return this.extractedMcode.getCancerRelatedRadiationProcedures();
+  protected get extractedCancerRelatedRadiationProcedures(): mcode.CancerRelatedRadiationProcedure[] {
+    return this.extractedMcode.cancerRelatedRadiationProcedures;
   }
-  protected getExtractedCancerRelatedSurgicalProcedures(): mcode.CancerRelatedSurgicalProcedure[] {
-    return this.extractedMcode.getCancerRelatedSurgicalProcedures();
+  protected get extractedCancerRelatedSurgicalProcedures(): mcode.CancerRelatedSurgicalProcedure[] {
+    return this.extractedMcode.cancerRelatedSurgicalProcedures;
   }
-  protected getExtractedCancerRelatedMedicationStatements(): fhir.Coding[] {
-    return this.extractedMcode.getCancerRelatedMedicationStatements();
+  protected get extractedCancerRelatedMedicationStatements(): fhir.Coding[] {
+    return this.extractedMcode.cancerRelatedMedicationStatements;
   }
-  protected getExtractedEcogPerformanceStatus(): number {
-    return this.extractedMcode.getEcogPerformanceStatus();
+  protected get extractedEcogPerformanceStatus(): number {
+    return this.extractedMcode.ecogPerformanceStatus;
   }
-  protected getExtractedKarnofskyPerformanceStatus(): number {
-    return this.extractedMcode.getKarnofskyPerformanceStatus();
+  protected get extractedKarnofskyPerformanceStatus(): number {
+    return this.extractedMcode.karnofskyPerformanceStatus;
   }
 
   /**

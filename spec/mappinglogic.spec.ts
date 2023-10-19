@@ -67,36 +67,36 @@ describe('Abstract Code Mapper getter tests', () => {
  */
 class DummyMappingLogic extends MappingLogic {
   getPrimaryCancerValues(): string {
-    return JSON.stringify(this.getExtractedPrimaryCancerConditions());
+    return JSON.stringify(this.extractedPrimaryCancerConditions);
   }
   getSecondaryCancerValues(): string[] {
-    return [JSON.stringify(this.getExtractedSecondaryCancerConditions())];
+    return [JSON.stringify(this.extractedSecondaryCancerConditions)];
   }
   getHistologyMorphologyValue(): string {
-    return JSON.stringify(this.getExtractedCancerGeneticVariants());
+    return JSON.stringify(this.extractedCancerGeneticVariants);
   }
   getRadiationProcedureValues(): string[] {
-    return [JSON.stringify(this.getExtractedCancerRelatedRadiationProcedures())];
+    return [JSON.stringify(this.extractedCancerRelatedRadiationProcedures)];
   }
   getSurgicalProcedureValues(): string[] {
-    return [JSON.stringify(this.getExtractedCancerRelatedSurgicalProcedures())];
+    return [JSON.stringify(this.extractedCancerRelatedSurgicalProcedures)];
   }
   getAgeValue(): number {
-    return parseInt(this.getExtractedBirthDate());
+    return parseInt(this.extractedBirthDate);
   }
   getStageValues(): string {
-    return JSON.stringify(this.getExtractedPrimaryCancerConditions());
+    return JSON.stringify(this.extractedPrimaryCancerConditions);
   }
   getTumorMarkerValues(): string[] {
-    return [JSON.stringify(this.getExtractedTNMclinicalStageGroup()), JSON.stringify(this.getExtractedTNMpathologicalStageGroup()), JSON.stringify(this.getExtractedTumorMarkers())];
+    return [JSON.stringify(this.extractedTNMClinicalStageGroup), JSON.stringify(this.extractedTNMPathologicalStageGroup), JSON.stringify(this.extractedTumorMarkers)];
   }
   getMedicationStatementValues(): string[] {
-    return [JSON.stringify(this.getExtractedCancerRelatedMedicationStatements())];
+    return [JSON.stringify(this.extractedCancerRelatedMedicationStatements)];
   }
   getECOGScore(): number {
-    return this.getExtractedEcogPerformanceStatus();
+    return this.extractedEcogPerformanceStatus;
   }
   getKarnofskyScore(): number {
-    return this.getExtractedKarnofskyPerformanceStatus();
+    return this.extractedKarnofskyPerformanceStatus;
   }
 }
