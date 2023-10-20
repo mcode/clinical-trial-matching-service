@@ -33,7 +33,7 @@ export abstract class MappingLogic {
   protected get extractedTNMPathologicalStageGroup(): fhir.Coding[] {
     return this.extractedMcode.TNMPathologicalStageGroups;
   }
-  protected get extractedBirthDate(): string {
+  protected get extractedBirthDate(): string | null {
     return this.extractedMcode.birthDate;
   }
   protected get extractedTumorMarkers(): mcode.TumorMarker[] {

@@ -285,7 +285,7 @@
         "recordedDate": "2017-07-21T23:41:09-04:00",
         "extension": [
           {
-            "url": "http://hl7.org/fhir/us/mcode/ValueSet/mcode-histology-morphology-behavior-vs",
+            "url": "http://hl7.org/fhir/us/mcode/StructureDefinition/mcode-histology-morphology-behavior",
             "valueCodeableConcept": {
               "coding": [
                 {

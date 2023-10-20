@@ -1,6 +1,23 @@
 import * as fhirpath from 'fhirpath';
 import * as fhir from 'fhir/r4';
 
+import {
+  MCODE_CANCER_GENETIC_VARIANT,
+  MCODE_CANCER_PATIENT,
+  MCODE_CANCER_RELATED_MEDICATION_STATEMENT,
+  MCODE_CANCER_RELATED_RADIATION_PROCEDURE,
+  MCODE_CANCER_RELATED_SURGICAL_PROCEDURE,
+  MCODE_ECOG_PERFORMANCE_STATUS,
+  MCODE_HISTOLOGY_MORPHOLOGY_BEHAVIOR,
+  MCODE_KARNOFSKY_PERFORMANCE_STATUS,
+  MCODE_PRIMARY_CANCER_CONDITION,
+  MCODE_SECONDARY_CANCER_CONDITION,
+  MCODE_TNM_CLINICAL_STAGE_GROUP,
+  MCODE_TNM_PATHOLOGICAL_STAGE_GROUP,
+  MCODE_TUMOR_MARKER
+} from './mcode';
+import { resourceContainsProfile } from './fhir-util';
+
 export type FHIRPath = string;
 
 export interface ReasonReference {
@@ -29,7 +46,7 @@ export interface BaseFhirResource {
 export interface CancerConditionParent extends BaseFhirResource {
   clinicalStatus: fhir.Coding[];
   meta_profile: string;
-  id: string;
+  id?: string;
 }
 
 export interface PrimaryCancerCondition extends CancerConditionParent {
@@ -77,6 +94,33 @@ export interface CancerGeneticVariantComponentType {
 }
 
 /**
+ * Extract coding from a codeable concept. Exported to allow testing.
+ * @param codeableConcept the codeable concept to check
+ * @return either the coding values or an empty array if not found
+ */
+export function extractCoding(codeableConcept: fhir.CodeableConcept[] | fhir.CodeableConcept | undefined): fhir.Coding[] {
+  if (codeableConcept) {
+    if (Array.isArray(codeableConcept)) {
+      // This is basically an overload, but in this case, we want to concatenate
+      // all the codings together into one array
+      const coding: fhir.Coding[] = [];
+      for (const concept of codeableConcept) {
+        if (Array.isArray(concept.coding)) {
+          coding.push(...concept.coding);
+        }
+      }
+      return coding;
+    } else {
+      const coding = codeableConcept.coding;
+      if (Array.isArray(coding)) {
+        return coding;
+      }
+    }
+  }
+  return [];
+}
+
+/**
  * Class that extracts mCODE data from a patient record.
  */
 export class mCODEextractor {
@@ -87,7 +131,10 @@ export class mCODEextractor {
   readonly secondaryCancerConditions: SecondaryCancerCondition[];
   readonly TNMClinicalStageGroups: fhir.Coding[];
   readonly TNMPathologicalStageGroups: fhir.Coding[];
-  readonly birthDate: string;
+  /**
+   * Birth date. String if date was found, null if a birth date was not given.
+   */
+  readonly birthDate: string | null;
   readonly tumorMarkers: TumorMarker[];
   readonly cancerGeneticVariants: CancerGeneticVariant[];
   readonly cancerRelatedRadiationProcedures: CancerRelatedRadiationProcedure[];
@@ -116,193 +163,160 @@ export class mCODEextractor {
     this.cancerRelatedSurgicalProcedures = [] as CancerRelatedSurgicalProcedure[];
     this.cancerRelatedMedicationStatements = [] as fhir.Coding[];
     this.cancerGeneticVariants = [] as CancerGeneticVariant[];
-    this.birthDate = 'N/A';
+    this.birthDate = null;
 
     if (patientBundle != undefined && patientBundle.entry) {
       for (const entry of patientBundle.entry) {
-        if (!('resource' in entry) || !entry.resource) {
-          // Skip bad entries
+        const resource = entry.resource;
+        if (typeof resource !== 'object' || resource === null) {
+          // Skip invalid resources
           continue;
         }
-        const resource = entry.resource;
 
-        if (
-          resource.resourceType === 'Condition' &&
-          this.resourceProfile(this.lookup(resource, 'meta.profile'), 'mcode-primary-cancer-condition')
-        ) {
-          const tempPrimaryCancerCondition: PrimaryCancerCondition = {
-            clinicalStatus: this.lookup(resource, 'clinicalStatus.coding') as unknown as fhir.Coding[],
-            meta_profile: 'mcode-primary-cancer-condition',
-            histologyMorphologyBehavior: [] as fhir.Coding[],
-            coding: this.lookup(resource, 'code.coding') as unknown as fhir.Coding[],
-            id: (this.lookup(resource, 'id') as string[])[0]
-          };
-          if (this.lookup(resource, 'extension').length !== 0) {
-            this.lookup(resource, 'extension').forEach((_, index) => {
-              if (
-                (this.lookup(resource, `extension[${index}].url`)[0] as string).includes(
-                  'mcode-histology-morphology-behavior'
-                )
-              ) {
-                tempPrimaryCancerCondition.histologyMorphologyBehavior = this.lookup(
-                  resource,
-                  `extension[${index}].valueCodeableConcept.coding`
-                ) as unknown as fhir.Coding[];
+        if (resource.resourceType === 'Condition') {
+          if (resourceContainsProfile(resource, MCODE_PRIMARY_CANCER_CONDITION)) {
+            const tempPrimaryCancerCondition: PrimaryCancerCondition = {
+              clinicalStatus: extractCoding(resource.clinicalStatus),
+              meta_profile: 'mcode-primary-cancer-condition',
+              histologyMorphologyBehavior: [],
+              coding: extractCoding(resource.code),
+              id: resource.id
+            };
+            const extensions = resource.extension;
+            if (Array.isArray(extensions)) {
+              for (const extension of extensions) {
+                if (extension.url === MCODE_HISTOLOGY_MORPHOLOGY_BEHAVIOR) {
+                  const coding = extension.valueCodeableConcept?.coding;
+                  if (Array.isArray(coding)) {
+                    tempPrimaryCancerCondition.histologyMorphologyBehavior = coding;
+                  }
+                }
               }
-            });
+            }
+            this.primaryCancerConditions.push(tempPrimaryCancerCondition);
           }
-          this.primaryCancerConditions.push(tempPrimaryCancerCondition);
+          if (resourceContainsProfile(resource, MCODE_SECONDARY_CANCER_CONDITION)) {
+            const tempSecondaryCancerCondition: SecondaryCancerCondition = {
+              clinicalStatus: extractCoding(resource.clinicalStatus),
+              meta_profile: 'mcode-secondary-cancer-condition',
+              id: resource.id,
+              bodySite: extractCoding(resource.bodySite),
+              coding: this.lookup(resource, 'code.coding') as unknown as fhir.Coding[]
+            };
+            this.secondaryCancerConditions.push(tempSecondaryCancerCondition); // needs specific de-dup helper function
+          }
         }
 
-        if (
-          resource.resourceType === 'Observation' &&
-          this.resourceProfile(this.lookup(resource, 'meta.profile'), 'mcode-tnm-clinical-stage-group')
-        ) {
-          this.TNMClinicalStageGroups = this.addCoding(
-            this.TNMClinicalStageGroups,
-            this.lookup(resource, 'valueCodeableConcept.coding') as unknown as fhir.Coding[]
-          );
-        }
+        if (resource.resourceType === 'Observation') {
+          if (resourceContainsProfile(resource, MCODE_TNM_CLINICAL_STAGE_GROUP)) {
+            this.TNMClinicalStageGroups = this.addCoding(
+              this.TNMClinicalStageGroups,
+              resource.valueCodeableConcept?.coding
+            );
+          }
+          if (resourceContainsProfile(resource, MCODE_TNM_PATHOLOGICAL_STAGE_GROUP)) {
+            this.TNMPathologicalStageGroups = this.addCoding(
+              this.TNMPathologicalStageGroups,
+              resource.valueCodeableConcept?.coding
+            );
+          }
+          if (resourceContainsProfile(resource, MCODE_TUMOR_MARKER)) {
+            const tempTumorMarker: TumorMarker = {
+              valueQuantity: this.lookup(resource, 'valueQuantity') as Quantity[],
+              valueRatio: this.lookup(resource, 'valueRatio') as Ratio[],
+              valueCodeableConcept: extractCoding(resource.valueCodeableConcept),
+              interpretation: extractCoding(resource.interpretation),
+              coding: extractCoding(resource.code)
+            };
+            this.tumorMarkers.push(tempTumorMarker);
+          }
+          // Parse and Extract mCODE Cancer Genetic Variant
+          if (resourceContainsProfile(resource, MCODE_CANCER_GENETIC_VARIANT)) {
+            const tempCGV: CancerGeneticVariant = {
+              coding: extractCoding(resource.code),
+              component: {
+                geneStudied: [] as CancerGeneticVariantComponentType[],
+                genomicsSourceClass: [] as CancerGeneticVariantComponentType[]
+              },
+              valueCodeableConcept: [],
+              interpretation: []
+            };
+            for (const currentComponent of this.lookup(
+              resource,
+              'component'
+            ) as unknown as CancerGeneticVariantComponentType[]) {
+              if (currentComponent.code == undefined) {
+                continue;
+              } else {
+                for (const currentComponentCode of currentComponent.code.coding) {
+                  if (currentComponentCode.code == '48018-6') {
+                    // With this code, we've reached a GeneStudied. Populate the GeneStudied attribute.
+                    tempCGV.component.geneStudied.push(currentComponent);
+                  }
+                  if (currentComponentCode.code == '48002-0') {
+                    // With this code, we've reached a GenomicSourceClass. Populate the GenomicSourceClass attribute.
+                    tempCGV.component.genomicsSourceClass.push(currentComponent);
+                  }
+                }
+              }
+            }
+            tempCGV.valueCodeableConcept = extractCoding(resource.valueCodeableConcept);
+            tempCGV.interpretation = extractCoding(resource.interpretation);
+            this.cancerGeneticVariants.push(tempCGV);
+          }
+          if (resourceContainsProfile(resource, MCODE_ECOG_PERFORMANCE_STATUS)) {
+            if (typeof resource.valueInteger === 'number') this.ecogPerformanceStatus = resource.valueInteger;
+          }
 
-        if (
-          resource.resourceType === 'Observation' &&
-          this.resourceProfile(this.lookup(resource, 'meta.profile'), 'mcode-tnm-pathological-stage-group')
-        ) {
-          this.TNMPathologicalStageGroups = this.addCoding(
-            this.TNMPathologicalStageGroups,
-            this.lookup(resource, 'valueCodeableConcept.coding') as unknown as fhir.Coding[]
-          );
-        }
-
-        if (
-          resource.resourceType === 'Condition' &&
-          this.resourceProfile(this.lookup(resource, 'meta.profile'), 'mcode-secondary-cancer-condition')
-        ) {
-          const tempSecondaryCancerCondition: SecondaryCancerCondition = {
-            clinicalStatus: this.lookup(resource, 'clinicalStatus.coding') as unknown as fhir.Coding[],
-            meta_profile: 'mcode-secondary-cancer-condition',
-            id: (this.lookup(resource, 'id') as string[])[0],
-            bodySite: this.lookup(resource, 'bodySite.coding') as unknown as fhir.Coding[],
-            coding: this.lookup(resource, 'code.coding') as unknown as fhir.Coding[]
-          };
-          this.secondaryCancerConditions.push(tempSecondaryCancerCondition); // needs specific de-dup helper function
+          if (resourceContainsProfile(resource, MCODE_KARNOFSKY_PERFORMANCE_STATUS)) {
+            if (typeof resource.valueInteger === 'number') this.karnofskyPerformanceStatus = resource.valueInteger;
+          }
         }
 
         if (
           resource.resourceType === 'Patient' &&
-          this.resourceProfile(this.lookup(resource, 'meta.profile'), 'mcode-cancer-patient')
+          // FIXME: Really constrain to resources with this profile? This does not appear to be set in the app!
+          resourceContainsProfile(resource, MCODE_CANCER_PATIENT)
         ) {
-          if (this.lookup(resource, 'birthDate').length !== 0) {
-            this.birthDate = this.lookup(resource, 'birthDate')[0] as string;
-          } else {
-            this.birthDate = 'NA';
+          if (resource.birthDate) {
+            this.birthDate = resource.birthDate;
           }
         }
 
-        if (
-          resource.resourceType === 'Observation' &&
-          this.resourceProfile(this.lookup(resource, 'meta.profile'), 'mcode-tumor-marker')
-        ) {
-          const tempTumorMarker: TumorMarker = {
-            valueQuantity: this.lookup(resource, 'valueQuantity') as Quantity[],
-            valueRatio: this.lookup(resource, 'valueRatio') as Ratio[],
-            valueCodeableConcept: this.lookup(resource, 'valueCodeableConcept.coding') as unknown as fhir.Coding[],
-            interpretation: this.lookup(resource, 'interpretation.coding') as unknown as fhir.Coding[],
-            coding: this.lookup(resource, 'code.coding') as unknown as fhir.Coding[]
-          };
-          this.tumorMarkers.push(tempTumorMarker);
-        }
-        // Parse and Extract mCODE Cancer Genetic Variant
-        if (
-          resource.resourceType === 'Observation' &&
-          this.resourceProfile(this.lookup(resource, 'meta.profile'), 'mcode-cancer-genetic-variant')
-        ) {
-          const tempCGV: CancerGeneticVariant = {
-            coding: this.lookup(resource, 'code.coding') as unknown as fhir.Coding[],
-            component: {
-              geneStudied: [] as CancerGeneticVariantComponentType[],
-              genomicsSourceClass: [] as CancerGeneticVariantComponentType[]
-            },
-            valueCodeableConcept: [],
-            interpretation: []
-          };
-          for (const currentComponent of this.lookup(
-            resource,
-            'component'
-          ) as unknown as CancerGeneticVariantComponentType[]) {
-            if (currentComponent.code == undefined) {
-              continue;
-            } else {
-              for (const currentComponentCode of currentComponent.code.coding) {
-                if (currentComponentCode.code == '48018-6') {
-                  // With this code, we've reached a GeneStudied. Populate the GeneStudied attribute.
-                  tempCGV.component.geneStudied.push(currentComponent);
-                }
-                if (currentComponentCode.code == '48002-0') {
-                  // With this code, we've reached a GenomicSourceClass. Populate the GenomicSourceClass attribute.
-                  tempCGV.component.genomicsSourceClass.push(currentComponent);
-                }
-              }
+        if (resource.resourceType === 'Procedure') {
+          if (resourceContainsProfile(resource, MCODE_CANCER_RELATED_RADIATION_PROCEDURE)) {
+            const tempCancerRelatedRadiationProcedure: CancerRelatedRadiationProcedure = {
+              bodySite: extractCoding(resource.bodySite),
+              mcodeTreatmentIntent: [],
+              coding: extractCoding(resource.code)
+            };
+            if (
+              !this.listContainsProcedure(this.cancerRelatedRadiationProcedures, tempCancerRelatedRadiationProcedure)
+            ) {
+              this.cancerRelatedRadiationProcedures.push(tempCancerRelatedRadiationProcedure);
             }
           }
-          tempCGV.valueCodeableConcept = this.lookup(
-            resource,
-            'valueCodeableConcept.coding'
-          ) as unknown as fhir.Coding[];
-          tempCGV.interpretation = this.lookup(resource, 'interpretation.coding') as unknown as fhir.Coding[];
-          this.cancerGeneticVariants.push(tempCGV);
-        }
 
-        if (
-          resource.resourceType === 'Procedure' &&
-          this.resourceProfile(this.lookup(resource, 'meta.profile'), 'mcode-cancer-related-radiation-procedure')
-        ) {
-          const tempCancerRelatedRadiationProcedure: CancerRelatedRadiationProcedure = {
-            bodySite: this.lookup(resource, 'bodySite.coding') as unknown as fhir.Coding[],
-            mcodeTreatmentIntent: [],
-            coding: this.lookup(resource, 'code.coding') as unknown as fhir.Coding[]
-          };
-          if (!this.listContainsProcedure(this.cancerRelatedRadiationProcedures, tempCancerRelatedRadiationProcedure)) {
-            this.cancerRelatedRadiationProcedures.push(tempCancerRelatedRadiationProcedure);
-          }
-        }
-
-        if (
-          resource.resourceType === 'Procedure' &&
-          this.resourceProfile(this.lookup(resource, 'meta.profile'), 'mcode-cancer-related-surgical-procedure')
-        ) {
-          const tempCancerRelatedSurgicalProcedure: CancerRelatedSurgicalProcedure = {
-            bodySite: this.lookup(resource, 'bodySite.coding') as unknown as fhir.Coding[],
-            reasonReference: (this.lookup(resource, 'reasonReference') as ReasonReference[])[0],
-            coding: this.lookup(resource, 'code.coding') as unknown as fhir.Coding[]
-          };
-          if (!this.listContainsProcedure(this.cancerRelatedSurgicalProcedures, tempCancerRelatedSurgicalProcedure)) {
-            this.cancerRelatedSurgicalProcedures.push(tempCancerRelatedSurgicalProcedure);
+          if (resourceContainsProfile(resource, MCODE_CANCER_RELATED_SURGICAL_PROCEDURE)) {
+            const tempCancerRelatedSurgicalProcedure: CancerRelatedSurgicalProcedure = {
+              bodySite: extractCoding(resource.bodySite),
+              reasonReference: (this.lookup(resource, 'reasonReference') as ReasonReference[])[0],
+              coding: extractCoding(resource.code)
+            };
+            if (!this.listContainsProcedure(this.cancerRelatedSurgicalProcedures, tempCancerRelatedSurgicalProcedure)) {
+              this.cancerRelatedSurgicalProcedures.push(tempCancerRelatedSurgicalProcedure);
+            }
           }
         }
 
         if (
           resource.resourceType === 'MedicationStatement' &&
-          this.resourceProfile(this.lookup(resource, 'meta.profile'), 'mcode-cancer-related-medication-statement')
+          resourceContainsProfile(resource, MCODE_CANCER_RELATED_MEDICATION_STATEMENT)
         ) {
           this.cancerRelatedMedicationStatements = this.addCoding(
             this.cancerRelatedMedicationStatements,
-            this.lookup(resource, 'medicationCodeableConcept.coding') as unknown as fhir.Coding[]
+            resource.medicationCodeableConcept?.coding
           );
-        }
-
-        if (
-          resource.resourceType === 'Observation' &&
-          this.resourceProfile(this.lookup(resource, 'meta.profile'), 'mcode-ecog-performance-status')
-        ) {
-          this.ecogPerformanceStatus = this.lookup(resource, 'valueInteger')[0] as number; // this is probably bad type handling
-        }
-
-        if (
-          resource.resourceType === 'Observation' &&
-          this.resourceProfile(this.lookup(resource, 'meta.profile'), 'mcode-karnofsky-performance-status')
-        ) {
-          this.karnofskyPerformanceStatus = this.lookup(resource, 'valueInteger')[0] as number; // so is this
         }
       }
     } else {
@@ -354,18 +368,6 @@ export class mCODEextractor {
   }
 
   /**
-   * Checks if the given profile constains a match to the given key.
-   */
-  private resourceProfile(profiles: unknown[], key: string): boolean {
-    for (const profile of profiles) {
-      if ((profile as string).includes(key)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
    * Checks whether the given list contains the given coding.
    * @param codingList
    * @param coding
@@ -378,13 +380,16 @@ export class mCODEextractor {
   /**
    * Adds the given coding to the given coding list.
    * @param codingList
-   * @param codes
+   * @param codes the codes to add - if undefined, nothing is added (undefined
+   *    is allowed to make checking easier)
    * @returns
    */
-  private addCoding(codingList: fhir.Coding[], codes: fhir.Coding[]): fhir.Coding[] {
-    for (const code of codes) {
-      if (!this.contains(codingList, code)) {
-        codingList.push(code);
+  private addCoding(codingList: fhir.Coding[], codes: fhir.Coding[] | undefined): fhir.Coding[] {
+    if (Array.isArray(codes)) {
+      for (const code of codes) {
+        if (!this.contains(codingList, code)) {
+          codingList.push(code);
+        }
       }
     }
     return codingList;

@@ -1,30 +1,14 @@
-import * as fs from 'node:fs';
+import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { Bundle } from 'fhir/r4';
 import { MappingLogic } from '../src/mappinglogic';
 
 describe('Abstract Code Mapper getter tests', () => {
   let mappingLogic: MappingLogic;
-  let sampleData: Bundle;
-  beforeAll(() => {
-    return new Promise((resolve, reject) => {
-      const patientDataPath = path.join(__dirname, '../../spec/data/patient_data.json');
-      fs.readFile(patientDataPath, { encoding: 'utf8' }, (error, data) => {
-        if (error) {
-          console.error('Could not read spec file');
-          reject(error);
-          return;
-        }
-        try {
-          sampleData = JSON.parse(data) as Bundle;
-          mappingLogic = new DummyMappingLogic(sampleData);
-          // The object we resolve to doesn't really matter
-          resolve(sampleData);
-        } catch (ex) {
-          reject(error);
-        }
-      });
-    });
+  beforeAll(async () => {
+    const patientDataPath = path.join(__dirname, '../../spec/data/patient_data.json');
+    const sampleData = JSON.parse(await fs.readFile(patientDataPath, { encoding: 'utf8' })) as Bundle;
+    mappingLogic = new DummyMappingLogic(sampleData);
   });
 
   it('Test Primary Cancer Value', function () {
@@ -82,7 +66,7 @@ class DummyMappingLogic extends MappingLogic {
     return [JSON.stringify(this.extractedCancerRelatedSurgicalProcedures)];
   }
   getAgeValue(): number {
-    return parseInt(this.extractedBirthDate);
+    return this.extractedBirthDate === null ? 0 : parseInt(this.extractedBirthDate);
   }
   getStageValues(): string {
     return JSON.stringify(this.extractedPrimaryCancerConditions);

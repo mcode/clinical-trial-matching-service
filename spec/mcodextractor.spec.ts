@@ -1,29 +1,18 @@
-import * as fs from 'node:fs';
+import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as fhir from 'fhir/r4';
 import { CodeMapper, CodeSystemEnum } from '../src/codeMapper';
 import * as mcode from '../src/mcodeextractor';
+import { MCODE_CANCER_RELATED_SURGICAL_PROCEDURE, MCODE_PRIMARY_CANCER_CONDITION } from '../src/mcode';
+
+async function loadSampleBundle(bundlePath: string): Promise<fhir.Bundle> {
+  return JSON.parse(await fs.readFile(path.join(__dirname, bundlePath), { encoding: 'utf8' })) as fhir.Bundle;
+}
 
 describe('ExtractedMCODE Import', () => {
   let sampleData: fhir.Bundle;
-  beforeAll(() => {
-    return new Promise((resolve, reject) => {
-      const patientDataPath = path.join(__dirname, '../../spec/data/patient_data.json');
-      fs.readFile(patientDataPath, { encoding: 'utf8' }, (error, data) => {
-        if (error) {
-          console.error('Could not read spec file');
-          reject(error);
-          return;
-        }
-        try {
-          sampleData = JSON.parse(data) as fhir.Bundle;
-          // The object we resolve to doesn't really matter
-          resolve(sampleData);
-        } catch (ex) {
-          reject(error);
-        }
-      });
-    });
+  beforeAll(async () => {
+    sampleData = await loadSampleBundle('../../spec/data/patient_data.json');
   });
 
   it('checksCountOfExtractedProfiles', function () {
@@ -201,29 +190,13 @@ describe('ExtractedMCODE Import', () => {
 
 describe('Missing Birthdate/ECOG/Karnofsky ExtractedMCODE Import', () => {
   let sampleData: fhir.Bundle;
-  beforeAll(() => {
-    return new Promise((resolve, reject) => {
-      const patientDataPath = path.join(__dirname, '../../spec/data/patient_data_empty-cgv.json');
-      fs.readFile(patientDataPath, { encoding: 'utf8' }, (error, data) => {
-        if (error) {
-          console.error('Could not read spec file');
-          reject(error);
-          return;
-        }
-        try {
-          sampleData = JSON.parse(data) as fhir.Bundle;
-          // The object we resolve to doesn't really matter
-          resolve(sampleData);
-        } catch (ex) {
-          reject(error);
-        }
-      });
-    });
+  beforeAll(async () => {
+    sampleData = await loadSampleBundle('../../spec/data/patient_data_empty-cgv.json');
   });
 
   it('checkMissingBirthdateEcogKarnofsky', function () {
     const extractedData = new mcode.mCODEextractor(sampleData);
-    expect(extractedData.birthDate).toBe('N/A');
+    expect(extractedData.birthDate).toBeNull();
     expect(extractedData.ecogPerformanceStatus).toBe(-1);
     expect(extractedData.karnofskyPerformanceStatus).toBe(-1);
   });
@@ -231,24 +204,8 @@ describe('Missing Birthdate/ECOG/Karnofsky ExtractedMCODE Import', () => {
 
 describe('Missing Histology Morphology', () => {
   let sampleData: fhir.Bundle;
-  beforeAll(() => {
-    return new Promise((resolve, reject) => {
-      const patientDataPath = path.join(__dirname, '../../spec/data/patient_data_missing_histology_morph.json');
-      fs.readFile(patientDataPath, { encoding: 'utf8' }, (error, data) => {
-        if (error) {
-          console.error('Could not read spec file');
-          reject(error);
-          return;
-        }
-        try {
-          sampleData = JSON.parse(data) as fhir.Bundle;
-          // The object we resolve to doesn't really matter
-          resolve(sampleData);
-        } catch (ex) {
-          reject(error);
-        }
-      });
-    });
+  beforeAll(async () => {
+    sampleData = await loadSampleBundle('../../spec/data/patient_data_missing_histology_morph.json');
   });
 
   it('Uses temporary Histology-Morphology', function () {
@@ -259,27 +216,8 @@ describe('Missing Histology Morphology', () => {
 
 describe('Missing Extensions for Primary Cancer Condition', () => {
   let sampleData: fhir.Bundle;
-  beforeAll(() => {
-    return new Promise((resolve, reject) => {
-      const patientDataPath = path.join(
-        __dirname,
-        '../../spec/data/patient_data_missing_birthdate_invalid_ecog_karnofsky.json'
-      );
-      fs.readFile(patientDataPath, { encoding: 'utf8' }, (error, data) => {
-        if (error) {
-          console.error('Could not read spec file');
-          reject(error);
-          return;
-        }
-        try {
-          sampleData = JSON.parse(data) as fhir.Bundle;
-          // The object we resolve to doesn't really matter
-          resolve(sampleData);
-        } catch (ex) {
-          reject(error);
-        }
-      });
-    });
+  beforeAll(async () => {
+    sampleData = await loadSampleBundle('../../spec/data/patient_data_missing_birthdate_invalid_ecog_karnofsky.json');
   });
 
   it('Uses temporary Histology-Morphology', function () {
@@ -290,27 +228,8 @@ describe('Missing Extensions for Primary Cancer Condition', () => {
 
 describe('Missing Cancer Genetic Variant Attributes Test', () => {
   let sampleData: fhir.Bundle;
-  beforeAll(() => {
-    return new Promise((resolve, reject) => {
-      const patientDataPath = path.join(
-        __dirname,
-        '../../spec/data/patient_data_missing_birthdate_invalid_ecog_karnofsky.json'
-      );
-      fs.readFile(patientDataPath, { encoding: 'utf8' }, (error, data) => {
-        if (error) {
-          console.error('Could not read spec file');
-          reject(error);
-          return;
-        }
-        try {
-          sampleData = JSON.parse(data) as fhir.Bundle;
-          // The object we resolve to doesn't really matter
-          resolve(sampleData);
-        } catch (ex) {
-          reject(error);
-        }
-      });
-    });
+  beforeAll(async () => {
+    sampleData = await loadSampleBundle('../../spec/data/patient_data_missing_birthdate_invalid_ecog_karnofsky.json');
   });
 
   it('checkMissingCgvAttributes', function () {
@@ -338,7 +257,7 @@ describe('error handling', () => {
           resource: {
             resourceType: 'Condition',
             meta: {
-              profile: ['mcode-primary-cancer-condition']
+              profile: [MCODE_PRIMARY_CANCER_CONDITION]
             },
             subject: {}
           }
@@ -347,7 +266,7 @@ describe('error handling', () => {
           resource: {
             resourceType: 'Procedure',
             meta: {
-              profile: ['mcode-cancer-related-surgical-procedure']
+              profile: [MCODE_CANCER_RELATED_SURGICAL_PROCEDURE]
             },
             status: 'completed',
             subject: {}
