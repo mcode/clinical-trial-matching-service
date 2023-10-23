@@ -127,13 +127,13 @@ describe('ExtractedMCODE Import', () => {
       extractedData.cancerRelatedSurgicalProcedures.some((procedure) => procedure.coding[0].code == '443497002')
     ).toBeTrue();
     expect(
-      extractedData.cancerRelatedSurgicalProcedures.some(
-        (procedure) => procedure.reasonReference.meta_profile == 'mcode-primary-cancer-condition'
+      extractedData.cancerRelatedSurgicalProcedures.some((procedure) =>
+        procedure.reasonReference.some((r) => r.meta_profile == 'mcode-primary-cancer-condition')
       )
     ).toBeTrue();
     expect(
-      extractedData.cancerRelatedSurgicalProcedures.some(
-        (procedure) => procedure.reasonReference.meta_profile == 'mcode-secondary-cancer-condition'
+      extractedData.cancerRelatedSurgicalProcedures.some((procedure) =>
+        procedure.reasonReference.some((r) => r.meta_profile == 'mcode-secondary-cancer-condition')
       )
     ).toBeTrue();
   });
@@ -148,38 +148,43 @@ describe('ExtractedMCODE Import', () => {
       'http://hl7.org/fhir/ValueSet/observation-interpretation'
     );
     expect(extractedData.cancerGeneticVariants[0].interpretation[0].code).toBe('POS');
-    expect(extractedData.cancerGeneticVariants[0].component.geneStudied[0].code.coding[0].system).toBe(
+    expect(extractedData.cancerGeneticVariants[0].component.geneStudied[0].code.coding?.[0].system).toBe(
       'http://loinc.org'
     );
-    expect(extractedData.cancerGeneticVariants[0].component.geneStudied[0].code.coding[0].code).toBe('48018-6');
+    expect(extractedData.cancerGeneticVariants[0].component.geneStudied[0].code.coding?.[0].code).toBe('48018-6');
     expect(
       CodeMapper.normalizeCodeSystem(
-        extractedData.cancerGeneticVariants[0].component.geneStudied[0].valueCodeableConcept.coding[0].system ?? 'null'
+        extractedData.cancerGeneticVariants[0].component.geneStudied[0].valueCodeableConcept?.coding?.[0].system ??
+          'null'
       )
     ).toBe(CodeSystemEnum.HGNC);
-    expect(extractedData.cancerGeneticVariants[0].component.geneStudied[0].valueCodeableConcept.coding[0].code).toBe(
+    expect(extractedData.cancerGeneticVariants[0].component.geneStudied[0].valueCodeableConcept?.coding?.[0].code).toBe(
       'HGNC:11389'
     );
-    expect(extractedData.cancerGeneticVariants[0].component.geneStudied[0].interpretation.coding[0].system).toBe(
-      'http://hl7.org/fhir/ValueSet/observation-interpretation'
+    expect(
+      extractedData.cancerGeneticVariants[0].component.geneStudied[0].interpretation?.[0]?.coding?.[0].system
+    ).toBe('http://hl7.org/fhir/ValueSet/observation-interpretation');
+    expect(extractedData.cancerGeneticVariants[0].component.geneStudied[0].interpretation?.[0].coding?.[0].code).toBe(
+      'CAR'
     );
-    expect(extractedData.cancerGeneticVariants[0].component.geneStudied[0].interpretation.coding[0].code).toBe('CAR');
-    expect(extractedData.cancerGeneticVariants[0].component.genomicsSourceClass[0].code.coding[0].system).toBe(
+    expect(extractedData.cancerGeneticVariants[0].component.genomicsSourceClass[0].code.coding?.[0].system).toBe(
       'http://loinc.org'
     );
-    expect(extractedData.cancerGeneticVariants[0].component.genomicsSourceClass[0].code.coding[0].code).toBe('48002-0');
+    expect(extractedData.cancerGeneticVariants[0].component.genomicsSourceClass[0].code.coding?.[0].code).toBe(
+      '48002-0'
+    );
     expect(
-      extractedData.cancerGeneticVariants[0].component.genomicsSourceClass[0].valueCodeableConcept.coding[0].system
+      extractedData.cancerGeneticVariants[0].component.genomicsSourceClass[0].valueCodeableConcept?.coding?.[0].system
     ).toBe('http://loinc.org');
     expect(
-      extractedData.cancerGeneticVariants[0].component.genomicsSourceClass[0].valueCodeableConcept.coding[0].code
+      extractedData.cancerGeneticVariants[0].component.genomicsSourceClass[0].valueCodeableConcept?.coding?.[0].code
     ).toBe('LA6684-0');
     expect(
-      extractedData.cancerGeneticVariants[0].component.genomicsSourceClass[0].interpretation.coding[0].system
+      extractedData.cancerGeneticVariants[0].component.genomicsSourceClass[0].interpretation?.[0]?.coding?.[0].system
     ).toBe('http://hl7.org/fhir/ValueSet/observation-interpretation');
-    expect(extractedData.cancerGeneticVariants[0].component.genomicsSourceClass[0].interpretation.coding[0].code).toBe(
-      'A'
-    );
+    expect(
+      extractedData.cancerGeneticVariants[0].component.genomicsSourceClass[0].interpretation?.[0]?.coding?.[0].code
+    ).toBe('A');
   });
 
   it('checkExtractedCancerRelatedMedicationStatement', function () {
@@ -241,10 +246,10 @@ describe('Missing Cancer Genetic Variant Attributes Test', () => {
 describe('error handling', () => {
   it('throws an error if given undefined or null', function () {
     expect(() => new mcode.mCODEextractor(undefined as unknown as fhir.Bundle)).toThrow(
-      Error('Input Patient Bundle is null.')
+      Error('Input Patient Bundle is invalid/has no entries')
     );
     expect(() => new mcode.mCODEextractor(null as unknown as fhir.Bundle)).toThrow(
-      Error('Input Patient Bundle is null.')
+      Error('Input Patient Bundle is invalid/has no entries')
     );
   });
 

@@ -57,16 +57,16 @@ export interface SecondaryCancerCondition extends CancerConditionParent {
   bodySite: fhir.Coding[];
 }
 
-export interface CancerRelatedProcedureParent extends BaseFhirResource {
+export interface BaseCancerRelatedProcedure extends BaseFhirResource {
   bodySite: fhir.Coding[];
 }
 
-export interface CancerRelatedRadiationProcedure extends CancerRelatedProcedureParent {
+export interface CancerRelatedRadiationProcedure extends BaseCancerRelatedProcedure {
   mcodeTreatmentIntent: fhir.Coding[];
 }
 
-export interface CancerRelatedSurgicalProcedure extends CancerRelatedProcedureParent {
-  reasonReference: ReasonReference;
+export interface CancerRelatedSurgicalProcedure extends BaseCancerRelatedProcedure {
+  reasonReference: ReasonReference[];
 }
 
 export interface TumorMarker extends BaseFhirResource {
@@ -83,14 +83,8 @@ export interface CancerGeneticVariant extends BaseFhirResource {
 }
 
 export interface CancerGeneticVariantComponent {
-  geneStudied: CancerGeneticVariantComponentType[];
-  genomicsSourceClass: CancerGeneticVariantComponentType[];
-}
-
-export interface CancerGeneticVariantComponentType {
-  code: { coding: fhir.Coding[] };
-  valueCodeableConcept: { coding: fhir.Coding[] };
-  interpretation: { coding: fhir.Coding[] };
+  geneStudied: fhir.ObservationComponent[];
+  genomicsSourceClass: fhir.ObservationComponent[];
 }
 
 /**
@@ -98,7 +92,9 @@ export interface CancerGeneticVariantComponentType {
  * @param codeableConcept the codeable concept to check
  * @return either the coding values or an empty array if not found
  */
-export function extractCoding(codeableConcept: fhir.CodeableConcept[] | fhir.CodeableConcept | undefined): fhir.Coding[] {
+export function extractCoding(
+  codeableConcept: fhir.CodeableConcept[] | fhir.CodeableConcept | undefined
+): fhir.Coding[] {
   if (codeableConcept) {
     if (Array.isArray(codeableConcept)) {
       // This is basically an overload, but in this case, we want to concatenate
@@ -154,18 +150,22 @@ export class mCODEextractor {
    * @param patientBundle The patient bundle to build the mCODE mapping from.
    */
   public constructor(patientBundle: fhir.Bundle) {
-    this.primaryCancerConditions = [] as PrimaryCancerCondition[];
-    this.TNMClinicalStageGroups = [] as fhir.Coding[];
-    this.TNMPathologicalStageGroups = [] as fhir.Coding[];
-    this.secondaryCancerConditions = [] as SecondaryCancerCondition[];
+    this.primaryCancerConditions = [];
+    this.TNMClinicalStageGroups = [];
+    this.TNMPathologicalStageGroups = [];
+    this.secondaryCancerConditions = [];
     this.tumorMarkers = [] as TumorMarker[];
-    this.cancerRelatedRadiationProcedures = [] as CancerRelatedRadiationProcedure[];
-    this.cancerRelatedSurgicalProcedures = [] as CancerRelatedSurgicalProcedure[];
-    this.cancerRelatedMedicationStatements = [] as fhir.Coding[];
-    this.cancerGeneticVariants = [] as CancerGeneticVariant[];
+    this.cancerRelatedRadiationProcedures = [];
+    this.cancerRelatedSurgicalProcedures = [];
+    // Temporary store of related reasons
+    const cancerRelatedSurgialProceduresReferences: fhir.Reference[][] = [];
+    this.cancerRelatedMedicationStatements = [];
+    this.cancerGeneticVariants = [];
     this.birthDate = null;
 
-    if (patientBundle != undefined && patientBundle.entry) {
+    if (!patientBundle || !Array.isArray(patientBundle.entry)) {
+      throw Error('Input Patient Bundle is invalid/has no entries');
+    } else {
       for (const entry of patientBundle.entry) {
         const resource = entry.resource;
         if (typeof resource !== 'object' || resource === null) {
@@ -201,7 +201,7 @@ export class mCODEextractor {
               meta_profile: 'mcode-secondary-cancer-condition',
               id: resource.id,
               bodySite: extractCoding(resource.bodySite),
-              coding: this.lookup(resource, 'code.coding') as unknown as fhir.Coding[]
+              coding: extractCoding(resource.code)
             };
             this.secondaryCancerConditions.push(tempSecondaryCancerCondition); // needs specific de-dup helper function
           }
@@ -235,27 +235,26 @@ export class mCODEextractor {
             const tempCGV: CancerGeneticVariant = {
               coding: extractCoding(resource.code),
               component: {
-                geneStudied: [] as CancerGeneticVariantComponentType[],
-                genomicsSourceClass: [] as CancerGeneticVariantComponentType[]
+                geneStudied: [],
+                genomicsSourceClass: []
               },
               valueCodeableConcept: [],
               interpretation: []
             };
-            for (const currentComponent of this.lookup(
-              resource,
-              'component'
-            ) as unknown as CancerGeneticVariantComponentType[]) {
-              if (currentComponent.code == undefined) {
-                continue;
-              } else {
-                for (const currentComponentCode of currentComponent.code.coding) {
-                  if (currentComponentCode.code == '48018-6') {
-                    // With this code, we've reached a GeneStudied. Populate the GeneStudied attribute.
-                    tempCGV.component.geneStudied.push(currentComponent);
-                  }
-                  if (currentComponentCode.code == '48002-0') {
-                    // With this code, we've reached a GenomicSourceClass. Populate the GenomicSourceClass attribute.
-                    tempCGV.component.genomicsSourceClass.push(currentComponent);
+            const components = resource.component;
+            if (Array.isArray(components)) {
+              for (const currentComponent of components) {
+                const coding = currentComponent.code?.coding;
+                if (Array.isArray(coding)) {
+                  for (const currentComponentCode of coding) {
+                    if (currentComponentCode.code == '48018-6') {
+                      // With this code, we've reached a GeneStudied. Populate the GeneStudied attribute.
+                      tempCGV.component.geneStudied.push(currentComponent);
+                    }
+                    if (currentComponentCode.code == '48002-0') {
+                      // With this code, we've reached a GenomicSourceClass. Populate the GenomicSourceClass attribute.
+                      tempCGV.component.genomicsSourceClass.push(currentComponent);
+                    }
                   }
                 }
               }
@@ -300,11 +299,12 @@ export class mCODEextractor {
           if (resourceContainsProfile(resource, MCODE_CANCER_RELATED_SURGICAL_PROCEDURE)) {
             const tempCancerRelatedSurgicalProcedure: CancerRelatedSurgicalProcedure = {
               bodySite: extractCoding(resource.bodySite),
-              reasonReference: (this.lookup(resource, 'reasonReference') as ReasonReference[])[0],
+              reasonReference: [],
               coding: extractCoding(resource.code)
             };
             if (!this.listContainsProcedure(this.cancerRelatedSurgicalProcedures, tempCancerRelatedSurgicalProcedure)) {
               this.cancerRelatedSurgicalProcedures.push(tempCancerRelatedSurgicalProcedure);
+              cancerRelatedSurgialProceduresReferences.push(resource.reasonReference ?? []);
             }
           }
         }
@@ -319,8 +319,6 @@ export class mCODEextractor {
           );
         }
       }
-    } else {
-      throw Error('Input Patient Bundle is null.');
     }
 
     // Checking if the performanceStatus exists and also making sure it's not 0, as 0 is a valid score
@@ -332,21 +330,22 @@ export class mCODEextractor {
     }
 
     // Once all resources are loaded, check to add the meta.profile for cancer related surgical procedure reason references.
-    for (const procedure of this.cancerRelatedSurgicalProcedures) {
+    for (let idx = 0; idx < this.cancerRelatedSurgicalProcedures.length; idx++) {
+      const procedure = this.cancerRelatedSurgicalProcedures[idx];
       const conditions: CancerConditionParent[] = (this.primaryCancerConditions as CancerConditionParent[]).concat(
         this.secondaryCancerConditions
       );
-      const reasonReference = procedure.reasonReference;
-      // reason can be undefined if reasonReference was missing/empty
-      if (reasonReference) {
+      // Populate the reasonReference field
+      for (const reasonReference of cancerRelatedSurgialProceduresReferences[idx]) {
         for (const condition of conditions) {
           if (condition.id === reasonReference.reference) {
-            const reasonReferenceResult = {
+            procedure.reasonReference.push({
               reference: reasonReference.reference,
               display: reasonReference.display,
               meta_profile: condition.meta_profile
-            } as ReasonReference;
-            procedure.reasonReference = reasonReferenceResult;
+            });
+            // Don't continue looking for matching resources
+            break;
           }
         }
       }
@@ -402,8 +401,8 @@ export class mCODEextractor {
    * @returns
    */
   listContainsProcedure(
-    procedureList: CancerRelatedProcedureParent[],
-    procedure: CancerRelatedProcedureParent
+    procedureList: BaseCancerRelatedProcedure[],
+    procedure: BaseCancerRelatedProcedure
   ): boolean {
     for (const storedProcedure of procedureList) {
       if (
