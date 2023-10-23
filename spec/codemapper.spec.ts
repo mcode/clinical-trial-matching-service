@@ -2,10 +2,10 @@ import * as fhir from 'fhir/r4';
 import { CodeMapper, CodeSystemEnum } from '../src/codeMapper';
 import * as code_mapper_test from './data/code_mapper_test.json';
 
-describe('Code Mapper Tests', () => {
+describe('CodeMapper', () => {
   const codeMapper = new CodeMapper(code_mapper_test);
 
-  it('Test all possible values.', function () {
+  it('handles all possible values', function () {
     const allCodings: fhir.Coding[] = [];
     allCodings.push({ code: 'aa', system: 'snomed' });
     allCodings.push({ code: 'bb', system: 'SNOMED' });
@@ -86,15 +86,44 @@ describe('Code Mapper Tests', () => {
   });
 
   it('Check code equality.', () => {
-    const code1 = {code: "gggggggg", system: "snomed"} as fhir.Coding;
-    const code2 = {code: "gggggggg", system: "snomed"};
-    const code3 = {code: "gggggggg", system: "icd-10"};
+    const code1 = { code: 'gggggggg', system: 'snomed' } as fhir.Coding;
+    const code2 = { code: 'gggggggg', system: 'snomed' };
+    const code3 = { code: 'gggggggg', system: 'icd-10' };
 
     expect(CodeMapper.codesEqual(code1, CodeMapper.normalizeCodeSystem(code2.system), code2.code)).toBeTrue();
     expect(CodeMapper.codesEqual(code1, CodeMapper.normalizeCodeSystem(code3.system), code3.code)).toBeFalse();
   });
 
   it('Test NIH System Normalizer.', () => {
-    expect(CodeMapper.normalizeCodeSystem("nih")).toBe(CodeSystemEnum.NIH);
+    expect(CodeMapper.normalizeCodeSystem('nih')).toBe(CodeSystemEnum.NIH);
+  });
+
+  describe('#extractMappings', () => {
+    it('skips codes with missing system/codes', () => {
+      expect(
+        codeMapper.extractCodeMappings([
+          {
+            /* literally nothing */
+          },
+          { system: 'http://www.example.com/' },
+          { code: '1234' }
+        ])
+      ).toEqual([]);
+    });
+  });
+
+  describe('.codesEqual', () => {
+    it('handles missing system/codes', () => {
+      expect(CodeMapper.codesEqual({}, CodeSystemEnum.ICD10, '1234')).toBeFalse();
+      expect(CodeMapper.codesEqual({ system: 'icd10' }, CodeSystemEnum.ICD10, '1234')).toBeFalse();
+      expect(CodeMapper.codesEqual({ code: '1234' }, CodeSystemEnum.ICD10, '1234')).toBeFalse();
+    });
+  });
+
+  describe('.normalizeCodeSystem', () => {
+    it('maps systems as expected', () => {
+      expect(CodeMapper.normalizeCodeSystem('http://www.example.com/hgnc')).toEqual(CodeSystemEnum.HGNC);
+      expect(CodeMapper.normalizeCodeSystem('http://www.genenames.org/hgnc')).toEqual(CodeSystemEnum.HGNC);
+    });
   });
 });

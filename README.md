@@ -130,25 +130,22 @@ Construct an error with the given `message` string and possibly with an `httpSta
 
 ## mCODE Extractor
 
-The mCODEextractor is a class within the package that can be used to extract and create mCODE objects from an input patient record.
+The mCODEextractor is a class within the package that can be used to extract mCODE objects from an input patient record.
 Construct with: `const extractedMcode = new mcode.mCODEextractor(patientBundle: fhir.Bundle);`
-Then, you can pull out the different objects using:
-  `getPrimaryCancerConditions(): PrimaryCancerCondition[]`
-  `getSecondaryCancerConditions(): SecondaryCancerCondition[]`
-  `getTNMclinicalStageGroup(): fhir.Coding[]`
-  `getTNMpathologicalStageGroup(): fhir.Coding[]`
-  `getBirthDate(): string`
-  `getTumorMarkers(): TumorMarker[]`
-  `getCancerGeneticVariants(): CancerGeneticVariant[]`
-  `getCancerRelatedRadiationProcedures(): CancerRelatedRadiationProcedure[]`
-  `getCancerRelatedSurgicalProcedures(): CancerRelatedSurgicalProcedure[]`
-  `getCancerRelatedMedicationStatements(): fhir.Coding[]`
-  `getEcogPerformanceStatus(): number`
-  `getKarnofskyPerformanceStatus(): number`
+Then, you can pull out the different objects using the following properties:
 
-## MappingLogic
-
-MappingLogic is an abstract class that can be extended to implement your own Mapping Logic. Its constructor takes, by default, a `(patientBundle: fhir.Bundle)` and automatically builds out the extracted mCODE objects. It includes several required methods that are necessary to have logic for.
+  - `primaryCancerConditions: PrimaryCancerCondition[]`
+  - `secondaryCancerConditions: SecondaryCancerCondition[]`
+  - `TNMClinicalStageGroups: fhir.Coding[]`
+  - `TNMPathologicalStageGroups: fhir.Coding[]`
+  - `birthDate: string | null`
+  - `tumorMarkers: TumorMarker[]`
+  - `cancerGeneticVariants: CancerGeneticVariant[]`
+  - `cancerRelatedRadiationProcedures: CancerRelatedRadiationProcedure[]`
+  - `cancerRelatedSurgicalProcedures: CancerRelatedSurgicalProcedure[]`
+  - `cancerRelatedMedicationStatements: fhir.Coding[]`
+  - `ecogPerformanceStatus: number`
+  - `karnofskyPerformanceStatus: number`
 
 ## CodeMapper
 

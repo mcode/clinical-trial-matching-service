@@ -8,7 +8,6 @@ export * from './searchset';
 export * from './clinicaltrialsgov';
 export { CodeMapper, CodeSystemEnum } from './codeMapper';
 export * from './mcodeextractor';
-export { MappingLogic } from './mappinglogic';
 export { Study } from './ctg-api';
 export { ClinicalTrialsGovAPI } from './clinicaltrialsgov-api';
 export { updateResearchStudyWithClinicalStudy } from './study-fhir-converter';

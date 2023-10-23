@@ -285,7 +285,7 @@
         "recordedDate": "2017-07-21T23:41:09-04:00",
         "extension": [
           {
-            "url": "http://hl7.org/fhir/us/mcode/ValueSet/mcode-histology-morphology-behavior-vs",
+            "url": "http://hl7.org/fhir/us/mcode/StructureDefinition/mcode-histology-morphology-behavior",
             "valueCodeableConcept": {
               "coding": [
                 {
@@ -760,14 +760,16 @@
             }
           ]
         },
-        "interpretation" : {
-          "coding" : [
-            {
-              "system" : "http://hl7.org/fhir/ValueSet/observation-interpretation",
-              "code" : "POS"
-            }
-          ]
-        },
+        "interpretation" : [
+          {
+            "coding" : [
+              {
+                "system" : "http://hl7.org/fhir/ValueSet/observation-interpretation",
+                "code" : "POS"
+              }
+            ]
+          }
+        ],
         "method" : {
           "coding" : [
             {
@@ -794,14 +796,16 @@
                 }
               ]
             },
-            "interpretation" : {
-              "coding" : [
-                {
-                  "system" : "http://hl7.org/fhir/ValueSet/observation-interpretation",
-                  "code" : "CAR"
-                }
-              ]
-            }
+            "interpretation" : [
+              {
+                "coding" : [
+                  {
+                    "system" : "http://hl7.org/fhir/ValueSet/observation-interpretation",
+                    "code" : "CAR"
+                  }
+                ]
+              }
+            ]
           },
           {
             "code" : {
@@ -856,14 +860,16 @@
                 }
               ]
             },
-            "interpretation" : {
-              "coding" : [
-                {
-                  "system" : "http://hl7.org/fhir/ValueSet/observation-interpretation",
-                  "code" : "A"
-                }
-              ]
-            }
+            "interpretation" : [
+              {
+                "coding" : [
+                  {
+                    "system" : "http://hl7.org/fhir/ValueSet/observation-interpretation",
+                    "code" : "A"
+                  }
+                ]
+              }
+            ]
           }
         ]
       },
@@ -1023,14 +1029,16 @@
             }
           ]
         },
-        "interpretation" : {
-          "coding" : [
-            {
-              "system" : "http://hl7.org/fhir/ValueSet/observation-interpretation",
-              "code" : "POS"
-            }
-          ]
-        },
+        "interpretation" : [
+          {
+            "coding" : [
+              {
+                "system" : "http://hl7.org/fhir/ValueSet/observation-interpretation",
+                "code" : "POS"
+              }
+            ]
+          }
+        ],
         "method" : {
           "coding" : [
             {
@@ -1057,14 +1065,16 @@
                 }
               ]
             },
-            "interpretation" : {
-              "coding" : [
-                {
-                  "system" : "http://hl7.org/fhir/ValueSet/observation-interpretation",
-                  "code" : "CAR"
-                }
-              ]
-            }
+            "interpretation" : [
+              {
+                "coding" : [
+                  {
+                    "system" : "http://hl7.org/fhir/ValueSet/observation-interpretation",
+                    "code" : "CAR"
+                  }
+                ]
+              }
+            ]
           },
           {
             "code" : {
@@ -1119,14 +1129,16 @@
                 }
               ]
             },
-            "interpretation" : {
-              "coding" : [
-                {
-                  "system" : "http://hl7.org/fhir/ValueSet/observation-interpretation",
-                  "code" : "A"
-                }
-              ]
-            }
+            "interpretation" : [
+              {
+                "coding" : [
+                  {
+                    "system" : "http://hl7.org/fhir/ValueSet/observation-interpretation",
+                    "code" : "A"
+                  }
+                ]
+              }
+            ]
           }
         ]
       },
