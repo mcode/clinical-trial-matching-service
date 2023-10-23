@@ -1,4 +1,3 @@
-import * as fhirpath from 'fhirpath';
 import * as fhir from 'fhir/r4';
 
 import {
@@ -17,8 +16,6 @@ import {
   MCODE_TUMOR_MARKER
 } from './mcode';
 import { resourceContainsProfile } from './fhir-util';
-
-export type FHIRPath = string;
 
 export interface ReasonReference {
   reference?: string;
@@ -70,8 +67,8 @@ export interface CancerRelatedSurgicalProcedure extends BaseCancerRelatedProcedu
 }
 
 export interface TumorMarker extends BaseFhirResource {
-  valueQuantity: Quantity[];
-  valueRatio: Ratio[];
+  valueQuantity?: Quantity;
+  valueRatio?: Ratio;
   valueCodeableConcept: fhir.Coding[];
   interpretation: fhir.Coding[];
 }
@@ -221,14 +218,18 @@ export class mCODEextractor {
             );
           }
           if (resourceContainsProfile(resource, MCODE_TUMOR_MARKER)) {
-            const tempTumorMarker: TumorMarker = {
-              valueQuantity: this.lookup(resource, 'valueQuantity') as Quantity[],
-              valueRatio: this.lookup(resource, 'valueRatio') as Ratio[],
-              valueCodeableConcept: extractCoding(resource.valueCodeableConcept),
-              interpretation: extractCoding(resource.interpretation),
-              coding: extractCoding(resource.code)
-            };
-            this.tumorMarkers.push(tempTumorMarker);
+            const valueQuantity = resource.valueQuantity;
+            const valueRatio = resource.valueRatio;
+            // For now, ignore values that are missing both a quantity and ratio
+            if (valueQuantity !== undefined || valueRatio !== undefined) {
+              this.tumorMarkers.push({
+                valueQuantity: valueQuantity,
+                valueRatio: valueRatio,
+                valueCodeableConcept: extractCoding(resource.valueCodeableConcept),
+                interpretation: extractCoding(resource.interpretation),
+                coding: extractCoding(resource.code)
+              });
+            }
           }
           // Parse and Extract mCODE Cancer Genetic Variant
           if (resourceContainsProfile(resource, MCODE_CANCER_GENETIC_VARIANT)) {
@@ -353,20 +354,6 @@ export class mCODEextractor {
   }
 
   /**
-   * Resource lookup.
-   * @param resource
-   * @param path
-   * @param environment
-   * @returns
-   */
-  private lookup(resource: fhir.Resource, path: FHIRPath, environment?: { [key: string]: string }): unknown[] {
-    // The FHIR client Resource type definition is wrong (sort of) - it requires
-    // that Meta references have a lastUpdated time. This is, in fact, optional,
-    // so just jam it in.
-    return fhirpath.evaluate(resource, path, environment);
-  }
-
-  /**
    * Checks whether the given list contains the given coding.
    * @param codingList
    * @param coding
@@ -400,10 +387,7 @@ export class mCODEextractor {
    * @param procedure
    * @returns
    */
-  listContainsProcedure(
-    procedureList: BaseCancerRelatedProcedure[],
-    procedure: BaseCancerRelatedProcedure
-  ): boolean {
+  listContainsProcedure(procedureList: BaseCancerRelatedProcedure[], procedure: BaseCancerRelatedProcedure): boolean {
     for (const storedProcedure of procedureList) {
       if (
         procedure.coding.every((coding1) =>

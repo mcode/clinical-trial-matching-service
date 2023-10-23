@@ -65,8 +65,8 @@ describe('ExtractedMCODE Import', () => {
       extractedData.tumorMarkers.some(
         (marker) =>
           marker.valueCodeableConcept[0].code == '10828004' &&
-          marker.valueQuantity[0].value == 3 &&
-          marker.valueRatio.length == 0 &&
+          marker.valueQuantity?.value == 3 &&
+          marker.valueRatio === undefined &&
           marker.coding[0].code == '48676-1' &&
           marker.coding[1].code == '85319-2' &&
           marker.interpretation[0].code == 'POS'
@@ -76,10 +76,10 @@ describe('ExtractedMCODE Import', () => {
       extractedData.tumorMarkers.some(
         (marker) =>
           marker.valueCodeableConcept[0].code == '10828004' &&
-          marker.valueQuantity.length == 0 &&
-          marker.valueRatio[0].numerator?.value == 1 &&
-          marker.valueRatio[0].numerator?.comparator == '>=' &&
-          marker.valueRatio[0].denominator?.value == 100 &&
+          marker.valueQuantity === undefined &&
+          marker.valueRatio?.numerator?.value == 1 &&
+          marker.valueRatio?.numerator?.comparator == '>=' &&
+          marker.valueRatio?.denominator?.value == 100 &&
           marker.coding[0].code == '48676-1' &&
           marker.coding[1].code == '85318-4' &&
           marker.interpretation.length == 0
@@ -89,11 +89,10 @@ describe('ExtractedMCODE Import', () => {
       extractedData.tumorMarkers.some(
         (marker) =>
           marker.valueCodeableConcept[0].code == '10828004' &&
-          marker.valueQuantity.length > 0 &&
-          marker.valueQuantity[0].value == 10 &&
-          marker.valueQuantity[0].comparator == '>=' &&
-          marker.valueQuantity[0].unit == '%' &&
-          marker.valueRatio.length == 0 &&
+          marker.valueQuantity?.value == 10 &&
+          marker.valueQuantity?.comparator == '>=' &&
+          marker.valueQuantity?.unit == '%' &&
+          marker.valueRatio === undefined &&
           marker.coding[0].code == '16112-5' &&
           marker.coding[1].code == '85337-4' &&
           marker.interpretation.length == 0

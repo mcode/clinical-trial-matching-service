@@ -226,8 +226,8 @@ describe('mCODEExtractor results', () => {
     ]);
     expect(extractedMcode.tumorMarkers).toEqual([
       {
-        valueQuantity: [{ value: 3 }],
-        valueRatio: [],
+        valueQuantity: { value: 3 },
+        valueRatio: undefined,
         valueCodeableConcept: [
           { system: 'http://snomed.info/sct', code: '10828004', display: 'Positive (qualifier value)' }
         ],
@@ -248,8 +248,8 @@ describe('mCODEExtractor results', () => {
         ]
       },
       {
-        valueQuantity: [],
-        valueRatio: [{ numerator: { value: 1, comparator: '>=' }, denominator: { value: 100, comparator: '>=' } }],
+        valueQuantity: undefined,
+        valueRatio: { numerator: { value: 1, comparator: '>=' }, denominator: { value: 100, comparator: '>=' } },
         valueCodeableConcept: [
           { system: 'http://snomed.info/sct', display: 'Positive (qualifier value)', code: '10828004' }
         ],
@@ -264,8 +264,8 @@ describe('mCODEExtractor results', () => {
         ]
       },
       {
-        valueQuantity: [{ value: 10, comparator: '>=', unit: '%', system: 'http://unitsofmeasure.org' }],
-        valueRatio: [],
+        valueQuantity: { value: 10, comparator: '>=', unit: '%', system: 'http://unitsofmeasure.org' },
+        valueRatio: undefined,
         valueCodeableConcept: [
           { system: 'http://snomed.info/sct', code: '10828004', display: 'Positive (qualifier value)' }
         ],
