@@ -14,11 +14,14 @@ SERVICES = {
     "trialjectory": "http://localhost:3001/getClinicalTrial"
 }
 
+# Change this if you just want to set this moving forward instead of 
 path_to_cancer_types = None
 
+# Filter function for selecting only values with specific cancer_type
 def filter_cancer_type(cancer_type, entry):
     return cancer_type in entry["cancerType"]
 
+# Basic request that will change the primary cancer condition
 def primary_request(code, display, system='http://snomed.info/sct'):
     req = {
             "resourceType": "Bundle",
@@ -87,6 +90,7 @@ def primary_request(code, display, system='http://snomed.info/sct'):
     return req
 
 def main(argv):
+    # Collect cli arguments
     argParser = argparse.ArgumentParser()
     argParser.add_argument("service", choices=["ancora", "bct", "carebox", "lungevity", "trialjectory"], help="Service you want to send the requests to")
     argParser.add_argument("cancer", choices=["bladder", "brain", "breast", "colon", "lung", "multipleMyeloma", "prostate"], help="Cancer type you would like to run against")
@@ -97,6 +101,7 @@ def main(argv):
     results = {}
     timeouts = []
 
+    # Process cli arguments
     service = args.service
     cancer_type = args.cancer
     directory = os.path.expanduser(args.directory)
@@ -111,17 +116,21 @@ def main(argv):
         print("Please supply a path to the application's list of cancer types.")
         sys.exit()
 
-    # Collect system, display, and code.
+    # Collect system, display, and code from app's cancerTypes.json file
     f = open(path_to_cancer_types)
     data = json.load(f)
 
+    # Filter out the ones for the specific cancer type we're testing against
     filtered_cancer_types = filter(lambda entry: filter_cancer_type(cancer_type, entry), data)
 
+    # Go through each of the primary cancer conditions
     for entry in filtered_cancer_types:
+        # Build the request and send it to the matching service wrapper
         req = primary_request(entry["code"], entry["display"], entry["system"])
         try:
             response = requests.post(SERVICES[service], data=json.dumps(req), headers={"Content-Type": "application/json"}, timeout=30)
         except requests.Timeout:
+            # Collect any Timeouts if we receive any
             print(f'There was a timeout with sending this record ({entry["code"]}, {entry["display"]}, {entry["system"]}) to the wrapper')
             timeouts.append([entry["code"], entry["display"], entry["system"]])
             continue
@@ -129,12 +138,15 @@ def main(argv):
         if response.status_code not in results:
             results[response.status_code] = []
 
+        # Collect results based on status returned
         researchStudies = response.json()
         results[response.status_code].append([entry["code"], entry["display"], entry["system"], researchStudies["total"] if "total" in researchStudies else 0 ])
 
-    dt = datetime.now().strftime("%d-%m-%YT%H:%M:%S")
+    dt = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     if directory != None and len(directory) > 0 and os.path.exists(directory):
         os.chdir(directory)
+
+    # Build excel sheet
     filename = f"{service}_{cancer_type}_{dt}.xlsx"
     workbook = xlsxwriter.Workbook(filename)
     # Prevent the codes from being changed to scientific/number formats
