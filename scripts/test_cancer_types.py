@@ -175,10 +175,10 @@ def main(argv):
         worksheet.write(0, 0, "Code")
         worksheet.write(0, 1, "Display")
         worksheet.write(0, 2, "System")
-        for entry in timeouts:
-            worksheet.write(index + 1, 0, timeouts[0], text_format)
-            worksheet.write(index + 1, 1, timeouts[1])
-            worksheet.write(index + 1, 2, timeouts[2])
+        for index, entry in enumerate(timeouts):
+            worksheet.write(index + 1, 0, entry[0], text_format)
+            worksheet.write(index + 1, 1, entry[1])
+            worksheet.write(index + 1, 2, entry[2])
 
     workbook.close()
     print(f"Results printed out to {filename}")
