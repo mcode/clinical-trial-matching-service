@@ -34,7 +34,7 @@ def primary_request(code, display, system='http://snomed.info/sct'):
                         "parameter": [
                             {
                                 "name": "zipCode",
-                                "valueString": "75390"
+                                "valueString": "75001"
                             },
                             {
                                 "name": "travelRadius",
@@ -142,6 +142,12 @@ def main(argv):
         researchStudies = response.json()
         results[response.status_code].append([entry["code"], entry["display"], entry["system"], researchStudies["total"] if "total" in researchStudies else 0 ])
 
+    print("-"*45)
+    print("Results", results)
+    print("-"*45)
+    print("Timeouts", timeouts)
+    print("-"*45)
+
     dt = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     if directory != None and len(directory) > 0 and os.path.exists(directory):
         os.chdir(directory)
@@ -175,11 +181,6 @@ def main(argv):
             worksheet.write(index + 1, 2, timeouts[2])
 
     workbook.close()
-    print("-"*45)
-    print("Results", results)
-    print("-"*45)
-    print("Timeouts", timeouts)
-    print("-"*45)
     print(f"Results printed out to {filename}")
 
 if __name__ == "__main__":
