@@ -16,13 +16,12 @@
  * This will fill out whatever can be filled out within the given studies.
  */
 
-import * as fs from 'node:fs';
-import { WriteFileOptions } from 'node:fs';
-import * as path from 'node:path';
 import { debuglog } from 'util';
 import { ResearchStudy } from 'fhir/r4';
 import { ClinicalTrialsGovAPI, Study } from './clinicaltrialsgov-api';
 import { updateResearchStudyWithClinicalStudy } from './study-fhir-converter';
+import * as sqlite from 'sqlite';
+import * as sqlite3 from 'sqlite3';
 
 /**
  * Logger type from the NodeJS utilities. (The TypeScript definitions for Node
@@ -49,6 +48,23 @@ export const CLINICAL_TRIAL_IDENTIFIER_CODING_SYSTEM_URL = 'http://clinicaltrial
  */
 export function isValidNCTNumber(nctNumber: string): boolean {
   return /^NCT[0-9]{8}$/.test(nctNumber);
+}
+
+export function parseNCTNumber(nctNumber: string): number | undefined {
+  if (isValidNCTNumber(nctNumber)) {
+    return parseInt(nctNumber.substring(3));
+  } else {
+    return undefined;
+  }
+}
+
+export function formatNCTNumber(nctNumber: number): string {
+  // Make sure the NCT number is an integer
+  nctNumber = Math.floor(nctNumber);
+  if (nctNumber < 0 || nctNumber > 99999999) {
+    throw new Error(`Invalid NCT number ${nctNumber}`);
+  }
+  return `NCT${nctNumber.toFixed(0).padStart(8, '0')}`;
 }
 
 /**
@@ -133,258 +149,26 @@ export function parseStudyJson(fileContents: string, log?: Logger): Study | null
   }
 }
 
-/**
- * Subset of the Node.js fs module necessary to handle the cache file system, allowing it to be overridden if
- * necessary.
- */
-export interface FileSystem {
-  readFile: (
-    path: fs.PathOrFileDescriptor,
-    options: { encoding: BufferEncoding; flag?: string },
-    callback: (err: NodeJS.ErrnoException | null, data: string) => void
-  ) => void;
-  mkdir: (path: string, callback: (err: NodeJS.ErrnoException | null) => void) => void;
-  readdir: (path: string, callback: (err: NodeJS.ErrnoException | null, files: string[]) => void) => void;
-  stat: (path: string, callback: (err: NodeJS.ErrnoException | null, stat: fs.Stats) => void) => void;
-  writeFile: (
-    file: string,
-    data: Buffer | string,
-    options: WriteFileOptions,
-    callback: (err: Error | null) => void
-  ) => void;
-  unlink: (path: string, callback: (err: NodeJS.ErrnoException | null) => void) => void;
+// Currently this exists as a simple object with only one function but may be updated later
+interface Migration {
+  up: (db: sqlite.Database) => Promise<void>;
 }
 
-interface PendingState {
-  promise: Promise<void>;
-  resolve: () => void;
-  reject: (e: Error) => void;
-}
-
-/**
- * A cache entry. Cache entries basically operate in two modes: an entry that is pending being written based on a ZIP
- * file, and a file that has a backing file ready to be loaded.
- *
- * The pending state is kind of weird because an entry is pending once a download has been requested for it, but cannot
- * be properly fulfilled until the file data has been saved. There's no really good way to wrap that in a Promise so
- * instead the resolve method is stored until the pending state can be resolved.
- */
-export class CacheEntry {
-  private _cache: ClinicalTrialsGovService;
-  // Dates are, sadly, mutable via set methods. This makes it impractical to attempt to make properties involving them
-  // immutable.
-  private _createdAt: Date | null;
-  private _lastAccess: Date;
-  /**
-   * The pending status. Either a Promise (in which case it is not only pending, but has things actively waiting for
-   * it), or true, in which case it is pending but the promise is yet to be created, or false if pending but the promise
-   * has not been created. This is so that no Promise is created if nothing ever needs it, which avoids cases where the
-   * Promise won't have a catch handler attached to it.
-   */
-  private _pending: PendingState | boolean = false;
-  /**
-   * Create a new cache entry.
-   * @param filename the file name of the entry
-   * @param options the file stats (if the file exists) or a flag indicating it's pending (being downloaded still)
-   */
-  constructor(
-    cache: ClinicalTrialsGovService,
-    public filename: string,
-    options: { stats?: fs.Stats; pending?: boolean }
-  ) {
-    this._cache = cache;
-    if (options.stats) {
-      // Default to using the metadata from the fs.Stats object
-      this._createdAt = options.stats.ctime;
-      // Assume the last modified time was when the cache entry was fetched (it's close enough anyway)
-      this._lastAccess = options.stats.mtime;
-    } else {
-      // Otherwise, default to now
-      this._createdAt = new Date();
-      this._lastAccess = new Date();
-    }
-    if (options.pending) {
-      // In this mode, mark createdAt as null
-      this._createdAt = null;
-      this._pending = true;
+// Order matters in this
+const MIGRATIONS: Record<string, Migration> = {
+  init: {
+    up: async (db: sqlite.Database): Promise<void> => {
+      // Create the cache table
+      await db.run(`CREATE TABLE ctgov_studies
+        (
+          nct_id INTEGER PRIMARY KEY,
+          study_json TEXT,
+          error_message TEXT,
+          created_at NUMERIC NOT NULL
+        )`);
     }
   }
-  // As the returned Date objects are mutable, return copies
-  /**
-   * Gets the time when this entry was initially created. If null, that indicates that the entry was never successfully
-   * created - it's still waiting for data to be downloaded.
-   */
-  get createdAt(): Date | null {
-    return this._createdAt === null ? null : new Date(this._createdAt);
-  }
-  /**
-   * Gets the last time the cache entry was accessed. This is updated whenever
-   * #load() is called.
-   */
-  get lastAccess(): Date {
-    return new Date(this._lastAccess);
-  }
-  /**
-   * Determine if the cache entry is still pending: data for it has not yet been saved.
-   */
-  get pending(): boolean {
-    return this._pending !== false;
-  }
-
-  /**
-   * Check if the last access time is before the given date
-   * @param date the date to check
-   * @returns true if the last access time was before the given date
-   */
-  lastAccessedBefore(date: Date): boolean {
-    return this._lastAccess < date;
-  }
-
-  /**
-   * Indicates that the entry has been located somewhere and that data for it is now being prepared.
-   */
-  found(): void {
-    if (this._createdAt === null) {
-      this._createdAt = new Date();
-    }
-  }
-
-  /**
-   * Resolves the pending state (if the entry was pending), otherwise does nothing. This does not change the "found"
-   * status - if ready() is called without found(), createdAt remains null and the entry may be removed as pointing to
-   * a record that does not exist.
-   */
-  ready(): void {
-    if (typeof this._pending === 'object') {
-      this._pending.resolve();
-    }
-    this._pending = false;
-  }
-
-  /**
-   * Forcibly fail the entry.
-   * @param e the error to fail the entry with
-   */
-  fail(e: Error | string): void {
-    if (typeof this._pending === 'object') {
-      if (typeof e === 'string') {
-        e = new Error(e);
-      }
-      this._pending.reject(e);
-    }
-    this._pending = false;
-  }
-
-  /**
-   * Loads the underlying file. If the entry is still pending, then the file is read once the entry is ready. This may
-   * resolve to null if the clinical study does not exist in the results.
-   */
-  load(): Promise<Study | null> {
-    // Move last access to now
-    this._lastAccess = new Date();
-    // If we're still pending, we have to wait for that to finish before we can
-    // read the underlying file.
-    if (this._pending) {
-      let promise: Promise<void>;
-      if (this._pending === true) {
-        // This is the only case when we actually create the Promise - when still pending and something attempts a load.
-        // TODO (maybe): Add a timeout?
-        // There's no way to prove it to TypeScript, but the executor function in the Promise runs immediately when the
-        // Promise is created. So create useless no-op funcs to avoid "may be undefined" errors.
-        let resolveFunc: () => void = /* istanbul ignore next */ () => {
-            /* no-op */
-          },
-          rejectFunc: (e: Error) => void = /* istanbul ignore next */ () => {
-            /* no-op */
-          };
-        promise = new Promise<void>((resolve, reject) => {
-          resolveFunc = resolve;
-          rejectFunc = reject;
-        });
-        this._pending = {
-          promise: promise,
-          resolve: resolveFunc,
-          reject: rejectFunc
-        };
-      } else {
-        promise = this._pending.promise;
-      }
-      return promise.then(() => {
-        return this.readFile();
-      });
-    } else {
-      // Otherwise we can just return immediately
-      return this.readFile();
-    }
-  }
-
-  /**
-   * Always attempt to read the file, regardless of whether or not the entry is pending.
-   */
-  readFile(): Promise<Study | null> {
-    return new Promise((resolve, reject) => {
-      this._cache.fs.readFile(this.filename, { encoding: 'utf8' }, (err, data) => {
-        if (err) {
-          reject(err);
-        } else {
-          // Again bump last access to now since the access has completed
-          this._lastAccess = new Date();
-          if (data.length === 0) {
-            // Sometimes files end up empty - this appears to be a bug?
-            // It's unclear what causes this to happen
-            this._cache.log('Warning: %s is empty on read', this.filename);
-            resolve(null);
-          } else {
-            resolve(parseStudyJson(data, this._cache.log));
-          }
-        }
-      });
-    });
-  }
-
-  /**
-   * Remove the entry from the cache. All this does is delete the underlying file. The returned Promise is more for
-   * error handling than anything else.
-   */
-  remove(): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      fs.unlink(this.filename, (err) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve();
-        }
-      });
-    });
-  }
-}
-
-/**
- * Create a directory if it does not already exist. If it does exist (or some other file exists in its place), this
- * still resolves rather than raising an error. This used to check if the paths were really directories, but since the
- * final step is now reading the file entries from the directory anyway, that check ensures everything is a directory
- * anyway.
- *
- * @param path the path to create (will be created recursively)
- * @return a Promise that resolves as true if the directory was newly created or false if it existed
- */
-export function mkdir(fs: FileSystem, path: string): Promise<boolean> {
-  return new Promise<boolean>((resolve, reject) => {
-    fs.mkdir(path, (err) => {
-      if (err) {
-        if (err.code === 'EEXIST') {
-          // This is fine - resolve false. We'll only get this if the final part of the path exists (although it will be
-          // EEXIST regardless of if it's a directory or a regular file)
-          resolve(false);
-        } else {
-          reject(err);
-        }
-      } else {
-        resolve(true);
-      }
-    });
-  });
-}
+};
 
 export interface ClinicalTrialsGovServiceOptions {
   /**
@@ -431,11 +215,6 @@ export interface ClinicalTrialsGovServiceOptions {
  * way to extract the clinical study data directly.
  */
 export class ClinicalTrialsGovService {
-  /**
-   * Internal value to track temporary file names.
-   */
-  private tempId = 0;
-
   /**
    * Log used to log debug information. Either passed in at creation time or created via the Node.js util.debuglog
    * function. With the latter, activate by setting the NODE_DEBUG environment variable to "ctgovservice" (or include it
@@ -504,34 +283,39 @@ export class ClinicalTrialsGovService {
    */
   maxAllowedEntrySize = 128 * 1024 * 1024;
 
-  private cacheDataDir: string;
-
+  private cacheDBPath: string | null;
+  private cacheDB: sqlite.Database | null;
   /**
-   * Actual cache of NCT IDs to their cached values. This is the "real cache" versus whatever's on the filesystem.
-   * (The NCT ID is in the form that returns true from isValidNCTNumber, so NCTnnnnnnnn where n are digits.)
+   * Internal flag indicating if init() has been called
    */
-  private cache = new Map<NCTNumber, CacheEntry>();
+  private cacheReady = false;
 
   private cleanupTimeout: NodeJS.Timeout | null = null;
 
   readonly service: ClinicalTrialsGovAPI;
 
   /**
-   * The filesystem being used by the cache.
-   */
-  readonly fs: FileSystem;
-
-  /**
    * Creates a new instance. This will not initialize the cache or load anything, this merely creates the object. Use
    * the #init() method to initialize the service and load existing data. (Or use createClinicalTrialsGovService() do
    * construct and initialize at the same time.)
    *
-   * @param dataDir the directory to use for cache data
+   * The {@link #init} method must be used **even if** given a database object, as it will initialize the necessary
+   * tables within the database. If given a path name, calling {@link #destroy} will close the database. However, if
+   * given a database directly, {@link #destroy} **will not** close the database and it will be the responsibility of
+   * the code using the service to close it.
+   *
+   * @param db either the path to the database file to use, or the sqlite.Database to use directly.
    * @param log an optional function to receive debug log messages. By default this uses util.debuglog('ctgovservice')
    *     meaning that the log can be activated by setting NODE_DEBUG to "ctgovservice"
    */
-  constructor(public readonly dataDir: string, options?: ClinicalTrialsGovServiceOptions) {
-    this.cacheDataDir = path.join(dataDir, 'data');
+  constructor(public readonly db: string | sqlite.Database, options?: ClinicalTrialsGovServiceOptions) {
+    if (typeof db === 'string') {
+      this.cacheDBPath = db;
+      this.cacheDB = null;
+    } else {
+      this.cacheDBPath = null;
+      this.cacheDB = db;
+    }
     const log = options ? options.log : undefined;
     // If no log was given, create it
     this.log = log ?? debuglog('ctgovservice');
@@ -539,28 +323,84 @@ export class ClinicalTrialsGovService {
     this.expirationTimeout = options?.expireAfter ?? 60 * 60 * 1000;
     // Default cleanup interval to an hour
     this.cleanupInterval = options?.cleanInterval ?? 60 * 60 * 1000;
-    this.fs = options?.fs ?? fs;
     this.service = new ClinicalTrialsGovAPI({ logger: this.log });
   }
 
   /**
-   * Creates the necessary directories if they do not exist, and loads any existing data into the cache. Parent
-   * directories of the cache will not be created automatically, they must already exist.
+   * Initializes the service. This will open the SQLite database and run through any necessary data migrations for it.
    */
   async init(): Promise<void> {
-    this.log('Using %s as cache dir for clinicaltrials.gov data', this.dataDir);
-    const baseDirExisted = !(await mkdir(this.fs, this.dataDir));
-    // The directory containing cached studies
-    const dataDirExisted = !(await mkdir(this.fs, this.cacheDataDir));
-    if (baseDirExisted && dataDirExisted) {
-      // If both directories existed, it's necessary to restore the cache directory
-      await this.restoreCacheFromFS();
-      this.log('Restored existing cache data.');
-    } else {
-      this.log(baseDirExisted ? 'Created data directory for storing result' : 'Created new cache directory');
+    if (this.cacheReady) {
+      throw new Error('init() has already been called');
     }
+    // Technically this isn't really ready yet, but prevent double-calls to init
+    this.cacheReady = true;
+    let db: sqlite.Database;
+    if (this.cacheDBPath === null) {
+      this.log('Using existing database object for clinicaltrials.gov data');
+      if (this.cacheDB === null) {
+        throw new Error('Invalid internal state: both cache DB path and DB are null');
+      }
+      db = this.cacheDB;
+    } else {
+      this.log('Using %s as cache DB for clinicaltrials.gov data', this.cacheDBPath);
+      this.cacheDB = db = await sqlite.open({ driver: sqlite3.Database, filename: this.cacheDBPath });
+    }
+    await this.migrateDB(db, MIGRATIONS);
     // Once started, run the cache cleanup every _cleanupIntervalMillis
     this.setCleanupTimeout();
+  }
+
+  /**
+   * Migrate a database. The arguments exist mostly for typing/testing purposes.
+   * @param db the database to migrate
+   * @param migrations the migrations to run (they're run in key order). This is an argument for testing purposes.
+   */
+  private async migrateDB(db: sqlite.Database, migrations: typeof MIGRATIONS): Promise<void> {
+    this.log('Applying migrations...');
+    // lock the database
+    await db.run('BEGIN TRANSACTION');
+    try {
+      await db.run('CREATE TABLE IF NOT EXISTS migrations (id INTEGER PRIMARY KEY, name TEXT NOT NULL)');
+      const appliedMigration = new Set(
+        (await db.all<{ id: number; name: string }[]>('SELECT name FROM migrations ORDER BY id ASC')).map(
+          (row) => row.name
+        )
+      );
+      for (const name in migrations) {
+        if (appliedMigration.has(name)) {
+          this.log('Migration %s already applied', name);
+        } else {
+          this.log('Applying migration %s...', name);
+          await migrations[name].up(db);
+          // Insert that this migration was run
+          await db.run('INSERT INTO migrations (name) VALUES (?)', name);
+          this.log('Migration %s completed.', name);
+        }
+      }
+      await db.run('COMMIT');
+      this.log('All migrations applied successfully.');
+    } catch (ex) {
+      this.log('Exception applying migrations: %o', ex);
+      // Rollback if we can
+      await db.run('ROLLBACK');
+      this.log('Migrations were rolled back.');
+      throw ex;
+    }
+  }
+
+  /**
+   * Internal method to get the database object, throwing an exception if it's
+   * not available.
+   * @returns the database
+   */
+  private getDB(): sqlite.Database {
+    if (this.cacheDB === null) {
+      throw new Error(
+        `Database not available (${this.cacheReady ? 'destroy() has been called' : 'init() has not been called'})`
+      );
+    }
+    return this.cacheDB;
   }
 
   /**
@@ -586,71 +426,25 @@ export class ClinicalTrialsGovService {
   }
 
   /**
-   * Shuts down the service, doing any final necessary cleanup. At present this stops any running timers. The Promise
-   * returned currently resolves immediately, but in the future, it may resolve asynchronously when the service has been
-   * cleanly shut down.
+   * Shuts down the service, doing any final necessary cleanup. If given a database object when constructed, this
+   * **will not** close the database. However, future calls to this object will no longer function.
    */
-  destroy(): Promise<void> {
+  async destroy(): Promise<void> {
     if (this.cleanupTimeout !== null) {
       clearTimeout(this.cleanupTimeout);
       // And blank it
       this.cleanupTimeout = null;
     }
-    return Promise.resolve();
-  }
-
-  /**
-   * This attempts to load the cache from the filesystem.
-   */
-  private restoreCacheFromFS(): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      this.log('Scanning %s for existing cache entries...', this.cacheDataDir);
-      this.fs.readdir(this.cacheDataDir, (err, files) => {
-        if (err) {
-          reject(err);
-        } else {
-          // Go through the files and create entries for them.
-          const promises: Promise<void>[] = [];
-          for (const file of files) {
-            this.log('Checking %s', file);
-            // Split this file name into two parts: the extension and the base name
-            const dotIdx = file.lastIndexOf('.');
-            if (dotIdx < 1) {
-              // Skip "bad" files
-              continue;
-            }
-            // FIXME: This is probably a bad idea. Right now the file name serves as the "master" name for files. It's
-            // probably possible to load the file and pull the NCT ID out that way, as well as clear out files that
-            // can't be parsed.
-            const baseName = file.substring(0, dotIdx);
-            const extension = file.substring(dotIdx + 1);
-            if (isValidNCTNumber(baseName) && extension === 'json') {
-              promises.push(this.createCacheEntry(baseName, path.join(this.cacheDataDir, file)));
-            }
-          }
-          Promise.all(promises).then(() => {
-            resolve();
-          }, reject);
-        }
-      });
-    });
-  }
-
-  private createCacheEntry(id: NCTNumber, filename: string): Promise<void> {
-    // Restoring this involves getting the time the file was created so we know when the entry expires
-    return new Promise((resolve, reject) => {
-      this.fs.stat(filename, (err, stats) => {
-        if (err) {
-          // TODO (maybe): Instead of rejecting, just log - rejecting will caused Promise.all to immediately reject and
-          // ignore the rest of the Promises. However, stat failing is probably a "real" error.
-          reject(err);
-        } else {
-          this.cache.set(id, new CacheEntry(this, filename, { stats: stats }));
-          this.log('Restored cache entry for %s', filename);
-          resolve();
-        }
-      });
-    });
+    if (this.cacheDBPath === null) {
+      // Always null out the database
+      this.cacheDB = null;
+    } else {
+      const db = this.cacheDB;
+      if (db) {
+        this.cacheDB = null;
+        await db.close();
+      }
+    }
   }
 
   /**
@@ -663,76 +457,78 @@ export class ClinicalTrialsGovService {
    * @returns a Promise that resolves when the studies are updated. It will resolve with the same array that was passed
    *     in - this updates the given objects, it does not clone them and create new ones.
    */
-  updateResearchStudies(studies: ResearchStudy[]): Promise<ResearchStudy[]> {
+  async updateResearchStudies(studies: ResearchStudy[]): Promise<ResearchStudy[]> {
     const nctIdMap = findNCTNumbers(studies);
     if (nctIdMap.size === 0) {
       // Nothing to do
-      return Promise.resolve(studies);
-    } else {
-      const nctIds = Array.from(nctIdMap.keys());
-      // Make sure the NCT numbers are in the cache
-      return this.ensureTrialsAvailable(nctIds).then(() => {
-        const promises: Promise<Study | null>[] = [];
-        // Go through the NCT numbers we found and updated all matching trials
-        for (const entry of nctIdMap.entries()) {
-          const [nctId, study] = entry;
-          const promise = this.getCachedClinicalStudy(nctId);
-          promises.push(promise);
-          promise.then((clinicalStudy) => {
-            if (clinicalStudy !== null) {
-              // Make sure we have data to use - we may still get null if there was no data for a given NCT number
-              // Update whatever trials we have
-              if (Array.isArray(study)) {
-                for (const s of study) {
-                  this.updateResearchStudy(s, clinicalStudy);
-                }
-              } else {
-                this.updateResearchStudy(study, clinicalStudy);
-              }
-            }
-          });
+      return studies;
+    }
+    const nctIds = Array.from(nctIdMap.keys());
+    // Make sure the NCT numbers are in the cache
+    await this.ensureTrialsAvailable(nctIds);
+    // Update the items in the list
+    await Promise.all(
+      Array.from(nctIdMap.entries()).map(([nctId, study]) => this.updateResearchStudyFromCache(nctId, study))
+    );
+    return studies;
+  }
+
+  private async updateResearchStudyFromCache(nctId: string, originals: ResearchStudy | ResearchStudy[]): Promise<void> {
+    const clinicalStudy = await this.getCachedClinicalStudy(nctId);
+    // Make sure we have data to use - cache can be missing NCT IDs even after requesting them if the NCT is missing
+    // from the origin service
+    if (clinicalStudy !== null) {
+      // Update whatever trials we have, which will either be an array or single object
+      if (Array.isArray(originals)) {
+        for (const s of originals) {
+          this.updateResearchStudy(s, clinicalStudy);
         }
-        // Finally resolve to the promises we were given
-        return Promise.all(promises).then(() => studies);
-      });
+      } else {
+        this.updateResearchStudy(originals, clinicalStudy);
+      }
     }
   }
 
   /**
-   * Tells the cache to delete all expired cached files. The entries are removed from access immediately, but a Promise
-   * is returned that resolves when all the underlying data is cleaned up. This Promise is more for error handling than
-   * anything else.
+   * Tells the cache to delete all expired cached files. Currently this does nothing - entries never expire. It may
+   * make sense to clean up the database every once and a while, but for now, this is a no-op.
    */
-  removeExpiredCacheEntries(): Promise<void> {
-    const expiredEntries: CacheEntry[] = [];
-    const expiredIds: string[] = [];
-    // Go through the cache and find all expired entries
-    const expired = new Date();
-    expired.setTime(expired.getTime() - this._expirationTimeout);
-    for (const [key, entry] of this.cache.entries()) {
-      if (entry.lastAccessedBefore(expired)) {
-        expiredIds.push(key);
-        expiredEntries.push(entry);
+  async removeExpiredCacheEntries(): Promise<void> {
+    // For now, does nothing.
+  }
+
+  /**
+   * Returns a list of NCT IDs that are valid and that are not in the cache.
+   * @param ids the NCT IDs to locate in the cache
+   * @return a list containing only NCT IDs that are valid and missing
+   */
+  async findCacheMisses(ids: string[]): Promise<string[]> {
+    const db = this.getDB();
+    const checkIds: number[] = [];
+    const idSet = new Set<string>();
+    let sql = '';
+    for (const id of ids) {
+      const nctNum = parseNCTNumber(id);
+      if (nctNum !== undefined) {
+        checkIds.push(nctNum);
+        idSet.add(id);
+        if (sql.length === 0) {
+          sql = 'SELECT nct_id FROM ctgov_studies WHERE nct_id IN (?';
+        } else {
+          sql += ', ?';
+        }
       }
     }
-    const expiredPromises: Promise<void>[] = [];
-    // Now that the expired entries have been found, remove them
-    for (const key of expiredIds) {
-      this.cache.delete(key);
+    // No valid IDs
+    if (sql.length === 0) {
+      return [];
     }
-    // FIXME: It's unclear whether or not this creates a race condition where it may be possible for another request
-    // for an entry we just expired to be deleted before the new entry is ready. This is somewhat unlikely, but it's
-    // something that could probably be fixed by ensuring that each time we create a cache entry we use a unique
-    // filename.
-    for (const entry of expiredEntries) {
-      expiredPromises.push(entry.remove());
+    const cacheHitIds = await db.all<{ nct_id: number }[]>(sql + ')', checkIds);
+    // Remove each hit ID
+    for (const row of cacheHitIds) {
+      idSet.delete(formatNCTNumber(row.nct_id));
     }
-
-    // The "then" essentially removes the array of undefined that will result
-    // into a single undefined.
-    return Promise.all(expiredPromises).then(() => {
-      /* do nothing */
-    });
+    return Array.from(idSet);
   }
 
   /**
@@ -742,9 +538,9 @@ export class ClinicalTrialsGovService {
    */
   ensureTrialsAvailable(ids: string[]): Promise<void>;
   ensureTrialsAvailable(studies: ResearchStudy[]): Promise<void>;
-  ensureTrialsAvailable(idsOrStudies: Array<string | ResearchStudy>): Promise<void> {
+  async ensureTrialsAvailable(idsOrStudies: Array<string | ResearchStudy>): Promise<void> {
     // We only want string IDs and we may end up filtering some of them out
-    const ids: string[] = [];
+    let ids: string[] = [];
     for (const o of idsOrStudies) {
       if (typeof o === 'string') {
         if (isValidNCTNumber(o)) ids.push(o);
@@ -753,15 +549,19 @@ export class ClinicalTrialsGovService {
         if (id) ids.push(id);
       }
     }
+    // Find the IDs we need to fetch
+    ids = await this.findCacheMisses(ids);
     // Now that we have the IDs, we can split them into download requests
-    const promises: Promise<boolean>[] = [];
+    // Run the download requests in series
     for (let start = 0; start < ids.length; start += this.maxTrialsPerRequest) {
-      promises.push(this.downloadTrials(ids.slice(start, Math.min(start + this.maxTrialsPerRequest, ids.length))));
+      await this.downloadTrials(ids.slice(start, Math.min(start + this.maxTrialsPerRequest, ids.length)));
     }
-    return Promise.all(promises).then(() => {
-      // This exists solely to turn the result from an array of success/fails into a single nothing
-    });
   }
+
+  /**
+   * A Promise used as a lock to ensure that only one downloadTrials is attempting to insert cache entries at a time.
+   */
+  private _downloadTrialsLock: Promise<void> | null = null;
 
   /**
    * Downloads the given trials from ClinicalTrials.gov and stores them in the data directory. Note that this will
@@ -772,90 +572,75 @@ export class ClinicalTrialsGovService {
    * is otherwise silently eaten
    */
   protected async downloadTrials(ids: string[]): Promise<boolean> {
-    let success = false;
-    // Now that we're starting to download clinical trials, immediately create pending entries for them.
-    for (const id of ids) {
-      if (!this.cache.has(id)) {
-        this.cache.set(id, new CacheEntry(this, this.pathForNctNumber(id), { pending: true }));
-      }
+    this.log('Fetching studies with NCT IDs %j', ids);
+    const studies = await this.tryFetchStudies(ids);
+    // If the call failed, return false
+    if (studies === null) {
+      return false;
     }
+    const db = this.getDB();
+    // Surround this in a transaction (otherwise each insert would be a transaction on its own)
+    // Some promise magic - if the lock exists, await it
+    if (this._downloadTrialsLock !== null) {
+      this.log('Waiting on transaction lock for NCT IDs %j', ids);
+      await this._downloadTrialsLock;
+      this.log('Transaction lock ready for %j', ids);
+    }
+    // Now, create the lock. (Default value gives it a type. Promise always runs the function in the constructor
+    // immediately so resolveLock will be set to the resolve method, but TypeScript can't prove that.)
+    let resolveLock = /* istanbul ignore next */ () => {};
+    this._downloadTrialsLock = new Promise((resolve) => {
+      resolveLock = resolve;
+    });
     try {
-      const studies = await this.service.fetchStudies(ids, this._maxTrialsPerRequest);
-      for (const study of studies) {
-        await this.addCacheEntry(study);
-      }
-      success = true;
-    } catch (ex) {
-      // If an error occurred while fetching studies, every cache entry we just loaded may be invalid.
-      this.log('Error while fetching trials: %o', ex);
-      this.log('Invalidating cache entry IDs for: %s', ids);
-      for (const id of ids) {
-        const entry = this.cache.get(id);
-        if (entry && entry.pending) {
-          this.cache.delete(id);
+      await db.run('BEGIN');
+      try {
+        for (const study of studies) {
+          await this.addCacheEntry(db, study);
         }
+        await db.run('COMMIT');
+        return true;
+      } catch (ex) {
+        this.log('Exception while adding cache entries: %j', ex);
+        await db.run('ROLLBACK');
+        return false;
       }
+    } finally {
+      this._downloadTrialsLock = null;
+      resolveLock();
     }
-    // Invalidate any IDs that are still pending, they weren't in the results
-    for (const id of ids) {
-      const entry = this.cache.get(id);
-      if (entry && entry.createdAt === null) {
-        this.log('Removing cache entry for %s: it was not in the downloaded bundle!', id);
-        entry.fail('Not found in bundle');
-        this.cache.delete(id);
-      }
-    }
-    return success;
   }
 
-  /**
-   * Create a path to the data file that stores data about a cache entry.
-   * @param nctNumber the NCT number
-   */
-  private pathForNctNumber(nctNumber: NCTNumber): string {
-    // FIXME: It's probably best not to use the NCT number as the sole part of the filename. See
-    // removeExpiredCacheEntries for details.
-    return path.join(this.cacheDataDir, nctNumber + '.json');
+  private async tryFetchStudies(ids: string[]): Promise<Study[] | null> {
+    try {
+      return await this.service.fetchStudies(ids, this._maxTrialsPerRequest);
+    } catch (ex) {
+      this.log('Error fetching trials from server: %o', ex);
+      return null;
+    }
   }
 
-  private addCacheEntry(study: Study): Promise<void> {
+  private async addCacheEntry(db: sqlite.Database, study: Study): Promise<void> {
     // See if we can locate an NCT number for this study.
     const nctNumber = study.protocolSection?.identificationModule?.nctId;
     if (typeof nctNumber !== 'string') {
       this.log(
         'Ignoring study object from server: unable to locate an NCT ID for it! (protocolSection.identificationModule.nctId missing or not a string)'
       );
-      return Promise.resolve();
+      return;
     }
-    const filename = this.pathForNctNumber(nctNumber);
-    // The cache entry should already exist
-    const entry = this.cache.get(nctNumber);
-    // Tell the entry that we are writing data
-    if (entry) {
-      entry.found();
-    } else {
-      this.log('No cache entry for %s! NOT writing it to cache! (Got back a different NCT number?)', nctNumber);
-      return Promise.resolve();
+    // Convert to the numeric ID sqlite will actually use
+    const rowId = parseNCTNumber(nctNumber);
+    if (rowId === undefined) {
+      this.log('Ignoring invalid study object from server: NCT ID %s is not valid!', nctNumber);
+      return;
     }
-    return new Promise<void>((resolve, reject) => {
-      this.fs.writeFile(filename, JSON.stringify(study), 'utf8', (err) => {
-        if (err) {
-          this.log('Unable to create file [%s]: %o', filename, err);
-          // If the cache entry exists in pending mode, delete it - we failed to create this entry
-          if (entry && entry.pending) {
-            entry.fail('Unable to create file');
-            this.cache.delete(nctNumber);
-          }
-          // TODO: Do we also need to delete the file? Or will the error prevent the file from existing?
-          reject(err);
-        } else {
-          if (entry && entry.pending) {
-            entry.ready();
-          }
-          resolve();
-        }
-      });
-    });
+    await db.run(
+      'INSERT INTO ctgov_studies (nct_id, study_json, created_at) VALUES (?, ?, ?) ON CONFLICT(nct_id) DO UPDATE SET study_json=excluded.study_json',
+      rowId,
+      JSON.stringify(study),
+      new Date().valueOf()
+    );
   }
 
   /**
@@ -864,13 +649,20 @@ export class ClinicalTrialsGovService {
    * @param nctNumber the NCT number
    * @returns a Promise that resolves to either the parsed ClinicalStudy or to null if the ClinicalStudy does not exist
    */
-  getCachedClinicalStudy(nctNumber: NCTNumber): Promise<Study | null> {
-    const entry = this.cache.get(nctNumber);
-    if (entry) {
-      return entry.load();
-    } else {
-      return Promise.resolve(null);
+  async getCachedClinicalStudy(nctNumber: NCTNumber): Promise<Study | null> {
+    const db = this.getDB();
+    const nctId = parseNCTNumber(nctNumber);
+    if (nctId) {
+      const result = await db.get<{ study_json: string } | null>(
+        'SELECT study_json FROM ctgov_studies WHERE nct_id=?',
+        nctId
+      );
+      // study_json can be NULL to indicate a cached failure
+      if (result && result.study_json) {
+        return JSON.parse(result.study_json);
+      }
     }
+    return null;
   }
 
   /**
@@ -886,33 +678,29 @@ export class ClinicalTrialsGovService {
   }
 
   /**
-   * Creates and initializes a new service for retrieving data from http://clinicaltrials.gov/. This will automatically
-   * invoke the init method to create the directory if it doesn't exist and load any existing data if it does. Note that
-   * the init method will not create missing parent directories - the path to the cache directory must already exist
-   * minus the cache directory itself. If the cache directory cannot be created the Promise will be rejected with the
-   * error preventing it from being created.
+   * Creates and initializes a new service for retrieving data from http://clinicaltrials.gov/.
    *
-   * @param dataDir the data directory
+   * This is essentially the same as constructing the object and then calling init() on it.
+   *
+   * Note the same behavior applies when `create()` is invoked with a database: the database object is nulled out when
+   * {@link #destroy} is called, but it isn't closed. When invoked with a database object, it is the caller's
+   * responsibility to close it.
+   *
+   * @param db the path to the database file or the database to use directly
    * @param options additional options that can be set to further configure the trial service
    * @returns a Promise that resolves when the service is ready
    */
-  static create(dataDir: string, options?: ClinicalTrialsGovServiceOptions): Promise<ClinicalTrialsGovService> {
-    const result = new ClinicalTrialsGovService(dataDir, options);
-    return result.init().then(() => result);
+  static async create(
+    db: string | sqlite.Database,
+    options?: ClinicalTrialsGovServiceOptions
+  ): Promise<ClinicalTrialsGovService> {
+    const result = new ClinicalTrialsGovService(db, options);
+    await result.init();
+    return result;
   }
 }
 
 /**
- * Creates and initializes a new service for retrieving data from http://clinicaltrials.gov/. This is the same as
- * ClinicalTrialsGovService.create, see that method for details.
- *
- * @param dataDir the data directory
- * @param options additional options that can be set to further configure the trial service
- * @returns a Promise that resolves when the service is ready
+ * Alias of ClinicalTrialsGovService.create.
  */
-export function createClinicalTrialsGovService(
-  dataDir: string,
-  options?: ClinicalTrialsGovServiceOptions
-): Promise<ClinicalTrialsGovService> {
-  return ClinicalTrialsGovService.create(dataDir, options);
-}
+export const createClinicalTrialsGovService = ClinicalTrialsGovService.create;

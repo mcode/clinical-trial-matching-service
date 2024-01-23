@@ -3,10 +3,10 @@ import * as ctg from '../src/clinicaltrialsgov';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as nock from 'nock';
-import { Volume } from 'memfs';
+import * as sqlite from 'sqlite';
+import * as sqlite3 from 'sqlite3';
 
 // Trial missing summary, inclusion/exclusion criteria, phase and study type
-import * as trialMissing from './data/resource.json';
 import { createClinicalStudy } from './support/clinicalstudy-factory';
 import { createResearchStudy } from './support/researchstudy-factory';
 import { PagedStudies, Study } from '../src/ctg-api';
@@ -28,8 +28,32 @@ describe('.isValidNCTNumber', () => {
   });
 });
 
+describe('.parseNCTNumber', () => {
+  it('parses valid numbers', () => {
+    expect(ctg.parseNCTNumber('NCT12345678')).toEqual(12345678);
+    expect(ctg.parseNCTNumber('NCT00000000')).toEqual(0);
+  });
+  it('rejects invalid numbers', () => {
+    expect(ctg.parseNCTNumber('NCT1234567')).toBeUndefined();
+    expect(ctg.parseNCTNumber('NCT123456789')).toBeUndefined();
+    expect(ctg.parseNCTNumber('blatantly wrong')).toBeUndefined();
+    expect(ctg.parseNCTNumber('')).toBeUndefined();
+  });
+});
+
+describe('.formatNCTNumber', () => {
+  it('formats valid numbers', () => {
+    expect(ctg.formatNCTNumber(12345678)).toEqual('NCT12345678');
+    expect(ctg.formatNCTNumber(1)).toEqual('NCT00000001');
+  });
+  it('rejects invalid numbers', () => {
+    expect(() => ctg.formatNCTNumber(-1)).toThrow();
+    expect(() => ctg.formatNCTNumber(100000000)).toThrow();
+  });
+});
+
 describe('.parseStudyJson', () => {
-  let loggerSpy: jasmine.Spy<(message: string, ...rest: unknown[])=>void>;
+  let loggerSpy: jasmine.Spy<(message: string, ...rest: unknown[]) => void>;
   let study: Study | null | undefined;
   beforeEach(() => {
     loggerSpy = jasmine.createSpy('log');
@@ -37,7 +61,7 @@ describe('.parseStudyJson', () => {
   });
 
   const makeTests = (testData: string, loggerShouldBeCalled: boolean) => {
-    it ('without a logger', () => {
+    it('without a logger', () => {
       study = ctg.parseStudyJson(testData);
     });
 
@@ -49,7 +73,7 @@ describe('.parseStudyJson', () => {
         expect(loggerSpy).not.toHaveBeenCalled();
       }
     });
-  }
+  };
 
   describe('parses valid study JSON', () => {
     const testJsonString = fs.readFileSync(specFilePath('NCT02513394.json'), 'utf8');
@@ -174,279 +198,45 @@ describe('parseStudyJson', () => {
   });
 });
 
-describe('CacheEntry', () => {
-  // Constant start time
-  const startTime = new Date(2021, 0, 21, 12, 0, 0, 0);
-  // Create a dummy service
-  const service = new ctg.ClinicalTrialsGovService('/invalid', { cleanInterval: 0 });
-  describe('createdAt', () => {
-    beforeAll(() => {
-      jasmine.clock().install();
-      jasmine.clock().mockDate(startTime);
-    });
-    afterAll(() => {
-      jasmine.clock().uninstall();
-    });
-    it('sets the created at time', () => {
-      const entry = new ctg.CacheEntry(service, 'test', {});
-      expect(entry.createdAt).toEqual(startTime);
-    });
-    it('clones the created at time', () => {
-      const entry = new ctg.CacheEntry(service, 'test', {});
-      const createdAt = entry.createdAt;
-      expect(createdAt).toBeDefined();
-      if (createdAt) createdAt.setMonth(5);
-      expect(entry.createdAt).toEqual(startTime);
-    });
-  });
-  describe('lastAccess', () => {
-    beforeAll(() => {
-      jasmine.clock().install();
-    });
-    beforeEach(() => {
-      // Reset the clock
-      jasmine.clock().mockDate(startTime);
-    });
-    afterAll(() => {
-      jasmine.clock().uninstall();
-    });
-    it('sets the last access time', () => {
-      const entry = new ctg.CacheEntry(service, 'test', {});
-      expect(entry.lastAccess).toEqual(startTime);
-    });
-    it('clones the last access time', () => {
-      const entry = new ctg.CacheEntry(service, 'test', {});
-      entry.lastAccess.setMonth(5);
-      expect(entry.lastAccess).toEqual(startTime);
-    });
-    it('updates the last access time if accessed', () => {
-      const entry = new ctg.CacheEntry(service, 'test', {});
-      // This spy exists to prevent an attempt from actually reading the file
-      spyOn(entry, 'readFile').and.callFake(() => {
-        return Promise.resolve(createClinicalStudy());
-      });
-      // Move forward a minute
-      jasmine.clock().tick(60000);
-      const promise = entry.load();
-      // Last access should now be a minute after the start time
-      expect(entry.lastAccess).toEqual(new Date(2021, 0, 21, 12, 1, 0, 0));
-      return expectAsync(promise).toBeResolved();
-    });
-    describe('#lastAccessBefore', () => {
-      it('determines if a date is before the last access time', () => {
-        const entry = new ctg.CacheEntry(service, 'test', {});
-        expect(entry.lastAccessedBefore(new Date(2021, 0, 21, 11, 59, 59, 999))).toBeFalse();
-        // Exactly the same time is not before
-        expect(entry.lastAccessedBefore(startTime)).toBeFalse();
-        expect(entry.lastAccessedBefore(new Date(2021, 0, 21, 12, 0, 0, 1))).toBeTrue();
-      });
-    });
-  });
-  describe('pending', () => {
-    it('resolves a load once pending resolves', () => {
-      // This test is kind of weird, but first, create an entry in the pending state:
-      const entry = new ctg.CacheEntry(service, 'pending', { pending: true });
-      const spy = spyOn(entry, 'readFile').and.callFake(() => Promise.resolve(createClinicalStudy()));
-      // Now, attempt to load it. This should do nothing as the entry is pending.
-      let shouldBeResolved = false;
-      const promise = entry.load();
-      promise.then(() => {
-        // Check if we should be resolved at this point
-        expect(shouldBeResolved).toBeTrue();
-        if (shouldBeResolved) {
-          // If it should be resolved, it should have called readFile
-          expect(spy).toHaveBeenCalledOnceWith();
-        }
-      });
-      // Set a timeout to happen "on next event loop" that marks the cache entry as ready
-      setTimeout(() => {
-        // Make sure the spy has not been called - yet.
-        expect(spy).not.toHaveBeenCalled();
-        // Set the resolved flag to true
-        shouldBeResolved = true;
-        // And mark the entry ready, which should trigger the promise resolving
-        entry.ready();
-        // And then mark it as ready again, which should NOT trigger a second resolve
-        entry.ready();
-      }, 0);
-      // And now return that original Promise, expecting it to eventually resolve successfully
-      return expectAsync(promise).toBeResolved();
-    });
-  });
-  describe('#load', () => {
-    it('uses the existing load promise if invoked twice', () => {
-      const entry = new ctg.CacheEntry(service, 'test', {pending: true});
-      // This test involves calling load on an entry twice while it hasn't
-      // been resolved
-      // This spy is used to ensure everything resolves at the end
-      const testStudy = createClinicalStudy('01234567');
-      spyOn(entry, 'readFile').and.callFake(() => Promise.resolve(testStudy));
-      // Invoke load twice, as if it's coming from two different sources.
-      const promise1 = expectAsync(entry.load()).toBeResolvedTo(testStudy);
-      const promise2 = expectAsync(entry.load()).toBeResolvedTo(testStudy);
-      // Now flag the entry as ready
-      entry.ready();
-      // This should make the two other promises resolve. Return them to Jasmine
-      // to end the test
-      return Promise.all([promise1, promise2]);
-    });
-  });
-  describe('#fail', () => {
-    // These tests are for instances when an entry fails between when a read has
-    // started but before it has ended.
-    let readSpy: jasmine.Spy;
-    let entry: ctg.CacheEntry;
-    beforeEach(() => {
-      entry = new ctg.CacheEntry(service, 'test', {pending: true});
-      // This spy exists solely to create a promise that won't resolve
-      readSpy = spyOn(entry, 'readFile').and.callFake(() => Promise.reject('should not be invoked'));
-    });
-    it('handles failures while waiting for a file to be read', () => {
-      const loadPromise = entry.load();
-      // We have now triggered a load request, meaning that there is now a
-      // Promise waiting for the entry to be ready before attempting to read it
-      // Read spy should not be invoked
-      expect(readSpy).not.toHaveBeenCalled();
-      // Now fail the entry
-      entry.fail('test error');
-      return expectAsync(loadPromise).toBeRejectedWithError('test error');
-    });
-    it('rejects with the error object given', () => {
-      const loadPromise = entry.load();
-      // We have now triggered a load request, meaning that there is now a
-      // Promise waiting for the entry to be ready before attempting to read it
-      // Read spy should not be invoked
-      expect(readSpy).not.toHaveBeenCalled();
-      // Now fail the entry
-      const error = new Error('expected error object');
-      entry.fail(error);
-      return expectAsync(loadPromise).toBeRejectedWith(error);
-    });
-  });
-  describe('#readFile()', () => {
-    it('rejects with an error if it fails', () => {
-      const readFileSpy = spyOn(fs, 'readFile') as unknown as jasmine.Spy<
-        (path: string, options: { encoding?: string }, callback: (err?: Error, data?: string) => void) => void
-      >;
-      readFileSpy.and.callFake((path, options, callback) => {
-        callback(new Error('Simulated error'));
-      });
-      const testEntry = new ctg.CacheEntry(service, 'test', {});
-      return expectAsync(testEntry.readFile()).toBeRejectedWithError('Simulated error');
-    });
-    it('resolves to null if the file is empty', () => {
-      const readFileSpy = spyOn(fs, 'readFile') as unknown as jasmine.Spy<
-        (path: string, options: { encoding?: string }, callback: (err?: Error, data?: string) => void) => void
-      >;
-      readFileSpy.and.callFake((path, options, callback) => {
-        callback(undefined, '');
-      });
-      const testEntry = new ctg.CacheEntry(service, 'test', {});
-      return expectAsync(testEntry.readFile()).toBeResolvedTo(null);
-    });
-    it('reads the file contents if the file exists', () => {
-      const expectedStudy = createClinicalStudy('73577357');
-      const readFileSpy = spyOn(fs, 'readFile') as unknown as jasmine.Spy<
-        (path: string, options: { encoding?: string }, callback: (err?: Error, data?: string) => void) => void
-      >;
-      readFileSpy.and.callFake((path, options, callback) => {
-        callback(undefined, JSON.stringify(expectedStudy));
-      });
-      const testEntry = new ctg.CacheEntry(service, 'test', {});
-      return expectAsync(testEntry.readFile()).toBeResolvedTo(expectedStudy);
-    });
-  });
-  describe('#remove()', () => {
-    let entry: ctg.CacheEntry;
-    let unlinkSpy: jasmine.Spy<(path: string, callback: (err?: Error) => void) => void>;
-    beforeEach(() => {
-      entry = new ctg.CacheEntry(service, 'NCT12345678.xml', {});
-      unlinkSpy = spyOn(fs, 'unlink') as unknown as jasmine.Spy<
-        (path: string, callback: (err?: Error) => void) => void
-      >;
-    });
+async function createMemorySqliteDB(): Promise<sqlite.Database> {
+  return await sqlite.open({ filename: ':memory:', driver: sqlite3.Database });
+}
 
-    it('deletes the underlying file', () => {
-      unlinkSpy.and.callFake((path, callback) => {
-        // Immediately invoke the callback
-        callback();
-      });
-      return expectAsync(entry.remove())
-        .toBeResolved()
-        .then(() => {
-          expect(unlinkSpy).toHaveBeenCalledTimes(1);
-          expect(unlinkSpy.calls.first().args[0]).toEqual('NCT12345678.xml');
-        });
-    });
+/**
+ * Creates a ClinicalTrialsGovService that stores data in an in-memory database.
+ * @param options options object - if not given, sends a set of options that disables the clean timer
+ * @returns
+ */
+function createMemoryCTGovService(options?: ctg.ClinicalTrialsGovServiceOptions): ctg.ClinicalTrialsGovService {
+  return new ctg.ClinicalTrialsGovService(':memory:', options ?? { cleanInterval: 0 });
+}
 
-    it('rejects if an error occurs', () => {
-      unlinkSpy.and.callFake((path, callback) => {
-        // Immediately invoke the callback
-        callback(new Error('Simulated unlink error'));
-      });
-      return expectAsync(entry.remove()).toBeRejectedWithError('Simulated unlink error');
-    });
-  });
-});
+async function insertTestStudy(db: sqlite.Database, nctId: string | number, study?: Study): Promise<void> {
+  const id = typeof nctId === 'string' ? ctg.parseNCTNumber(nctId) : nctId;
+  if (id === undefined) {
+    throw new Error(`Internal test error: invalid NCT ID ${nctId}`);
+  }
+  await db.run(
+    'INSERT INTO ctgov_studies (nct_id, study_json, created_at) VALUES (?, ?, ?)',
+    id,
+    study ? JSON.stringify(study) : '{"dummyData":true}',
+    new Date().valueOf()
+  );
+}
 
 describe('ClinicalTrialsGovService', () => {
-  // The data dir path
-  const dataDirPath = '/ctg-cache';
-  // Virtual directory that has more than one entry (with known times)
-  const multipleEntriesDataDir = '/ctg-cache-multi';
-  // The date used for when the cache was first created, 2021-02-01T12:00:00.000 (picked arbitrarily)
-  const cacheStartTime = new Date(2021, 1, 1, 12, 0, 0, 0);
-  let study: ResearchStudy;
-  // Create our mock FS
-  const cacheVol = Volume.fromNestedJSON({
-    '/ctg-cache/data/NCT02513394.json': fs.readFileSync(specFilePath('NCT02513394.json'), { encoding: 'utf8' }),
-    '/existing-file': 'Existing stub',
-    '/ctg-cache-multi/data': {
-      'NCT00000001.json': 'Test File 1',
-      'NCT00000002.json': 'Test File 2',
-      'NCT00000003.json': 'Test File 3',
-      // Junk files: files that should be skipped on init
-      '.json': 'not really a JSON file, but a dot file called "json"',
-      'invalid.json': 'not an NCT',
-      'NCT1.json': 'not a valid NCT'
-    }
-  });
-  // Force the type to FileSystem since the memfs types are wrong (well, too loose, compared to the proper types)
-  const cacheFS: ctg.FileSystem = cacheVol as ctg.FileSystem;
-  beforeAll(() => {
-    study = trialMissing.entry[0].resource as ResearchStudy;
-    const maybeNctID = ctg.findNCTNumber(study);
-    if (maybeNctID === null) {
-      // This indicates a failure in test cases
-      throw new Error('ResearchStudy has no NCT number');
-    }
-    // Create an empty directory
-    cacheVol.mkdirSync('/ctg-cache-empty');
-    // Update mtimes for files
-    // Mock file that was created 1 minute after cache was created
-    let time = new Date(cacheStartTime.getTime() + 60 * 1000);
-    cacheVol.utimesSync('/ctg-cache-multi/data/NCT00000001.json', time, time);
-    // Mock file that was created 1.5 minutes after cache was created
-    time = new Date(cacheStartTime.getTime() + 90 * 1000);
-    cacheVol.utimesSync('/ctg-cache-multi/data/NCT00000002.json', time, time);
-    // Mock file that was created 2 minutes after cache was created
-    time = new Date(cacheStartTime.getTime() + 2 * 60 * 1000);
-    cacheVol.utimesSync('/ctg-cache-multi/data/NCT00000003.json', time, time);
-  });
-
   it('can set a custom logger', () => {
     const customLogger = (): void => {
       // Do nothing
     };
-    const instance = new ctg.ClinicalTrialsGovService(dataDirPath, { log: customLogger, fs: cacheFS });
+    const instance = createMemoryCTGovService({ log: customLogger });
     expect(instance['log']).toEqual(customLogger);
   });
 
   describe('#maxTrialsPerRequest', () => {
     let service: ctg.ClinicalTrialsGovService;
     beforeEach(() => {
-      // The service is never initialized so the temp directory isn't created
-      service = new ctg.ClinicalTrialsGovService(dataDirPath, { fs: cacheFS });
+      service = createMemoryCTGovService();
     });
     it('does not allow values less than 1 to be set', () => {
       // First, set it to a known value - this also makes sure get works
@@ -468,7 +258,7 @@ describe('ClinicalTrialsGovService', () => {
   describe('#expirationTimeout', () => {
     let service: ctg.ClinicalTrialsGovService;
     beforeEach(() => {
-      service = new ctg.ClinicalTrialsGovService(dataDirPath, { fs: cacheFS });
+      service = createMemoryCTGovService();
     });
     it('ensures the value is at least 1000', () => {
       service.expirationTimeout = 5;
@@ -483,7 +273,7 @@ describe('ClinicalTrialsGovService', () => {
   describe('#cleanupInterval', () => {
     let service: ctg.ClinicalTrialsGovService;
     beforeEach(() => {
-      service = new ctg.ClinicalTrialsGovService(dataDirPath, { fs: cacheFS });
+      service = createMemoryCTGovService();
     });
     it('caps the value to 2^31', () => {
       // This is too large: it exceeds 2^31
@@ -507,100 +297,13 @@ describe('ClinicalTrialsGovService', () => {
   });
 
   describe('#init', () => {
-    it('restores cache entries in an existing directory', () => {
-      const testService = new ctg.ClinicalTrialsGovService(multipleEntriesDataDir, { cleanInterval: 0, fs: cacheFS });
-      return expectAsync(testService.init())
-        .toBeResolved()
-        .then(() => {
-          // Restored cache should have only one key in it as it should have
-          // ignored the two invalid file names
-          expect(Array.from(testService['cache'].keys()).sort()).toEqual(['NCT00000001', 'NCT00000002', 'NCT00000003']);
-          // Make sure the cache entries were created properly with the stats
-          function expectDate(key: string, date: Date): void {
-            const entry = testService['cache'].get(key);
-            expect(entry).toBeDefined();
-            if (entry) {
-              // Must have the entry to check it
-              expect(entry.lastAccess).toEqual(date);
-            }
-          }
-          expectDate('NCT00000001', new Date(2021, 1, 1, 12, 1, 0, 0));
-          expectDate('NCT00000002', new Date(2021, 1, 1, 12, 1, 30, 0));
-          expectDate('NCT00000003', new Date(2021, 1, 1, 12, 2, 0, 0));
-        });
-    });
-
-    it('handles the directory already existing but not being a directory', () => {
-      const testService = new ctg.ClinicalTrialsGovService('existing-file', { cleanInterval: 0, fs: cacheFS });
-      return expectAsync(testService.init()).toBeRejected();
-    });
-
-    it('creates the data directory if the cache directory exists but is empty', () => {
-      const testService = new ctg.ClinicalTrialsGovService('/ctg-cache-empty', { cleanInterval: 0, fs: cacheFS });
-      return expectAsync(testService.init())
-        .toBeResolved()
-        .then(() => {
-          // Make sure the mocked directory exists - because this is being mocked,
-          // just use sync fs functions
-          expect(() => {
-            cacheVol.readdirSync('/ctg-cache-empty/data');
-          }).not.toThrow();
-        });
-    });
-
-    it("creates the directory if it doesn't exist", () => {
-      const testService = new ctg.ClinicalTrialsGovService('/new-ctg-cache', { cleanInterval: 0, fs: cacheFS });
-      return expectAsync(testService.init())
-        .toBeResolved()
-        .then(() => {
-          // Make sure the mocked directory exists - because this is being mocked,
-          // just use sync fs functions
-          expect(() => {
-            cacheVol.readdirSync('/new-ctg-cache');
-          }).not.toThrow();
-        });
-    });
-
-    it('handles the directory creation failing', () => {
-      // because we don't override promisify, we need to "delete" the type data
-      const testService = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 0, fs: cacheFS });
-      (spyOn(cacheFS, 'mkdir') as jasmine.Spy).and.callFake((path, callback) => {
-        expect(path).toEqual(dataDirPath);
-        callback(new Error('Simulated error'));
-      });
-      return expectAsync(testService.init()).toBeRejectedWithError('Simulated error');
-    });
-
-    it('rejects if the directory cannot be read', () => {
-      const testService = new ctg.ClinicalTrialsGovService(dataDirPath, { fs: cacheFS });
-      (spyOn(cacheFS, 'readdir') as jasmine.Spy).and.callFake((path, callback) => {
-        callback(new Error('Simulated error'));
-      });
-      return expectAsync(testService.init()).toBeRejectedWithError('Simulated error');
-    });
-
-    it('rejects if a single file load fails', () => {
-      // FIXME (maybe): it's unclear to me if this is correct behavior - maybe the file should be skipped?
-      (spyOn(cacheFS, 'stat') as jasmine.Spy).and.callFake(
-        (filename, callback: (err?: Error, stats?: fs.Stats) => void) => {
-          callback(new Error('Simulated error'));
-        }
-      );
-      const testService = new ctg.ClinicalTrialsGovService(dataDirPath, { fs: cacheFS });
-      return expectAsync(testService.init()).toBeRejectedWithError('Simulated error');
-    });
-
-    it('can have no options', () => {
-      expect(() => new ctg.ClinicalTrialsGovService(dataDirPath)).not.toThrowError();
-    });
-
     describe('starts a timer', () => {
       const realTimeout = setTimeout;
       let testService: ctg.ClinicalTrialsGovService;
       let removeExpiredCacheEntries: jasmine.Spy<() => Promise<void>>;
       beforeEach(() => {
         jasmine.clock().install();
-        testService = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 60000, fs: cacheFS });
+        testService = createMemoryCTGovService({ cleanInterval: 60000 });
         removeExpiredCacheEntries = spyOn(testService, 'removeExpiredCacheEntries');
       });
       afterEach(() => {
@@ -645,10 +348,66 @@ describe('ClinicalTrialsGovService', () => {
     });
 
     it('does not start a timer if the interval is set to 0', async () => {
-      const testService = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 0, fs: cacheFS });
+      const testService = createMemoryCTGovService({ cleanInterval: 0 });
       const spy = jasmine.createSpy('setCleanupTimeout');
       await testService.init();
       expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('initializes the database tables', async () => {
+      const db = await createMemorySqliteDB();
+      await ctg.ClinicalTrialsGovService.create(db);
+      const tableNames = await db.all<{ name: string }[]>('SELECT name FROM sqlite_schema');
+      expect(tableNames).toContain({ name: 'migrations' });
+      expect(tableNames).toContain({ name: 'ctgov_studies' });
+    });
+
+    it('disallows double calls', async () => {
+      const testService = createMemoryCTGovService();
+      await testService.init();
+      await expectAsync(testService.init()).toBeRejected();
+    });
+
+    it('raises an exception on an invalid state', async () => {
+      const testService = createMemoryCTGovService();
+      // The constructor shouldn't allow this but for typing reasons it needs to be checked anyway
+      testService['cacheDBPath'] = null;
+      await expectAsync(testService.init()).toBeRejected();
+    });
+
+    describe('migrations', () => {
+      let db: sqlite.Database;
+      let service: ctg.ClinicalTrialsGovService;
+
+      beforeEach(async () => {
+        db = await createMemorySqliteDB();
+        service = new ctg.ClinicalTrialsGovService(db, { cleanInterval: 0 });
+      });
+
+      it("doesn't rerun an already run migration", async () => {
+        const migration = jasmine.createSpy('up').and.callFake(() => Promise.resolve());
+        const migrations = {
+          init: { up: migration }
+        };
+        await service['migrateDB'](db, migrations);
+        expect(migration).toHaveBeenCalledTimes(1);
+        await service['migrateDB'](db, migrations);
+        expect(migration).toHaveBeenCalledTimes(1);
+      });
+
+      it('rolls back on a failed migration', async () => {
+        const migration = jasmine.createSpy('up').and.callFake(async (db: sqlite.Database): Promise<void> => {
+          // Create a test table
+          await db.run('CREATE TABLE test (id INTEGER PRIMARY KEY)');
+          throw new Error('Test error');
+        });
+        const migrations = {
+          init: { up: migration }
+        };
+        await expectAsync(service['migrateDB'](db, migrations)).toBeRejected();
+        // Make sure the test table doesn't exist
+        expect(await db.get<{ name: string }>("SELECT name FROM sqlite_schema WHERE name='test'")).toBeUndefined();
+      });
     });
   });
 
@@ -661,7 +420,7 @@ describe('ClinicalTrialsGovService', () => {
     });
 
     it('stops the timer', async () => {
-      const testService = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 60000, fs: cacheFS });
+      const testService = createMemoryCTGovService({ cleanInterval: 60000 });
       // This spy should never be invoked but provide the fake implementation so that if it is, the tests won't hang
       const removeExpiredCacheEntries = spyOn(testService, 'removeExpiredCacheEntries').and.callFake(() => {
         return Promise.resolve();
@@ -674,9 +433,70 @@ describe('ClinicalTrialsGovService', () => {
       expect(testService['cleanupTimeout']).toEqual(null);
     });
 
-    it('does nothing if never started', () => {
-      const testService = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 60000, fs: cacheFS });
-      return expectAsync(testService.destroy()).toBeResolved();
+    it('closes the database if it opened it', async () => {
+      const testService = createMemoryCTGovService();
+      await testService.init();
+      // Need to spy on the private db field
+      const db = testService['cacheDB'];
+      expect(db).not.toBeNull();
+      if (db != null) {
+        const closeSpy = spyOn(db, 'close').and.callThrough();
+        await testService.destroy();
+        expect(closeSpy).toHaveBeenCalled();
+      }
+    });
+
+    it('does not close the database if passed a DB to use', async () => {
+      const db = await createMemorySqliteDB();
+      const closeSpy = spyOn(db, 'close').and.callThrough();
+      const testService = new ctg.ClinicalTrialsGovService(db, { cleanInterval: 0 });
+      await testService.init();
+      await testService.destroy();
+      expect(closeSpy).not.toHaveBeenCalled();
+    });
+
+    it('does nothing if never started', async () => {
+      const testService = createMemoryCTGovService({ cleanInterval: 60000 });
+      await testService.destroy();
+      // There's nothing to really test other than to ensure it worked
+    });
+  });
+
+  describe('#getDB', () => {
+    // This is an internal private method intended to ensure that methods can't be invoked without the cache being ready
+    let service: ctg.ClinicalTrialsGovService;
+    beforeEach(() => {
+      service = createMemoryCTGovService();
+    });
+
+    it('throws an exception if called before init()', () => {
+      expect(() => service['getDB']()).toThrow();
+    });
+
+    it('throws an exception if called after destroy()', async () => {
+      await service.init();
+      await service.destroy();
+      expect(() => service['getDB']()).toThrow();
+    });
+  });
+
+  describe('#findCacheMisses', () => {
+    let db: sqlite.Database;
+    let service: ctg.ClinicalTrialsGovService;
+    beforeEach(async () => {
+      db = await createMemorySqliteDB();
+      service = await ctg.ClinicalTrialsGovService.create(db, { cleanInterval: 0 });
+    });
+
+    it('returns a list of IDs with existing IDs removed', async () => {
+      // First, insert dummy entries
+      await insertTestStudy(db, 1);
+      await insertTestStudy(db, 3);
+      expect(await service.findCacheMisses(['NCT00000001', 'NCT00000002', 'NCT00000003'])).toEqual(['NCT00000002']);
+    });
+
+    it('ignores invalid IDs', async () => {
+      expect(await service.findCacheMisses(['invalid'])).toEqual([]);
     });
   });
 
@@ -684,16 +504,17 @@ describe('ClinicalTrialsGovService', () => {
     let service: ctg.ClinicalTrialsGovService;
     let downloadTrialsSpy: jasmine.Spy;
 
-    beforeEach(() => {
+    beforeEach(async () => {
       // The service is never initialized
-      service = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 0, fs: cacheFS });
+      service = createMemoryCTGovService();
+      await service.init();
       // TypeScript won't allow us to install spies the "proper" way on private methods
       service['downloadTrials'] = downloadTrialsSpy = jasmine.createSpy('downloadTrials').and.callFake(() => {
-        return Promise.resolve('ignored');
+        return Promise.resolve(true);
       });
     });
 
-    // These tests basically are only to ensure that all trials are properly visisted when given.
+    // These tests basically are only to ensure that all trials are properly visited when given.
     it('updates all the given studies', () => {
       // Our test studies contain the same NCT ID twice to make sure that works as expected, as well as a NCT ID that
       // download spy will return null for to indicate a failure.
@@ -754,95 +575,31 @@ describe('ClinicalTrialsGovService', () => {
     });
   });
 
+  // this functionality is currently unimplemented - this test exists solely to "cover" the method
   describe('#removeExpiredCacheEntries', () => {
-    let service: ctg.ClinicalTrialsGovService;
-    let entry1: ctg.CacheEntry, entry2: ctg.CacheEntry, entry3: ctg.CacheEntry;
-    beforeEach(() => {
-      // These tests all involve mucking with time.
-      jasmine.clock().install();
-      // Set the start date to the cache start time
-      jasmine.clock().mockDate(cacheStartTime);
-      return ctg
-        .createClinicalTrialsGovService(multipleEntriesDataDir, { expireAfter: 60000, fs: cacheFS })
-        .then((newService) => {
-          service = newService;
-          // "Steal" the cache to grab entries for spying purposes
-          const cache = service['cache'];
-          function safeGet(key: string): ctg.CacheEntry {
-            const result = cache.get(key);
-            if (result) {
-              return result;
-            } else {
-              throw new Error('Missing cache entry for ' + key + ' (bailing before tests will fail)');
-            }
-          }
-          entry1 = safeGet('NCT00000001');
-          entry2 = safeGet('NCT00000002');
-          entry3 = safeGet('NCT00000003');
-        });
-    });
-    afterEach(() => {
-      // Stop playing with time
-      jasmine.clock().uninstall();
-    });
-
-    function spyOnRemove(entry: ctg.CacheEntry): jasmine.Spy<() => Promise<void>> {
-      // Need to include a default implementation or this will never work
-      const spy = spyOn(entry, 'remove').and.callFake(() => Promise.resolve());
-      spy.and.identity = entry.filename + '.remove';
-      return spy;
-    }
-
-    it('removes entries when they expire', async () => {
-      // Create the spies on the remove methods
-      const removeSpy1 = spyOnRemove(entry1),
-        removeSpy2 = spyOnRemove(entry2),
-        removeSpy3 = spyOnRemove(entry3);
-      const cache = service['cache'];
+    it('does nothing', async () => {
+      const service = createMemoryCTGovService();
       await service.removeExpiredCacheEntries();
-      // None of the spies should have been removed (technically we're "back in time" before the entires were created)
-      expect(removeSpy1).not.toHaveBeenCalled();
-      expect(removeSpy2).not.toHaveBeenCalled();
-      expect(removeSpy3).not.toHaveBeenCalled();
-      // Advance to the point where the first entry should be removed
-      jasmine.clock().tick(2 * 60 * 1000 + 1);
-      await service.removeExpiredCacheEntries();
-      expect(removeSpy1).toHaveBeenCalledTimes(1);
-      expect(removeSpy2).not.toHaveBeenCalled();
-      expect(removeSpy3).not.toHaveBeenCalled();
-      // Make sure the entry was actually removed
-      expect(cache.has('NCT00000001')).toBeFalse();
-      // And that the others weren't
-      expect(cache.has('NCT00000002')).toBeTrue();
-      expect(cache.has('NCT00000003')).toBeTrue();
-      // And tick forward to where everything should be cleared
-      jasmine.clock().tick(5 * 60 * 1000);
-      await service.removeExpiredCacheEntries();
-      expect(removeSpy1).toHaveBeenCalledTimes(1);
-      expect(removeSpy2).toHaveBeenCalledTimes(1);
-      expect(removeSpy3).toHaveBeenCalledTimes(1);
-      // Cache should now be empty
-      expect(cache.size).toEqual(0);
     });
   });
 
   describe('#downloadTrials', () => {
     let scope: nock.Scope;
     let interceptor: nock.Interceptor;
+    let db: sqlite.Database;
     let downloader: ctg.ClinicalTrialsGovService;
     const nctIDs = ['NCT00000001', 'NCT00000002', 'NCT00000003'];
     beforeEach(async () => {
       scope = nock('https://clinicaltrials.gov');
       interceptor = scope.get(`/api/v2/studies?filter.ids=${nctIDs.join(',')}&pageSize=128`);
-      // Need to intercept the writeFile method
-      spyOn(cacheFS, 'writeFile').and.callFake((_file, _data, _options, callback) => {
-        // For these, always pretend it succeeded
-        callback(null);
-      });
-      downloader = await ctg.createClinicalTrialsGovService(dataDirPath, { cleanInterval: 0, fs: cacheFS });
+      // Create the test DB as this needs to poke into it
+      db = await createMemorySqliteDB();
+      // Initialize the downloaded
+      downloader = await ctg.ClinicalTrialsGovService.create(db, { cleanInterval: 0 });
     });
 
-    afterEach(() => {
+    afterEach(async () => {
+      await downloader.destroy();
       scope.done();
     });
 
@@ -853,14 +610,9 @@ describe('ClinicalTrialsGovService', () => {
 
     it('handles failure responses from the server', async () => {
       interceptor.reply(404, 'Unknown');
-      // Pretend the middle entry exists
-      downloader['cache'].set(nctIDs[1], new ctg.CacheEntry(downloader, nctIDs[1] + '.json', {}));
-      expect(await downloader['downloadTrials'](nctIDs)).withContext('downloader indicates failure').toBeFalse();
-      // Check to make sure the new cache entries do not still exist - the failure should remove them, but not the
-      // non-pending one
-      expect(downloader['cache'].has(nctIDs[0])).withContext('cache entry 0').toBeFalse();
-      expect(downloader['cache'].has(nctIDs[1])).withContext('cache entry 1').toBeTrue();
-      expect(downloader['cache'].has(nctIDs[2])).withContext('cache entry 2').toBeFalse();
+      expect(await downloader['downloadTrials'](nctIDs))
+        .withContext('downloader indicates failure')
+        .toBeFalse();
     });
 
     it('creates cache entries', async () => {
@@ -878,69 +630,119 @@ describe('ClinicalTrialsGovService', () => {
         { 'Content-type': 'application/json' }
       );
       // For this test, create an existing cache entry for one of the IDs
-      downloader['cache'].set(nctIDs[1], new ctg.CacheEntry(downloader, nctIDs[1] + '.xml', {}));
+      await insertTestStudy(db, 2);
       expect(await downloader['downloadTrials'](nctIDs)).toBeTrue();
 
       // Should have created the two missing items which should be resolved
-      let entry = downloader['cache'].get(nctIDs[0]);
-      expect(entry?.pending).toBeFalse();
-      entry = downloader['cache'].get(nctIDs[1]);
-      expect(entry?.pending).toBeFalse();
-      entry = downloader['cache'].get(nctIDs[2]);
-      expect(entry?.pending).toBeFalse();
+      for (const nctId of nctIDs) {
+        const result = await db.get<{ study_json: string }>(
+          'SELECT study_json FROM ctgov_studies WHERE nct_id=?',
+          ctg.parseNCTNumber(nctId)
+        );
+        expect(result?.study_json).toEqual(
+          `{"protocolSection":{"identificationModule":{"nctId":${JSON.stringify(nctId)}}}}`
+        );
+      }
     });
 
-    it('invalidates cache entries that were not found in the results', async () => {
-      interceptor.reply(
-        200,
-        JSON.stringify({
-          // Only include NCT ID 1
-          studies: [
-            {
-              protocolSection: {
-                identificationModule: {
-                  nctId: nctIDs[1]
-                }
-              }
-            }
-          ]
-        } as PagedStudies),
-        { 'Content-type': 'application/json' }
-      );
-      expect(await downloader['downloadTrials'](nctIDs)).toBeTrue();
-      // The failed NCT IDs should be removed at this point
-      expect(downloader['cache'].has(nctIDs[0])).toBeFalse();
-      expect(downloader['cache'].has(nctIDs[1])).toBeTrue();
-      expect(downloader['cache'].has(nctIDs[2])).toBeFalse();
+    it('rolls back on failure from addCacheEntry', async () => {
+      // Bunch of setup for this
+      const testNCT = 'NCT00000001';
+      const study = createClinicalStudy(testNCT);
+      // Mock out the tryFetchStudies method
+      downloader['tryFetchStudies'] = async () => [study];
+      // Make addCacheEntry throw an exception
+      downloader['addCacheEntry'] = async () => {
+        throw new Error('test error');
+      };
+      expect(await downloader['downloadTrials']([testNCT])).toBeFalse();
+      expect(await db.get<{ nct_id: number }>('SELECT nct_id FROM ctgov_studies WHERE nct_id=1')).toBeUndefined();
+    });
+
+    describe('multiple simultaneous calls', () => {
+      const realTimeout = setTimeout;
+      beforeEach(() => {
+        jasmine.clock().install();
+      });
+      afterEach(() => {
+        jasmine.clock().uninstall();
+      });
+      // Essentially, let internal promises resolve
+      function tickEventLoop(): Promise<void> {
+        return new Promise((resolve) => {
+          realTimeout(resolve, 1);
+        });
+      }
+      it('waits for the first to complete', async () => {
+        // This is kind of a weird set of tests since it involves ensuring things
+        // happen in a very specific order.
+        // First, mock out the db's "run" method to just resolve immediately
+        spyOn(db, 'run').and.callFake(() => Promise.resolve({} as sqlite.ISqlite.RunResult));
+        // Mock tryFetchStudies to always return a test study after a brief
+        // timeout
+        const fetchStudiesSpy = downloader['tryFetchStudies'] = jasmine.createSpy('tryFetchStudies').and.callFake((ids: string[]) => {
+          return new Promise<Study[]>((resolve) => {
+            setTimeout(() => {
+              resolve(ids.map(createClinicalStudy));
+            }, 1);
+          });
+        });
+        // Mock out addCacheEntry to again resolve after a specific timeout
+        const addCacheEntrySpy = downloader['addCacheEntry'] = jasmine.createSpy('addCacheEntry').and.callFake(() => {
+          return new Promise<void>((resolve) => {
+            setTimeout(resolve, 1);
+          });
+        });
+        let firstPromiseResolved = false;
+        const firstPromise = downloader['downloadTrials'](['NCT00000001']).then(() => {
+          firstPromiseResolved = true;
+        });
+        expect(fetchStudiesSpy).toHaveBeenCalledTimes(1);
+        // First promise will not have resolved yet, it's waiting on the mock tryFetchStudies
+        // Tick forward
+        jasmine.clock().tick(1);
+        // Allow promises to resolve
+        await tickEventLoop();
+        expect(firstPromiseResolved).toBeFalse();
+        expect(addCacheEntrySpy).toHaveBeenCalledTimes(1);
+        // OK, so at this point, the first should have resolved tryFetchStudies, created the lock, and moved on to
+        // waiting to insert the one cache entry. Start the second promise now
+        let secondPromiseResolved = false;
+        const secondPromise = downloader['downloadTrials'](['NCT00000002']).then(() => {
+          secondPromiseResolved = true;
+        });
+        expect(downloader['_downloadTrialsLock']).not.toBeNull();
+        expect(fetchStudiesSpy).toHaveBeenCalledTimes(2);
+        expect(addCacheEntrySpy).toHaveBeenCalledTimes(1);
+        jasmine.clock().tick(1);
+        await tickEventLoop();
+        // First promise should now resolve, having had a chance to finish
+        expect(firstPromiseResolved).toBeTrue();
+        // Second promise should now be waiting on addCacheEntry
+        expect(secondPromiseResolved).toBeFalse();
+        jasmine.clock().tick(1);
+        await tickEventLoop();
+        expect(fetchStudiesSpy).toHaveBeenCalledTimes(2);
+        expect(addCacheEntrySpy).toHaveBeenCalledTimes(2);
+        // And finally just ensure everything cleans up properly
+        await Promise.all([firstPromise, secondPromise]);
+      });
     });
   });
 
   describe('#getCachedClinicalStudy', () => {
-    let downloader: ctg.ClinicalTrialsGovService;
-    beforeEach(() => {
-      return ctg.createClinicalTrialsGovService(dataDirPath, { cleanInterval: 0, fs: cacheFS }).then((service) => {
-        downloader = service;
-      });
-    });
-    it('handles a file that does not exist', () => {
-      // Intentionally call private method (this is a test after all)
-      return expectAsync(downloader.getCachedClinicalStudy('this is an invalid id')).toBeResolvedTo(null);
+    it('handles an invalid NCT ID', async () => {
+      const service = createMemoryCTGovService();
+      await service.init();
+      expect(await service.getCachedClinicalStudy('not an NCT')).toBeNull();
     });
 
-    it('invokes the load method of the cache entry', () => {
-      // Force in a "fake" cache entry
-      const entry = new ctg.CacheEntry(downloader, 'test', {});
+    it('loads the appropriate cache entry', async () => {
+      const db = await createMemorySqliteDB();
+      const service = await ctg.ClinicalTrialsGovService.create(db, { cleanInterval: 0 });
       const study = createClinicalStudy();
-      const spy = spyOn(entry, 'load').and.callFake(() => {
-        return Promise.resolve(study);
-      });
-      downloader['cache'].set('test', entry);
-      return expectAsync(downloader.getCachedClinicalStudy('test'))
-        .toBeResolvedTo(study)
-        .then(() => {
-          // Make sure the spy was called once
-          expect(spy).toHaveBeenCalledOnceWith();
-        });
+      await insertTestStudy(db, 1234, study);
+      expect(await service.getCachedClinicalStudy('NCT00001234')).toEqual(study);
     });
   });
 
@@ -948,8 +750,9 @@ describe('ClinicalTrialsGovService', () => {
     // Most of these tests just pass through to downloadTrials
     let service: ctg.ClinicalTrialsGovService;
     let downloadTrials: jasmine.Spy<(ids: string[]) => Promise<boolean>>;
-    beforeEach(() => {
-      service = new ctg.ClinicalTrialsGovService(dataDirPath, { fs: cacheFS });
+    beforeEach(async () => {
+      service = createMemoryCTGovService();
+      await service.init();
       // Can't directly spy on within TypeScript because downloadTrials is protected
       const spy = jasmine.createSpy<(ids: string[]) => Promise<boolean>>('downloadTrials');
       // Jam it in
@@ -958,136 +761,82 @@ describe('ClinicalTrialsGovService', () => {
       downloadTrials.and.callFake(() => Promise.resolve(true));
     });
 
-    it('excludes invalid NCT numbers in an array of strings', () => {
-      return expectAsync(service.ensureTrialsAvailable(['NCT00000001', 'NCT00000012', 'invalid', 'NCT01234567']))
-        .toBeResolved()
-        .then(() => {
-          expect(downloadTrials).toHaveBeenCalledOnceWith(['NCT00000001', 'NCT00000012', 'NCT01234567']);
-        });
+    it('excludes invalid NCT numbers in an array of strings', async () => {
+      await service.ensureTrialsAvailable(['NCT00000001', 'NCT00000012', 'invalid', 'NCT01234567']);
+      expect(downloadTrials).toHaveBeenCalledOnceWith(['NCT00000001', 'NCT00000012', 'NCT01234567']);
     });
 
-    it('pulls NCT numbers out of given ResearchStudy objects', () => {
-      return expectAsync(
-        service.ensureTrialsAvailable([
-          createResearchStudy('test1', 'NCT00000001'),
-          createResearchStudy('test2', 'NCT12345678'),
-          createResearchStudy('no-nct')
-        ])
-      )
-        .toBeResolved()
-        .then(() => {
-          expect(downloadTrials).toHaveBeenCalledOnceWith(['NCT00000001', 'NCT12345678']);
-        });
+    it('pulls NCT numbers out of given ResearchStudy objects', async () => {
+      await service.ensureTrialsAvailable([
+        createResearchStudy('test1', 'NCT00000001'),
+        createResearchStudy('test2', 'NCT12345678'),
+        createResearchStudy('no-nct')
+      ]);
+      expect(downloadTrials).toHaveBeenCalledOnceWith(['NCT00000001', 'NCT12345678']);
     });
   });
 
   describe('#addCacheEntry', () => {
-    // addCacheEntry is responsible for saving a single Study object to a file
-    // There is a matrix of three entry states (existing pending, exists non-pending, does not exist) and two stream
-    // cases (succeeds, fails) that needs to be handled.
+    // addCacheEntry is responsible for saving a single Study object to the cache
+    let db: sqlite.Database;
     let service: ctg.ClinicalTrialsGovService;
-    // Error to use
-    let writeError: Error | null;
-    let writeFileSpy: jasmine.Spy;
-    const mockNctNumber = 'NCT12345678';
-    const testStudy: Study = { protocolSection: { identificationModule: { nctId: mockNctNumber } } };
 
-    beforeEach(() => {
-      service = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 0, fs: cacheFS });
-
-      writeError = null;
-      writeFileSpy = spyOn(cacheFS, 'writeFile').and.callFake((file, data, options, callback) => {
-        // Just need to invoke the callback to pretend this has completed.
-        callback(writeError);
-      });
+    beforeEach(async () => {
+      db = await createMemorySqliteDB();
+      service = await ctg.ClinicalTrialsGovService.create(db, { cleanInterval: 0 });
     });
 
-    const makeTests = function () {
-      it('handles an error', async () => {
-        writeError = new Error('Test error');
-        await expectAsync(service['addCacheEntry'](testStudy)).toBeRejected();
-      });
-
-      it('handles writing the entry', async () => {
-        writeError = null;
-        await service['addCacheEntry'](testStudy);
-        expect(writeFileSpy).toHaveBeenCalled();
-      });
-    };
-
-    it('with no entry resolves without writing anything', async () => {
-      // Make sure that nothing happens when doing this
-      await service['addCacheEntry'](testStudy);
-      expect(writeFileSpy).not.toHaveBeenCalled();
-    });
-
-    it('with a missing NCT number resolves without writing anything', async () => {
+    it('does not write an invalid cache entry', async () => {
+      const dbRunSpy = spyOn(db, 'run').and.callThrough();
       // Everything in the object is optional
-      await service['addCacheEntry']({});
-      expect(writeFileSpy).not.toHaveBeenCalled();
+      await service['addCacheEntry'](db, {});
+      expect(dbRunSpy).not.toHaveBeenCalled();
       // For completeness sake:
-      await service['addCacheEntry']({ protocolSection: {} });
-      expect(writeFileSpy).not.toHaveBeenCalled();
-      await service['addCacheEntry']({ protocolSection: { identificationModule: {} } });
-      expect(writeFileSpy).not.toHaveBeenCalled();
-      // And finally assume something invalid was sent
-      await service['addCacheEntry']({ protocolSection: { identificationModule: { nctId: 12 as unknown as string } } });
-      expect(writeFileSpy).not.toHaveBeenCalled();
+      await service['addCacheEntry'](db, { protocolSection: {} });
+      expect(dbRunSpy).not.toHaveBeenCalled();
+      await service['addCacheEntry'](db, { protocolSection: { identificationModule: {} } });
+      expect(dbRunSpy).not.toHaveBeenCalled();
+      // Invalid type
+      await service['addCacheEntry'](db, {
+        protocolSection: { identificationModule: { nctId: 12 as unknown as string } }
+      });
+      expect(dbRunSpy).not.toHaveBeenCalled();
+      // Invalid ID
+      await service['addCacheEntry'](db, { protocolSection: { identificationModule: { nctId: 'not an NCT id' } } });
+      expect(dbRunSpy).not.toHaveBeenCalled();
     });
 
-    describe('with an existing pending entry', () => {
-      let entry: ctg.CacheEntry;
-      let readySpy: jasmine.Spy;
-      beforeEach(() => {
-        entry = new ctg.CacheEntry(service, mockNctNumber + '.json', { pending: true });
-        // Add the entry
-        service['cache'].set(mockNctNumber, entry);
-        // We want to see if ready is invoked but also have it work as expected
-        readySpy = spyOn(entry, 'ready').and.callThrough();
-      });
-      afterEach(() => {
-        if (writeError != null) {
-          // Expect the cache entry to have been removed
-          expect(service['cache'].has(mockNctNumber)).toBeFalse();
-          // Ready should not have been called in this case
-          expect(readySpy).not.toHaveBeenCalled();
-        } else {
-          // Otherwise, expect the entry to be ready
-          expect(readySpy).toHaveBeenCalled();
-        }
-      });
-
-      // And make the tests
-      makeTests();
+    it('inserts a new cache entry', async () => {
+      const study = createClinicalStudy('NCT12345678');
+      await service['addCacheEntry'](db, study);
+      // Explicitly pull from the database
+      const result = await db.get<{ study_json: string }>(
+        'SELECT study_json FROM ctgov_studies WHERE nct_id = 12345678'
+      );
+      expect(result?.study_json).toEqual(JSON.stringify(study));
     });
 
-    describe('with an existing non-pending entry', () => {
-      let entry: ctg.CacheEntry;
-      let readySpy: jasmine.Spy;
-      beforeEach(() => {
-        entry = new ctg.CacheEntry(service, mockNctNumber + '.xml', {});
-        // Add the entry
-        service['cache'].set(mockNctNumber, entry);
-        // In this case we just want to know if ready was not invoked as it shouldn't be
-        readySpy = spyOn(entry, 'ready').and.callThrough();
-      });
-      afterEach(() => {
-        if (writeError != null) {
-          // Expect the cache entry to remain - it's assumed the existing entry is still OK (this may be false?)
-          expect(service['cache'].has(mockNctNumber)).toBeTrue();
-        }
-        // In either case, ready should not have been called
-        expect(readySpy).not.toHaveBeenCalled();
-      });
-
-      // And make the tests
-      makeTests();
+    it('upserts if the entry already exists', async () => {
+      // Insert invalid entry
+      await db.run(
+        'INSERT INTO ctgov_studies (nct_id, study_json, created_at) VALUES (?, ?, ?)',
+        12345678,
+        null,
+        new Date().valueOf()
+      );
+      const study = createClinicalStudy('NCT12345678');
+      await service['addCacheEntry'](db, study);
+      // Explicitly pull from the database
+      const result = await db.get<{ study_json: string }>(
+        'SELECT study_json FROM ctgov_studies WHERE nct_id = 12345678'
+      );
+      expect(result?.study_json).toEqual(JSON.stringify(study));
     });
   });
 
   describe('#updateResearchStudy', () => {
     it('forwards to updateResearchStudyWithClinicalStudy', () => {
-      const service = new ctg.ClinicalTrialsGovService(dataDirPath, { cleanInterval: 0, fs: cacheFS });
+      const service = createMemoryCTGovService();
       const testResearchStudy = createResearchStudy('test');
       const testClinicalStudy = createClinicalStudy();
       service.updateResearchStudy(testResearchStudy, testClinicalStudy);
