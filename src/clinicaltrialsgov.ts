@@ -579,12 +579,10 @@ export class ClinicalTrialsGovService {
       return false;
     }
     const db = this.getDB();
-    // Surround this in a transaction (otherwise each insert would be a transaction on its own)
     // Some promise magic - if the lock exists, await it
-    if (this._downloadTrialsLock !== null) {
+    while (this._downloadTrialsLock !== null) {
       this.log('Waiting on transaction lock for NCT IDs %j', ids);
       await this._downloadTrialsLock;
-      this.log('Transaction lock ready for %j', ids);
     }
     // Now, create the lock. (Default value gives it a type. Promise always runs the function in the constructor
     // immediately so resolveLock will be set to the resolve method, but TypeScript can't prove that.)
@@ -593,6 +591,7 @@ export class ClinicalTrialsGovService {
       resolveLock = resolve;
     });
     try {
+      // Surround this in a transaction (otherwise each insert would be a transaction on its own)
       await db.run('BEGIN');
       try {
         for (const study of studies) {
