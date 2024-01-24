@@ -211,7 +211,7 @@ function createMemoryCTGovService(options?: ctg.ClinicalTrialsGovServiceOptions)
   return new ctg.ClinicalTrialsGovService(':memory:', options ?? { cleanInterval: 0 });
 }
 
-async function insertTestStudy(db: sqlite.Database, nctId: string | number, study?: Study): Promise<void> {
+async function insertTestStudy(db: sqlite.Database, nctId: string | number, study?: Study | null): Promise<void> {
   const id = typeof nctId === 'string' ? ctg.parseNCTNumber(nctId) : nctId;
   if (id === undefined) {
     throw new Error(`Internal test error: invalid NCT ID ${nctId}`);
@@ -219,18 +219,35 @@ async function insertTestStudy(db: sqlite.Database, nctId: string | number, stud
   await db.run(
     'INSERT INTO ctgov_studies (nct_id, study_json, created_at) VALUES (?, ?, ?)',
     id,
-    study ? JSON.stringify(study) : '{"dummyData":true}',
+    study ? JSON.stringify(study) : study === null ? null : '{"dummyData":true}',
     new Date().valueOf()
   );
 }
 
 describe('ClinicalTrialsGovService', () => {
-  it('can set a custom logger', () => {
-    const customLogger = (): void => {
-      // Do nothing
-    };
-    const instance = createMemoryCTGovService({ log: customLogger });
-    expect(instance['log']).toEqual(customLogger);
+  describe('constructor', () => {
+    it('can set a custom logger', () => {
+      const customLogger = (): void => {
+        // Do nothing
+      };
+      const instance = createMemoryCTGovService({ log: customLogger });
+      expect(instance['log']).toEqual(customLogger);
+    });
+    it('sets defaults', () => {
+      const service = new ctg.ClinicalTrialsGovService(':memory:');
+      expect(service.log).not.toBeNull();
+      expect(service.expirationTimeout).toEqual(60 * 60 * 1000);
+      expect(service.cleanupInterval).toEqual(60 * 60 * 1000);
+    });
+    it('sets options', () => {
+      const service = new ctg.ClinicalTrialsGovService(':memory:', {
+        expireAfter: 24 * 60 * 60 * 1000,
+        cleanInterval: 0
+      });
+      expect(service.log).not.toBeNull();
+      expect(service.expirationTimeout).toEqual(24 * 60 * 60 * 1000);
+      expect(service.cleanupInterval).toEqual(0);
+    });
   });
 
   describe('#maxTrialsPerRequest', () => {
@@ -680,19 +697,21 @@ describe('ClinicalTrialsGovService', () => {
         spyOn(db, 'run').and.callFake(() => Promise.resolve({} as sqlite.ISqlite.RunResult));
         // Mock tryFetchStudies to always return a test study after a brief
         // timeout
-        const fetchStudiesSpy = downloader['tryFetchStudies'] = jasmine.createSpy('tryFetchStudies').and.callFake((ids: string[]) => {
-          return new Promise<Study[]>((resolve) => {
-            setTimeout(() => {
-              resolve(ids.map(createClinicalStudy));
-            }, 1);
-          });
-        });
+        const fetchStudiesSpy = (downloader['tryFetchStudies'] = jasmine
+          .createSpy('tryFetchStudies')
+          .and.callFake((ids: string[]) => {
+            return new Promise<Study[]>((resolve) => {
+              setTimeout(() => {
+                resolve(ids.map(createClinicalStudy));
+              }, 1);
+            });
+          }));
         // Mock out addCacheEntry to again resolve after a specific timeout
-        const addCacheEntrySpy = downloader['addCacheEntry'] = jasmine.createSpy('addCacheEntry').and.callFake(() => {
+        const addCacheEntrySpy = (downloader['addCacheEntry'] = jasmine.createSpy('addCacheEntry').and.callFake(() => {
           return new Promise<void>((resolve) => {
             setTimeout(resolve, 1);
           });
-        });
+        }));
         let firstPromiseResolved = false;
         const firstPromise = downloader['downloadTrials'](['NCT00000001']).then(() => {
           firstPromiseResolved = true;
@@ -731,18 +750,26 @@ describe('ClinicalTrialsGovService', () => {
   });
 
   describe('#getCachedClinicalStudy', () => {
+    let db: sqlite.Database;
+    let service: ctg.ClinicalTrialsGovService;
+    beforeEach(async () => {
+      db = await createMemorySqliteDB();
+      service = await ctg.ClinicalTrialsGovService.create(db, { cleanInterval: 0 });
+    });
     it('handles an invalid NCT ID', async () => {
-      const service = createMemoryCTGovService();
-      await service.init();
       expect(await service.getCachedClinicalStudy('not an NCT')).toBeNull();
     });
 
     it('loads the appropriate cache entry', async () => {
-      const db = await createMemorySqliteDB();
-      const service = await ctg.ClinicalTrialsGovService.create(db, { cleanInterval: 0 });
       const study = createClinicalStudy();
       await insertTestStudy(db, 1234, study);
       expect(await service.getCachedClinicalStudy('NCT00001234')).toEqual(study);
+    });
+
+    it('returns null on cached failure', async () => {
+      // This currently can't happen as failed trials aren't currently marked as failed but...
+      await insertTestStudy(db, 7357, null);
+      expect(await service.getCachedClinicalStudy('NCT00007357')).toBeNull();
     });
   });
 

@@ -464,6 +464,7 @@ export class ClinicalTrialsGovService {
       return studies;
     }
     const nctIds = Array.from(nctIdMap.keys());
+    this.log('Updating research studies with NCT IDs %j', nctIds);
     // Make sure the NCT numbers are in the cache
     await this.ensureTrialsAvailable(nctIds);
     // Update the items in the list
