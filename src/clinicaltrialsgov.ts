@@ -18,6 +18,7 @@
 
 import { debuglog } from 'util';
 import { ResearchStudy } from 'fhir/r4';
+import {SearchBundleEntry as SearchSetEntry} from './searchset';
 import { ClinicalTrialsGovAPI, Study } from './clinicaltrialsgov-api';
 import { updateResearchStudyWithClinicalStudy } from './study-fhir-converter';
 import * as sqlite from 'sqlite';
@@ -488,6 +489,24 @@ export class ClinicalTrialsGovService {
         this.updateResearchStudy(originals, clinicalStudy);
       }
     }
+  }
+
+  updateSearchSetEntries(entries: SearchSetEntry[]):Promise<SearchSetEntry[]>{
+    const studies:ResearchStudy[] = entries.map(item => item.resource as ResearchStudy)
+    return this.ensureTrialsAvailable(studies).then( () => {
+      // const updatedEntries:SearchSetEntry[] = []
+      const promises: Promise<Study| null>[] = [];
+      for (const entry of entries) {
+        const nctId = findNCTNumber(entry.resource as ResearchStudy) || '';
+        if (nctId == '') continue;
+        const promise = this.getCachedClinicalStudy(nctId);
+        promises.push(promise);
+        promise.then((clinicalStudy) => {
+            if (clinicalStudy != null) this.updateResearchStudy(entry.resource as ResearchStudy, clinicalStudy as Study);
+        });
+      }
+      return Promise.all(promises).then(() => entries);
+    });
   }
 
   /**
