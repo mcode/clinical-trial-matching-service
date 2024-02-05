@@ -10,7 +10,7 @@ export { CodeMapper, CodeSystemEnum } from './codeMapper';
 export * from './mcodeextractor';
 export { Study } from './ctg-api';
 export { ClinicalTrialsGovAPI } from './clinicaltrialsgov-api';
-export { updateResearchStudyWithClinicalStudy } from './study-fhir-converter';
+export { createResearchStudyFromClinicalStudy } from './study-fhir-converter';
 
 // The export { v } from "mod" forms do not appear to work for types yet, so
 // they have to be imported and then exported...

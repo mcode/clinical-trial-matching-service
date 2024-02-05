@@ -20,7 +20,7 @@ import { debuglog } from 'util';
 import { ResearchStudy } from 'fhir/r4';
 import { SearchBundleEntry as SearchSetEntry } from './searchset';
 import { ClinicalTrialsGovAPI, Study } from './clinicaltrialsgov-api';
-import { updateResearchStudyWithClinicalStudy } from './study-fhir-converter';
+import { createResearchStudyFromClinicalStudy } from './study-fhir-converter';
 import * as sqlite from 'sqlite';
 import * as sqlite3 from 'sqlite3';
 
@@ -690,7 +690,7 @@ export class ClinicalTrialsGovService {
    * @param clinicalStudy the clinical study to update it with
    */
   updateResearchStudy(researchStudy: ResearchStudy, clinicalStudy: Study): void {
-    updateResearchStudyWithClinicalStudy(researchStudy, clinicalStudy);
+    createResearchStudyFromClinicalStudy(clinicalStudy, researchStudy);
   }
 
   /**
