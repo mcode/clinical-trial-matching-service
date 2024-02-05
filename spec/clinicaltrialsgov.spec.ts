@@ -644,12 +644,6 @@ describe('ClinicalTrialsGovService', () => {
     it('handles splitting requests', () => {
       // Basically, drop the limit to be very low, and make sure we get two calls
       service.maxTrialsPerRequest = 2;
-      const testStudies: ResearchStudy[] = [
-        createResearchStudy('test1', 'NCT00000001'),
-        createResearchStudy('test2', 'NCT00000002'),
-        createResearchStudy('test3', 'NCT00000003'),
-        createResearchStudy('test4', 'NCT00000004')
-      ];
 
       const testSearchSetEntries: SearchBundleEntry[] = [
         createSearchSetEntry('test1', 'NCT00000001'),
@@ -665,7 +659,7 @@ describe('ClinicalTrialsGovService', () => {
 
       service.getCachedClinicalStudy = getTrialSpy;
       return expectAsync(
-        service.updateResearchStudies(testStudies).then(() => {
+        service.updateSearchSetEntries(testSearchSetEntries).then(() => {
           expect(downloadTrialsSpy.calls.count()).toEqual(2);
           expect(downloadTrialsSpy.calls.argsFor(0)).toEqual([['NCT00000001', 'NCT00000002']]);
           expect(downloadTrialsSpy.calls.argsFor(1)).toEqual([['NCT00000003', 'NCT00000004']]);
