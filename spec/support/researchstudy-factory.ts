@@ -4,7 +4,7 @@ import { ResearchStudy } from '../../src/research-study';
 import { SearchBundleEntry } from '../../src/searchset';
 
 export function createResearchStudyObject(nctId?: string): ResearchStudy {
-  const result = new ResearchStudy(nctId ?? "test");
+  const result = new ResearchStudy(nctId ?? 'test');
   if (nctId) {
     result.identifier = [
       {
@@ -35,12 +35,12 @@ export function createResearchStudy(id: string, nctId?: string): IResearchStudy 
 }
 
 export function createSearchSetEntry(id: string, nctId?: string, score?: number): SearchBundleEntry {
-  const result:SearchBundleEntry = {
-    resource: createResearchStudy(id,nctId),
+  const result: SearchBundleEntry = {
+    resource: createResearchStudy(id, nctId),
     search: {
-      mode: "match",
+      mode: 'match',
       score: score || 0
     }
-  }
+  };
   return result;
 }

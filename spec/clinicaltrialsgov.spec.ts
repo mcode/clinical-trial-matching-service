@@ -607,43 +607,38 @@ describe('ClinicalTrialsGovService', () => {
       });
     });
 
-        // These tests basically are only to ensure that all trials are properly visited when given.
-    it('updates all the given studies', () => {
-          // Our test studies contain the same NCT ID twice to make sure that works as expected, as well as a NCT ID that
-          // download spy will return null for to indicate a failure.
-          const testSearchSetEntries: SearchBundleEntry[] = [
-            createSearchSetEntry('dupe1', 'NCT00000001'),
-            createSearchSetEntry('missing', 'NCT00000002'),
-            createSearchSetEntry('dupe2', 'NCT00000001'),
-            createSearchSetEntry('singleton', 'NCT00000003', 0.5),
+    // These tests basically are only to ensure that all trials are properly visited when given.
+    it('updates all the given studies', async () => {
+      // Our test studies contain the same NCT ID twice to make sure that works as expected, as well as a NCT ID that
+      // download spy will return null for to indicate a failure.
+      const testSearchSetEntries: SearchBundleEntry[] = [
+        createSearchSetEntry('dupe1', 'NCT00000001'),
+        createSearchSetEntry('missing', 'NCT00000002'),
+        createSearchSetEntry('dupe2', 'NCT00000001'),
+        createSearchSetEntry('singleton', 'NCT00000003', 0.5)
+      ];
 
-          ]
+      const testStudy = createClinicalStudy();
+      const updateSpy = spyOn(service, 'updateResearchStudy');
+      const getTrialSpy = jasmine.createSpy('getCachedClinicalStudy').and.callFake((nctId: string) => {
+        return Promise.resolve(nctId === 'NCT00000002' ? null : testStudy);
+      });
 
-          const testStudy = createClinicalStudy();
-          const updateSpy = spyOn(service, 'updateResearchStudy');
-          const getTrialSpy = jasmine.createSpy('getCachedClinicalStudy').and.callFake((nctId: string) => {
-            return Promise.resolve(nctId === 'NCT00000002' ? null : testStudy);
-          });
-
-          service.getCachedClinicalStudy = getTrialSpy;
-          return expectAsync(
-            service.updateSearchSetEntries(testSearchSetEntries).then(() => {
-              expect(downloadTrialsSpy).toHaveBeenCalledOnceWith(['NCT00000001', 'NCT00000002', 'NCT00000003']);
-              // Update should have been called three times: twice for the NCT00000001 studies, and once for the NCT00000003 study
-              expect(updateSpy).toHaveBeenCalledWith(testSearchSetEntries[0].resource as ResearchStudy, testStudy);
-              expect(updateSpy).not.toHaveBeenCalledWith(testSearchSetEntries[1].resource as ResearchStudy, testStudy);
-              expect(updateSpy).toHaveBeenCalledWith(testSearchSetEntries[2].resource as ResearchStudy, testStudy);
-              expect(updateSpy).toHaveBeenCalledWith(testSearchSetEntries[3].resource as ResearchStudy, testStudy);
-            })
-          ).toBeResolved();
+      service.getCachedClinicalStudy = getTrialSpy;
+      await service.updateSearchSetEntries(testSearchSetEntries);
+      expect(downloadTrialsSpy).toHaveBeenCalledOnceWith(['NCT00000001', 'NCT00000002', 'NCT00000003']);
+      // Update should have been called three times: twice for the NCT00000001 studies, and once for the NCT00000003 study
+      expect(updateSpy).toHaveBeenCalledWith(testSearchSetEntries[0].resource as ResearchStudy, testStudy);
+      expect(updateSpy).not.toHaveBeenCalledWith(testSearchSetEntries[1].resource as ResearchStudy, testStudy);
+      expect(updateSpy).toHaveBeenCalledWith(testSearchSetEntries[2].resource as ResearchStudy, testStudy);
+      expect(updateSpy).toHaveBeenCalledWith(testSearchSetEntries[3].resource as ResearchStudy, testStudy);
     });
 
-    it('does nothing if no studies have NCT IDs', () => {
-      return expectAsync(
-        service.updateSearchSetEntries([ {resource: { resourceType: 'ResearchStudy', status: 'active' }, search: { mode: 'match', score: 0 }}]).then(() => {
-          expect(downloadTrialsSpy).not.toHaveBeenCalled();
-        })
-      ).toBeResolved();
+    it('does nothing if no studies have NCT IDs', async () => {
+      await service.updateSearchSetEntries([
+        { resource: { resourceType: 'ResearchStudy', status: 'active' }, search: { mode: 'match', score: 0 } }
+      ]);
+      expect(downloadTrialsSpy).not.toHaveBeenCalled();
     });
 
     it('handles splitting requests', () => {
@@ -660,15 +655,14 @@ describe('ClinicalTrialsGovService', () => {
         createSearchSetEntry('test1', 'NCT00000001'),
         createSearchSetEntry('test2', 'NCT00000002'),
         createSearchSetEntry('test3', 'NCT00000003'),
-        createSearchSetEntry('test4', 'NCT00000004', 0.5),
-
-      ]
+        createSearchSetEntry('test4', 'NCT00000004', 0.5)
+      ];
       const testStudy = createClinicalStudy();
       spyOn(service, 'updateResearchStudy');
       const getTrialSpy = jasmine.createSpy('getCachedClinicalStudy').and.callFake(() => {
         return Promise.resolve(testStudy);
       });
-      
+
       service.getCachedClinicalStudy = getTrialSpy;
       return expectAsync(
         service.updateResearchStudies(testStudies).then(() => {
@@ -678,7 +672,6 @@ describe('ClinicalTrialsGovService', () => {
         })
       ).toBeResolved();
     });
-      
   });
 
   // this functionality is currently unimplemented - this test exists solely to "cover" the method

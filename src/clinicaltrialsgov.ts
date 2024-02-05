@@ -18,7 +18,7 @@
 
 import { debuglog } from 'util';
 import { ResearchStudy } from 'fhir/r4';
-import {SearchBundleEntry as SearchSetEntry} from './searchset';
+import { SearchBundleEntry as SearchSetEntry } from './searchset';
 import { ClinicalTrialsGovAPI, Study } from './clinicaltrialsgov-api';
 import { updateResearchStudyWithClinicalStudy } from './study-fhir-converter';
 import * as sqlite from 'sqlite';
@@ -491,17 +491,17 @@ export class ClinicalTrialsGovService {
     }
   }
 
-  async updateSearchSetEntries(entries: SearchSetEntry[]):Promise<SearchSetEntry[]> {
-    const studies:ResearchStudy[] = entries.map(item => item.resource as ResearchStudy);
+  async updateSearchSetEntries(entries: SearchSetEntry[]): Promise<SearchSetEntry[]> {
+    const studies: ResearchStudy[] = entries.map((item) => item.resource as ResearchStudy);
 
     await this.ensureTrialsAvailable(studies);
 
     await Promise.all(
       entries.map((entry) => {
-       const nctId = findNCTNumber(entry.resource as ResearchStudy) || '';
-       return this.updateResearchStudyFromCache(nctId, entry.resource as ResearchStudy);
-
-      }));
+        const nctId = findNCTNumber(entry.resource as ResearchStudy) || '';
+        return this.updateResearchStudyFromCache(nctId, entry.resource as ResearchStudy);
+      })
+    );
 
     return entries;
   }
