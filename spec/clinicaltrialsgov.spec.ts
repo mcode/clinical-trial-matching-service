@@ -8,8 +8,9 @@ import * as sqlite3 from 'sqlite3';
 
 // Trial missing summary, inclusion/exclusion criteria, phase and study type
 import { createClinicalStudy } from './support/clinicalstudy-factory';
-import { createResearchStudy } from './support/researchstudy-factory';
+import { createResearchStudy, createSearchSetEntry } from './support/researchstudy-factory';
 import { PagedStudies, Study } from '../src/ctg-api';
+import { SearchBundleEntry } from '../src/searchset';
 
 function specFilePath(specFilePath: string): string {
   return path.join(__dirname, '../../spec/data', specFilePath);
@@ -584,6 +585,81 @@ describe('ClinicalTrialsGovService', () => {
       service.getCachedClinicalStudy = getTrialSpy;
       return expectAsync(
         service.updateResearchStudies(testStudies).then(() => {
+          expect(downloadTrialsSpy.calls.count()).toEqual(2);
+          expect(downloadTrialsSpy.calls.argsFor(0)).toEqual([['NCT00000001', 'NCT00000002']]);
+          expect(downloadTrialsSpy.calls.argsFor(1)).toEqual([['NCT00000003', 'NCT00000004']]);
+        })
+      ).toBeResolved();
+    });
+  });
+
+  describe('#updateSearchSetEntries', () => {
+    let service: ctg.ClinicalTrialsGovService;
+    let downloadTrialsSpy: jasmine.Spy;
+
+    beforeEach(async () => {
+      // The service is never initialized
+      service = createMemoryCTGovService();
+      await service.init();
+      // TypeScript won't allow us to install spies the "proper" way on private methods
+      service['downloadTrials'] = downloadTrialsSpy = jasmine.createSpy('downloadTrials').and.callFake(() => {
+        return Promise.resolve(true);
+      });
+    });
+
+    // These tests basically are only to ensure that all trials are properly visited when given.
+    it('updates all the given studies', async () => {
+      // Our test studies contain the same NCT ID twice to make sure that works as expected, as well as a NCT ID that
+      // download spy will return null for to indicate a failure.
+      const testSearchSetEntries: SearchBundleEntry[] = [
+        createSearchSetEntry('dupe1', 'NCT00000001'),
+        createSearchSetEntry('missing', 'NCT00000002'),
+        createSearchSetEntry('dupe2', 'NCT00000001'),
+        createSearchSetEntry('singleton', 'NCT00000003', 0.5)
+      ];
+
+      const testStudy = createClinicalStudy();
+      const updateSpy = spyOn(service, 'updateResearchStudy');
+      const getTrialSpy = jasmine.createSpy('getCachedClinicalStudy').and.callFake((nctId: string) => {
+        return Promise.resolve(nctId === 'NCT00000002' ? null : testStudy);
+      });
+
+      service.getCachedClinicalStudy = getTrialSpy;
+      await service.updateSearchSetEntries(testSearchSetEntries);
+      expect(downloadTrialsSpy).toHaveBeenCalledOnceWith(['NCT00000001', 'NCT00000002', 'NCT00000003']);
+      // Update should have been called three times: twice for the NCT00000001 studies, and once for the NCT00000003 study
+      expect(updateSpy).toHaveBeenCalledWith(testSearchSetEntries[0].resource as ResearchStudy, testStudy);
+      expect(updateSpy).not.toHaveBeenCalledWith(testSearchSetEntries[1].resource as ResearchStudy, testStudy);
+      expect(updateSpy).toHaveBeenCalledWith(testSearchSetEntries[2].resource as ResearchStudy, testStudy);
+      expect(updateSpy).toHaveBeenCalledWith(testSearchSetEntries[3].resource as ResearchStudy, testStudy);
+    });
+
+    it('does nothing if no studies have NCT IDs', async () => {
+      await service.updateSearchSetEntries([
+        { resource: { resourceType: 'ResearchStudy', status: 'active' }, search: { mode: 'match', score: 0 } }
+      ]);
+      expect(downloadTrialsSpy).not.toHaveBeenCalled();
+    });
+
+    it('handles splitting requests', () => {
+      // Basically, drop the limit to be very low, and make sure we get two calls
+      service.maxTrialsPerRequest = 2;
+
+      const testSearchSetEntries: SearchBundleEntry[] = [
+        createSearchSetEntry('test1', 'NCT00000001'),
+        createSearchSetEntry('test2', 'NCT00000002'),
+        createSearchSetEntry('test3', 'NCT00000003'),
+        createSearchSetEntry('test4', 'NCT00000004', 0.5)
+      ];
+      const testStudy = createClinicalStudy();
+      spyOn(service, 'updateResearchStudy');
+      const getTrialSpy = jasmine.createSpy('getCachedClinicalStudy').and.callFake(() => {
+        return Promise.resolve(testStudy);
+      });
+
+      service.getCachedClinicalStudy = getTrialSpy;
+      return expectAsync(
+        service.updateSearchSetEntries(testSearchSetEntries).then(() => {
           expect(downloadTrialsSpy.calls.count()).toEqual(2);
           expect(downloadTrialsSpy.calls.argsFor(0)).toEqual([['NCT00000001', 'NCT00000002']]);
           expect(downloadTrialsSpy.calls.argsFor(1)).toEqual([['NCT00000003', 'NCT00000004']]);
