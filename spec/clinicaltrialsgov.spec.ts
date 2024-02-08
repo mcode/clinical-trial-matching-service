@@ -938,7 +938,7 @@ describe('ClinicalTrialsGovService', () => {
   });
 
   describe('#updateResearchStudy', () => {
-    it('forwards to updateResearchStudyWithClinicalStudy', () => {
+    it('forwards to createResearchStudyFromClinicalStudy', () => {
       const service = createMemoryCTGovService();
       const testResearchStudy = createResearchStudy('test');
       const testClinicalStudy = createClinicalStudy();

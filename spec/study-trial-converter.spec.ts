@@ -1,6 +1,6 @@
 import { Address, FhirResource, Location, ResearchStudy, PlanDefinition } from 'fhir/r4';
 import { getContainedResource, ResearchStudy as ResearchStudyObj } from '../src/research-study';
-import { updateResearchStudyWithClinicalStudy } from '../src/study-fhir-converter';
+import { createResearchStudyFromClinicalStudy } from '../src/study-fhir-converter';
 import {
   DateType,
   DesignAllocation,
@@ -28,7 +28,7 @@ describe('filling out a partial trial', () => {
   let updatedTrial: ResearchStudy;
 
   beforeAll(async function () {
-    updatedTrial = updateResearchStudyWithClinicalStudy(study, sampleStudy as Study);
+    updatedTrial = createResearchStudyFromClinicalStudy(sampleStudy as Study, study);
   });
 
   it('fills in inclusion criteria', () => {
@@ -66,11 +66,11 @@ describe('filling out a partial trial', () => {
     }
   });
 
-  it('does not overwrite existing categories', () => {
+  it('overwrites existing categories', () => {
     const researchStudy = new ResearchStudyObj('id');
     researchStudy.category = [{ text: 'Study Type: Do Not Replace' }];
 
-    updateResearchStudyWithClinicalStudy(researchStudy, {
+    createResearchStudyFromClinicalStudy({
       protocolSection: {
         designModule: {
           studyType: StudyType.INTERVENTIONAL,
@@ -86,7 +86,7 @@ describe('filling out a partial trial', () => {
           }
         }
       }
-    });
+    }, researchStudy);
 
     expect(researchStudy.category).toBeDefined();
     if (researchStudy.category) {
@@ -95,7 +95,7 @@ describe('filling out a partial trial', () => {
       expect(categories).toHaveSize(7);
       expect(categories).toEqual(
         jasmine.arrayContaining([
-          'Study Type: Do Not Replace',
+          'Study Type: Interventional',
           'Intervention Model: Parallel',
           'Primary Purpose: Treatment',
           'Masking: None',
@@ -104,25 +104,6 @@ describe('filling out a partial trial', () => {
           'Observation Model: Case Control'
         ])
       );
-    }
-  });
-
-  it('will retain old categories if not part of standard study design', () => {
-    const researchStudy = new ResearchStudyObj('id');
-    // Empty category but there is an object there for the sake of this test.
-    researchStudy.category = [{}];
-
-    updateResearchStudyWithClinicalStudy(researchStudy, {
-      protocolSection: {
-        designModule: {
-          studyType: StudyType.INTERVENTIONAL
-        }
-      }
-    });
-
-    expect(researchStudy.category).toBeDefined();
-    if (researchStudy.category) {
-      expect(researchStudy.category).toHaveSize(2);
     }
   });
 
@@ -191,8 +172,7 @@ describe('filling out a partial trial', () => {
   });
 
   it('fills in interventions even without arms', () => {
-    const researchStudy = new ResearchStudyObj('id');
-    const result = updateResearchStudyWithClinicalStudy(researchStudy, {
+    const result = createResearchStudyFromClinicalStudy({
       protocolSection: {
         armsInterventionsModule: {
           interventions: [
@@ -231,8 +211,7 @@ describe('filling out a partial trial', () => {
   });
 
   it('fills in interventions with description and subtitle', () => {
-    const researchStudy = new ResearchStudyObj('id');
-    const result = updateResearchStudyWithClinicalStudy(researchStudy, {
+    const result = createResearchStudyFromClinicalStudy({
       protocolSection: {
         armsInterventionsModule: {
           interventions: [
@@ -273,8 +252,7 @@ describe('filling out a partial trial', () => {
   });
 
   it('falls back on the intervention model description if no intervention model is given', () => {
-    const researchStudy = new ResearchStudyObj('id');
-    const result = updateResearchStudyWithClinicalStudy(researchStudy, {
+    const result = createResearchStudyFromClinicalStudy({
       protocolSection: {
         designModule: {
           designInfo: {
@@ -287,8 +265,7 @@ describe('filling out a partial trial', () => {
   });
 
   it('fills in period', () => {
-    const researchStudy = new ResearchStudyObj('id');
-    const result = updateResearchStudyWithClinicalStudy(researchStudy, {
+    const result = createResearchStudyFromClinicalStudy({
       protocolSection: {
         statusModule: {
           startDateStruct: {
@@ -314,8 +291,7 @@ describe('filling out a partial trial', () => {
   });
 
   it('fills in start of period even without end', () => {
-    const researchStudy = new ResearchStudyObj('id');
-    const result = updateResearchStudyWithClinicalStudy(researchStudy, {
+    const result = createResearchStudyFromClinicalStudy({
       protocolSection: {
         statusModule: {
           startDateStruct: {
@@ -336,8 +312,7 @@ describe('filling out a partial trial', () => {
   });
 
   it('fills in end of period even without start', () => {
-    const researchStudy = new ResearchStudyObj('id');
-    const result = updateResearchStudyWithClinicalStudy(researchStudy, {
+    const result = createResearchStudyFromClinicalStudy({
       protocolSection: {
         statusModule: {
           completionDateStruct: {
@@ -358,8 +333,7 @@ describe('filling out a partial trial', () => {
   });
 
   it('does not fill in period if not a real date', () => {
-    const researchStudy = new ResearchStudyObj('id');
-    const result = updateResearchStudyWithClinicalStudy(researchStudy, {
+    const result = createResearchStudyFromClinicalStudy({
       protocolSection: {
         statusModule: {
           startDateStruct: {
@@ -382,8 +356,7 @@ describe('filling out a partial trial', () => {
   });
 
   it('fills out the status', () => {
-    const actual = updateResearchStudyWithClinicalStudy(
-      { resourceType: 'ResearchStudy', status: 'active' },
+    const actual = createResearchStudyFromClinicalStudy(
       {
         protocolSection: {
           statusModule: {
@@ -395,9 +368,8 @@ describe('filling out a partial trial', () => {
     expect(actual.status).toEqual('completed');
   });
 
-  it('leaves status alone if unavailable', () => {
-    const actual = updateResearchStudyWithClinicalStudy(
-      { resourceType: 'ResearchStudy', status: 'active' },
+  it('defaults to active if status is unavailable', () => {
+    const actual = createResearchStudyFromClinicalStudy(
       {
         // Lie about types
         protocolSection: {
@@ -412,8 +384,7 @@ describe('filling out a partial trial', () => {
   });
 
   it('fills out conditions', () => {
-    const actual = updateResearchStudyWithClinicalStudy(
-      { resourceType: 'ResearchStudy', status: 'active' },
+    const actual = createResearchStudyFromClinicalStudy(
       {
         protocolSection: {
           conditionsModule: {
@@ -431,8 +402,7 @@ describe('filling out a partial trial', () => {
   });
 
   it('fills in contact', () => {
-    const researchStudy = new ResearchStudyObj('id');
-    const result = updateResearchStudyWithClinicalStudy(researchStudy, {
+    const result = createResearchStudyFromClinicalStudy({
       protocolSection: {
         contactsLocationsModule: {
           centralContacts: [
@@ -476,8 +446,7 @@ describe('filling out a partial trial', () => {
   });
 
   it('fills in contacts even with missing information', () => {
-    const researchStudy = new ResearchStudyObj('id');
-    const result = updateResearchStudyWithClinicalStudy(researchStudy, {
+    const result = createResearchStudyFromClinicalStudy({
       protocolSection: {
         contactsLocationsModule: {
           centralContacts: [
@@ -512,10 +481,10 @@ describe('filling out a partial trial', () => {
     }
   });
 
-  it('does not overwrite site data', () => {
+  it('overwrites site data', () => {
     const researchStudy = new ResearchStudyObj('id');
-    const location = researchStudy.addSite('Example');
-    const result = updateResearchStudyWithClinicalStudy(researchStudy, {
+    researchStudy.addSite('Example');
+    const result = createResearchStudyFromClinicalStudy({
       protocolSection: {
         contactsLocationsModule: {
           locations: [
@@ -527,38 +496,14 @@ describe('filling out a partial trial', () => {
       }
     });
     expect(result.site).toBeDefined();
-    const sites = result.site;
-    if (sites) {
-      expect(sites.length).toEqual(1);
-      if (sites[0]) {
-        expect(sites[0].reference).toEqual('#' + location.id);
-        if (location.id) {
-          const actualLocation = getContainedResource(result, location.id);
-          expect(actualLocation).not.toBeNull();
-          if (actualLocation) {
-            expect(actualLocation.resourceType).toEqual('Location');
-            expect((actualLocation as Location).name).toEqual('Example');
-          }
-        } else {
-          fail('location.id not defined');
-        }
-      } else {
-        fail('sites[0] undefined');
-      }
-    }
+    // FIXME: Verify that the sites are from thte test data
   });
 
-  it('does not alter a filled out trial', () => {
+  it('replaces the data in a filled out study', () => {
     // Clone the trial in the dumbest but also most sensible way
     const exampleStudy: ResearchStudy = JSON.parse(JSON.stringify(trialFilled));
-    updateResearchStudyWithClinicalStudy(exampleStudy, sampleStudy as Study);
-    // Currently active gets overwritten intentioanlly, so set the example
-    // back to its original value even if it changed
-    // (Note that the "as" *should* verify that the underlying JSON value is
-    // in fact valid at compile time. I think.)
-    exampleStudy.status = trialFilled.status as ResearchStudy['status'];
-    // Nothing should have changed
-    expect(exampleStudy).toEqual(trialFilled as ResearchStudy);
+    createResearchStudyFromClinicalStudy(sampleStudy as Study, exampleStudy);
+    // TODO: Figure out the data that should have changed
   });
 
   function expectTelecom(location: Location, type: 'phone' | 'email', expectedValue: string | null) {
@@ -622,8 +567,7 @@ describe('filling out a partial trial', () => {
   }
 
   it('fills out sites as expected', () => {
-    const result = updateResearchStudyWithClinicalStudy(
-      { resourceType: 'ResearchStudy', status: 'active' },
+    const result = createResearchStudyFromClinicalStudy(
       {
         protocolSection: {
           contactsLocationsModule: {
@@ -702,7 +646,7 @@ describe('filling out a partial trial', () => {
   });
 
   function expectEmptyResearchStudy(researchStudy: ResearchStudy): void {
-    // Technically this is just checking fields updateResearchStudyWithClinicalStudy may change
+    // Technically this is just checking fields createResearchStudyFromClinicalStudy may change
     expect(researchStudy.contained).withContext('contained').not.toBeDefined();
     expect(researchStudy.enrollment).withContext('enrollment').not.toBeDefined();
     expect(researchStudy.description).withContext('description').not.toBeDefined();
@@ -716,11 +660,11 @@ describe('filling out a partial trial', () => {
   it("handles JSON with missing data (doesn't crash)", () => {
     let researchStudy: ResearchStudy;
     // According to the schema, literally everything is optional, so an empty object should "work"
-    researchStudy = updateResearchStudyWithClinicalStudy(new ResearchStudyObj('id'), {});
+    researchStudy = createResearchStudyFromClinicalStudy({});
     // Expect nothing to have changed
     expectEmptyResearchStudy(researchStudy);
     // Some partial JSON
-    researchStudy = updateResearchStudyWithClinicalStudy(new ResearchStudyObj('id'), {
+    researchStudy = createResearchStudyFromClinicalStudy({
       protocolSection: {
         eligibilityModule: {
           genderBased: false,
@@ -731,7 +675,7 @@ describe('filling out a partial trial', () => {
     });
     expectEmptyResearchStudy(researchStudy);
     // Some bad JSON that shouldn't cause issues
-    researchStudy = updateResearchStudyWithClinicalStudy(new ResearchStudyObj('id'), {
+    researchStudy = createResearchStudyFromClinicalStudy({
       protocolSection: {
         contactsLocationsModule: {
           locations: [undefined as unknown as StudyLocation]

@@ -6,7 +6,7 @@ describe('index', () => {
     expect(ctms.ResearchStudy).toBeDefined();
     expect(ctms.ClinicalTrialMatchingService).toBeDefined();
     expect(ctms.ClinicalTrialsGovAPI).toBeDefined();
-    expect(ctms.updateResearchStudyWithClinicalStudy).toBeDefined();
+    expect(ctms.createResearchStudyFromClinicalStudy).toBeDefined();
     expect(ctms.CodeMapper).toBeDefined();
     expect(ctms.CodeSystemEnum).toBeDefined();
     expect(ctms.ClientError).toBeDefined();
