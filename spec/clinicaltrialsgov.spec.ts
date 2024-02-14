@@ -114,15 +114,15 @@ describe('.findNCTNumber', () => {
         identifier: [
           {
             system: 'other',
-            value: 'ignoreme'
+            value: 'NCT12345678'
           },
           {
             system: ctg.CLINICAL_TRIAL_IDENTIFIER_CODING_SYSTEM_URL,
-            value: 'test'
+            value: 'NCT87654321'
           }
         ]
       })
-    ).toEqual('test');
+    ).toEqual('NCT87654321');
   });
   it('finds an NCT number based on regexp', () => {
     expect(
@@ -173,18 +173,17 @@ describe('.findNCTNumber', () => {
 });
 
 describe('findNCTNumbers', () => {
-  it('builds a map', () => {
+  it('builds a set', () => {
     const studies: ResearchStudy[] = [
       createResearchStudy('no-NCTID'),
       createResearchStudy('dupe1', 'NCT00000001'),
       createResearchStudy('singleton', 'NCT12345678'),
       createResearchStudy('dupe2', 'NCT00000001'),
-      createResearchStudy('dupe3', 'NCT00000001')
+      createResearchStudy('dupe3', 'NCT00000001'),
+      createResearchStudy('invalid', 'ignore this ID')
     ];
-    const map = ctg.findNCTNumbers(studies);
-    expect(map.size).toEqual(2);
-    expect(map.get('NCT12345678')).toEqual(studies[2]);
-    expect(map.get('NCT00000001')).toEqual([studies[1], studies[3], studies[4]]);
+    const set = ctg.findNCTNumbers(studies);
+    expect(set).toEqual(new Set<string>(['NCT12345678', 'NCT00000001']));
   });
 });
 
@@ -533,31 +532,26 @@ describe('ClinicalTrialsGovService', () => {
     });
 
     // These tests basically are only to ensure that all trials are properly visited when given.
-    it('updates all the given studies', () => {
+    it('updates studies with proper IDs', async () => {
       // Our test studies contain the same NCT ID twice to make sure that works as expected, as well as a NCT ID that
       // download spy will return null for to indicate a failure.
       const testStudies: ResearchStudy[] = [
         createResearchStudy('dupe1', 'NCT00000001'),
         createResearchStudy('missing', 'NCT00000002'),
         createResearchStudy('dupe2', 'NCT00000001'),
-        createResearchStudy('singleton', 'NCT00000003')
+        createResearchStudy('singleton', 'NCT00000003'),
+        createResearchStudy('invalidid', 'not an NCT id')
       ];
       const testStudy = createClinicalStudy();
-      const updateSpy = spyOn(service, 'updateResearchStudy');
       const getTrialSpy = jasmine.createSpy('getCachedClinicalStudy').and.callFake((nctId: string) => {
         return Promise.resolve(nctId === 'NCT00000002' ? null : testStudy);
       });
       service.getCachedClinicalStudy = getTrialSpy;
-      return expectAsync(
-        service.updateResearchStudies(testStudies).then(() => {
-          expect(downloadTrialsSpy).toHaveBeenCalledOnceWith(['NCT00000001', 'NCT00000002', 'NCT00000003']);
-          // Update should have been called three times: twice for the NCT00000001 studies, and once for the NCT00000003 study
-          expect(updateSpy).toHaveBeenCalledWith(testStudies[0], testStudy);
-          expect(updateSpy).not.toHaveBeenCalledWith(testStudies[1], testStudy);
-          expect(updateSpy).toHaveBeenCalledWith(testStudies[2], testStudy);
-          expect(updateSpy).toHaveBeenCalledWith(testStudies[3], testStudy);
-        })
-      ).toBeResolved();
+      const result = await service.updateResearchStudies(testStudies);
+      expect(downloadTrialsSpy).toHaveBeenCalledOnceWith(['NCT00000001', 'NCT00000002', 'NCT00000003']);
+      // Expect the invalid ID to be left unchanged
+      console.log(JSON.stringify(result, null, 2));
+      expect(result[4]).toEqual(testStudies[4]);
     });
 
     it('does nothing if no studies have NCT IDs', () => {
@@ -578,7 +572,6 @@ describe('ClinicalTrialsGovService', () => {
         createResearchStudy('test4', 'NCT00000004')
       ];
       const testStudy = createClinicalStudy();
-      spyOn(service, 'updateResearchStudy');
       const getTrialSpy = jasmine.createSpy('getCachedClinicalStudy').and.callFake(() => {
         return Promise.resolve(testStudy);
       });
@@ -619,7 +612,6 @@ describe('ClinicalTrialsGovService', () => {
       ];
 
       const testStudy = createClinicalStudy();
-      const updateSpy = spyOn(service, 'updateResearchStudy');
       const getTrialSpy = jasmine.createSpy('getCachedClinicalStudy').and.callFake((nctId: string) => {
         return Promise.resolve(nctId === 'NCT00000002' ? null : testStudy);
       });
@@ -627,11 +619,6 @@ describe('ClinicalTrialsGovService', () => {
       service.getCachedClinicalStudy = getTrialSpy;
       await service.updateSearchSetEntries(testSearchSetEntries);
       expect(downloadTrialsSpy).toHaveBeenCalledOnceWith(['NCT00000001', 'NCT00000002', 'NCT00000003']);
-      // Update should have been called three times: twice for the NCT00000001 studies, and once for the NCT00000003 study
-      expect(updateSpy).toHaveBeenCalledWith(testSearchSetEntries[0].resource as ResearchStudy, testStudy);
-      expect(updateSpy).not.toHaveBeenCalledWith(testSearchSetEntries[1].resource as ResearchStudy, testStudy);
-      expect(updateSpy).toHaveBeenCalledWith(testSearchSetEntries[2].resource as ResearchStudy, testStudy);
-      expect(updateSpy).toHaveBeenCalledWith(testSearchSetEntries[3].resource as ResearchStudy, testStudy);
     });
 
     it('does nothing if no studies have NCT IDs', async () => {
@@ -652,7 +639,6 @@ describe('ClinicalTrialsGovService', () => {
         createSearchSetEntry('test4', 'NCT00000004', 0.5)
       ];
       const testStudy = createClinicalStudy();
-      spyOn(service, 'updateResearchStudy');
       const getTrialSpy = jasmine.createSpy('getCachedClinicalStudy').and.callFake(() => {
         return Promise.resolve(testStudy);
       });
@@ -934,16 +920,6 @@ describe('ClinicalTrialsGovService', () => {
         'SELECT study_json FROM ctgov_studies WHERE nct_id = 12345678'
       );
       expect(result?.study_json).toEqual(JSON.stringify(study));
-    });
-  });
-
-  describe('#updateResearchStudy', () => {
-    it('forwards to createResearchStudyFromClinicalStudy', () => {
-      const service = createMemoryCTGovService();
-      const testResearchStudy = createResearchStudy('test');
-      const testClinicalStudy = createClinicalStudy();
-      service.updateResearchStudy(testResearchStudy, testClinicalStudy);
-      // There's no really good way to verify this worked. For now, it not blowing up is good enough.
     });
   });
 });
