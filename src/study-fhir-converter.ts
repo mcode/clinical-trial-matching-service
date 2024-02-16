@@ -12,6 +12,7 @@ import {
 } from 'fhir/r4';
 import { isFhirDate } from './fhir-type-guards';
 import { addContainedResource, addToContainer } from './research-study';
+import { CLINICAL_TRIAL_IDENTIFIER_CODING_SYSTEM_URL } from './clinicaltrialsgov';
 
 const PHASE_MAP = new Map<Phase, string>([
   [Phase.NA, 'n-a'],
@@ -101,6 +102,29 @@ export function createResearchStudyFromClinicalStudy(study: Study, result?: Rese
   // If there is no protocol section, we can't do anything.
   if (!protocolSection) {
     return result;
+  }
+
+  // Fill out basic information
+  const identificationModule = protocolSection.identificationModule;
+  if (identificationModule) {
+    const nctId = identificationModule.nctId;
+    if (nctId) {
+      result.identifier = [
+        {
+          system: CLINICAL_TRIAL_IDENTIFIER_CODING_SYSTEM_URL,
+          value: nctId
+        }
+      ];
+    }
+    const briefTitle = identificationModule.briefTitle;
+    if (briefTitle) {
+      result.title = briefTitle;
+    } else {
+      const officialTitle = identificationModule.officialTitle;
+      if (officialTitle) {
+        result.title = officialTitle;
+      }
+    }
   }
 
   const eligibility = protocolSection.eligibilityModule;

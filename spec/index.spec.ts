@@ -11,6 +11,8 @@ describe('index', () => {
     expect(ctms.CodeSystemEnum).toBeDefined();
     expect(ctms.ClientError).toBeDefined();
     expect(ctms.ServerError).toBeDefined();
+    expect(ctms.FHIRDate).toBeDefined();
+    expect(ctms.resourceContainsProfile).toBeDefined();
     // This is dumb but otherwise Istanbul complains they were never called
     expect(new ctms.ClientError('example')).toBeInstanceOf(Error);
     expect(new ctms.ServerError('example')).toBeInstanceOf(Error);

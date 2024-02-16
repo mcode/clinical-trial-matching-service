@@ -84,7 +84,11 @@ export function formatNCTNumber(nctNumber: number): string {
 export function findNCTNumber(study: ResearchStudy): NCTNumber | null {
   if (study.identifier && Array.isArray(study.identifier) && study.identifier.length > 0) {
     for (const identifier of study.identifier) {
-      if (identifier.system === CLINICAL_TRIAL_IDENTIFIER_CODING_SYSTEM_URL && typeof identifier.value === 'string')
+      if (
+        identifier.system === CLINICAL_TRIAL_IDENTIFIER_CODING_SYSTEM_URL &&
+        typeof identifier.value === 'string' &&
+        isValidNCTNumber(identifier.value)
+      )
         return identifier.value;
     }
     // Fallback: regexp match
@@ -98,26 +102,15 @@ export function findNCTNumber(study: ResearchStudy): NCTNumber | null {
 
 /**
  * Finds all the NCT numbers within the given list of studies. Returns a map of
- * NCT numbers to the research studies they match. If multiple research studies
- * have the same NCT ID, then an array will be used to contain all matching
- * studies. (This should be very uncommon but is supported anyway.)
+ * NCT numbers to the research studies they match.
  * @param studies the NCT numbers found, if any
  */
-export function findNCTNumbers(studies: ResearchStudy[]): Map<NCTNumber, ResearchStudy | Array<ResearchStudy>> {
-  const result = new Map<NCTNumber, ResearchStudy | Array<ResearchStudy>>();
+export function findNCTNumbers(studies: ResearchStudy[]): Set<NCTNumber> {
+  const result = new Set<NCTNumber>();
   for (const study of studies) {
     const nctId = findNCTNumber(study);
     if (nctId !== null) {
-      const existing = result.get(nctId);
-      if (existing === undefined) {
-        result.set(nctId, study);
-      } else {
-        if (Array.isArray(existing)) {
-          existing.push(study);
-        } else {
-          result.set(nctId, [existing, study]);
-        }
-      }
+      result.add(nctId);
     }
   }
   return result;
@@ -455,40 +448,38 @@ export class ClinicalTrialsGovService {
    * occurs).
    *
    * @param studies the studies to attempt to update
-   * @returns a Promise that resolves when the studies are updated. It will resolve with the same array that was passed
-   *     in - this updates the given objects, it does not clone them and create new ones.
+   * @returns a Promise that resolves with updated studies
    */
   async updateResearchStudies(studies: ResearchStudy[]): Promise<ResearchStudy[]> {
-    const nctIdMap = findNCTNumbers(studies);
-    if (nctIdMap.size === 0) {
+    const nctIds = Array.from(findNCTNumbers(studies));
+    if (nctIds.length === 0) {
       // Nothing to do
       return studies;
     }
-    const nctIds = Array.from(nctIdMap.keys());
     this.log('Updating research studies with NCT IDs %j', nctIds);
     // Make sure the NCT numbers are in the cache
     await this.ensureTrialsAvailable(nctIds);
     // Update the items in the list
+    const updatedTrials = new Map<string, ResearchStudy>();
     await Promise.all(
-      Array.from(nctIdMap.entries()).map(([nctId, study]) => this.updateResearchStudyFromCache(nctId, study))
-    );
-    return studies;
-  }
-
-  private async updateResearchStudyFromCache(nctId: string, originals: ResearchStudy | ResearchStudy[]): Promise<void> {
-    const clinicalStudy = await this.getCachedClinicalStudy(nctId);
-    // Make sure we have data to use - cache can be missing NCT IDs even after requesting them if the NCT is missing
-    // from the origin service
-    if (clinicalStudy !== null) {
-      // Update whatever trials we have, which will either be an array or single object
-      if (Array.isArray(originals)) {
-        for (const s of originals) {
-          this.updateResearchStudy(s, clinicalStudy);
+      Array.from(nctIds).map(async (nctId) => {
+        const study = await this.getCachedClinicalStudy(nctId);
+        if (study) {
+          updatedTrials.set(nctId, createResearchStudyFromClinicalStudy(study));
         }
-      } else {
-        this.updateResearchStudy(originals, clinicalStudy);
+      })
+    );
+    return studies.map<ResearchStudy>((study) => {
+      const id = findNCTNumber(study);
+      if (id) {
+        // It's possible some IDs may not exist and may be left alone
+        const updated = updatedTrials.get(id);
+        if (updated) {
+          return updated;
+        }
       }
-    }
+      return study;
+    });
   }
 
   async updateSearchSetEntries(entries: SearchSetEntry[]): Promise<SearchSetEntry[]> {
@@ -497,9 +488,15 @@ export class ClinicalTrialsGovService {
     await this.ensureTrialsAvailable(studies);
 
     await Promise.all(
-      entries.map((entry) => {
-        const nctId = findNCTNumber(entry.resource as ResearchStudy) || '';
-        return this.updateResearchStudyFromCache(nctId, entry.resource as ResearchStudy);
+      entries.map(async (entry) => {
+        const resource = entry.resource as ResearchStudy;
+        const nctId = findNCTNumber(resource);
+        if (nctId) {
+          const study = await this.getCachedClinicalStudy(nctId);
+          if (study) {
+            entry.resource = createResearchStudyFromClinicalStudy(study);
+          }
+        }
       })
     );
 
@@ -679,18 +676,6 @@ export class ClinicalTrialsGovService {
       }
     }
     return null;
-  }
-
-  /**
-   * The provides a stub that handles updating the research study with data from a clinical study downloaded from the
-   * ClinicalTrials.gov website. This primarily exists as a stub to allow the exact process which updates a research
-   * study to be overridden if necessary.
-   *
-   * @param researchStudy the research study to update
-   * @param clinicalStudy the clinical study to update it with
-   */
-  updateResearchStudy(researchStudy: ResearchStudy, clinicalStudy: Study): void {
-    createResearchStudyFromClinicalStudy(clinicalStudy, researchStudy);
   }
 
   /**
