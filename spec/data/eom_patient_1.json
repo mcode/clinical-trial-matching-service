@@ -1,0 +1,720 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    {
+      "fullUrl": "urn:uuid:Ancora-13",
+      "resource": {
+        "resourceType": "Patient",
+        "id": "Ancora-13",
+        "gender": "female",
+        "identifier": [
+          {
+            "type": {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/v2-0203",
+                  "code": "MR",
+                  "display": "Medical Record Number"
+                }
+              ],
+              "text": "Medical Record Number"
+            },
+            "system": "http://example.com/system/mrn",
+            "value": "Ancora-13"
+          }
+        ],
+        "name": [
+          {
+            "text": "CC Ancora",
+            "family": "Ancora",
+            "given": [
+              "CC"
+            ]
+          }
+        ],
+        "birthDate": "1987-01-01",
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-birthsex",
+            "valueCode": "F"
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:conditionId-1",
+      "resource": {
+        "resourceType": "Condition",
+        "id": "conditionId-1",
+        "meta": {
+          "profile": [
+            "http://hl7.org/fhir/us/mcode/StructureDefinition/mcode-primary-cancer-condition"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/us/mcode/StructureDefinition/mcode-histology-morphology-behavior",
+            "valueCodeableConcept": {
+              "coding": [
+                {
+                  "system": "http://snomed.info/sct",
+                  "code": "1187425009"
+                }
+              ]
+            }
+          },
+          {
+            "url": "http://hl7.org/fhir/StructureDefinition/condition-assertedDate",
+            "valueDateTime": "2024-01-01"
+          }
+        ],
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/condition-category",
+                "code": "problem-list-item"
+              }
+            ]
+          },
+          {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "64572001"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "372137005",
+              "display": "Primary malignant neoplasm of breast (disorder)"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:Ancora-13",
+          "type": "Patient"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:conditionId-2",
+      "resource": {
+        "resourceType": "Condition",
+        "meta": {
+          "profile": [
+            "http://hl7.org/fhir/us/mcode/StructureDefinition/mcode-secondary-cancer-condition"
+          ]
+        },
+        "id": "conditionId-2",
+        "clinicalStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/condition-clinical",
+              "code": "active"
+            }
+          ]
+        },
+        "verificationStatus": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/condition-ver-status",
+              "code": "confirmed"
+            }
+          ]
+        },
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "64572001"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "94391008",
+              "display": "Metastatic malignant neoplasm to lung (disorder)"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:Ancora-13",
+          "type": "Patient"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:cancerDiseaseStatusId-1",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "cancerDiseaseStatusId-1",
+        "meta": {
+          "profile": [
+            "http://hl7.org/fhir/us/mcode/StructureDefinition/mcode-cancer-disease-status"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/us/mcode/StructureDefinition/mcode-cancer-disease-status-evidence-type",
+            "valueCodeableConcept": {
+              "coding": [
+                {
+                  "system": "http://snomed.info/sct",
+                  "code": "363679005",
+                  "display": "Imaging (procedure)"
+                }
+              ]
+            }
+          }
+        ],
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "97509-4",
+              "display": "Cancer Disease Progression"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:Ancora-13",
+          "type": "Patient"
+        },
+        "focus": [
+          {
+            "reference": "urn:uuid:conditionId-1",
+            "type": "Condition"
+          }
+        ],
+        "effectiveDateTime": "2024-01-01",
+        "valueCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "268910001",
+              "display": "Patient's condition improved (finding)"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:546d75a171ad7f90983a6f32e7fb3da7511534dd4229d6d3fd9e493b22c6f3c7",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "546d75a171ad7f90983a6f32e7fb3da7511534dd4229d6d3fd9e493b22c6f3c7",
+        "meta": {
+          "profile": [
+            "http://hl7.org/fhir/us/mcode/StructureDefinition/mcode-tnm-clinical-stage-group"
+          ]
+        },
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "survey"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "21908-9"
+            }
+          ]
+        },
+        "method": {
+          "coding": [
+            {
+              "system": "http://ncimeta.nci.nih.gov",
+              "code": "C146985"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:Ancora-13",
+          "type": "Patient"
+        },
+        "effectiveDateTime": "2022-01-02",
+        "valueCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://cancerstaging.org",
+              "code": "4"
+            }
+          ]
+        },
+        "focus": [
+          {
+            "reference": "urn:uuid:conditionId-1",
+            "type": "Condition"
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:tnm-clinical-primary-tumor-category-cT3",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "tnm-clinical-primary-tumor-category-cT3",
+        "meta": {
+          "profile": [
+            "http://hl7.org/fhir/us/mcode/StructureDefinition/mcode-tnm-primary-tumor-category"
+          ]
+        },
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "399504009",
+              "display": "cT category"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:Ancora-13",
+          "type": "Patient"
+        },
+        "effectiveDateTime": "2019-04-01",
+        "valueCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "1228938002",
+              "display": "American Joint Committee on Cancer cT3 (qualifier value)"
+            }
+          ]
+        },
+        "method": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "897275008",
+              "display": "American Joint Commission on Cancer, Cancer Staging Manual, 8th edition neoplasm staging system (tumor staging)"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:tnm-clinical-regional-nodes-category-cN3",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "tnm-clinical-regional-nodes-category-cN3",
+        "meta": {
+          "profile": [
+            "http://hl7.org/fhir/us/mcode/StructureDefinition/mcode-tnm-regional-nodes-category"
+          ]
+        },
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "399534004",
+              "display": "cN category"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:Ancora-13",
+          "type": "Patient"
+        },
+        "effectiveDateTime": "2019-04-01",
+        "valueCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "1229984001",
+              "display": "American Joint Committee on Cancer cN3 (qualifier value)"
+            }
+          ]
+        },
+        "method": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "897275008",
+              "display": "American Joint Commission on Cancer, Cancer Staging Manual, 8th edition neoplasm staging system (tumor staging)"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:tnm-clinical-distant-metastases-category-cM0",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "tnm-clinical-distant-metastases-category-cM0",
+        "meta": {
+          "profile": [
+            "http://hl7.org/fhir/us/mcode/StructureDefinition/mcode-tnm-distant-metastases-category"
+          ]
+        },
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "399387003",
+              "display": "cM category"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:Ancora-13",
+          "type": "Patient"
+        },
+        "effectiveDateTime": "2019-04-01",
+        "valueCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "1229901006",
+              "display": "American Joint Committee on Cancer cM0 (qualifier value)"
+            }
+          ]
+        },
+        "method": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "897275008",
+              "display": "American Joint Commission on Cancer, Cancer Staging Manual, 8th edition neoplasm staging system (tumor staging)"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:tumor-marker-test-her2-jenny-m",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "tumor-marker-test-her2-jenny-m",
+        "meta": {
+          "profile": [
+            "http://hl7.org/fhir/us/mcode/StructureDefinition/mcode-tumor-marker-test"
+          ]
+        },
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "laboratory"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "48676-1",
+              "display": "HER2 [Interpretation] in Tissue"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:Ancora-13",
+          "type": "Patient"
+        },
+        "effectiveDateTime": "2018-03-10",
+        "valueCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "LA6577-6",
+              "display": "Negative"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:tumor-marker-test-er-jenny-m",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "tumor-marker-test-er-jenny-m",
+        "meta": {
+          "profile": [
+            "http://hl7.org/fhir/us/mcode/StructureDefinition/mcode-tumor-marker-test"
+          ]
+        },
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "laboratory"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "85337-4",
+              "display": "Estrogen receptor Ag [Presence] in Breast cancer specimen by Immune stain"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:Ancora-13",
+          "type": "Patient"
+        },
+        "effectiveDateTime": "2018-03-10",
+        "valueCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "LA6576-8",
+              "display": "Positive"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:tumor-marker-test-pr-jenny-m",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "tumor-marker-test-pr-jenny-m",
+        "meta": {
+          "profile": [
+            "http://hl7.org/fhir/us/mcode/StructureDefinition/mcode-tumor-marker-test"
+          ]
+        },
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "code": "laboratory"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "85339-0",
+              "display": "Progesterone receptor Ag [Presence] in Breast cancer specimen by Immune stain"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:Ancora-13",
+          "type": "Patient"
+        },
+        "effectiveDateTime": "2018-03-10",
+        "valueCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "LA6577-6",
+              "display": "Negative"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:observation-id-1",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "observation-id-1",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "89247-1",
+              "display": "ECOG Performance Status score"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:Ancora-13",
+          "type": "Patient"
+        },
+        "effectiveDateTime": "2022-01-02",
+        "valueInteger": 3
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:medicationId-1",
+      "resource": {
+        "resourceType": "MedicationStatement",
+        "id": "medicationId-1",
+        "meta": {
+          "profile": [
+            "http://hl7.org/fhir/us/mcode/StructureDefinition/mcode-cancer-related-medication-statement"
+          ]
+        },
+        "status": "completed",
+        "medicationCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+              "code": "1946827",
+              "display": "abemaciclib Oral Product"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:Ancora-13",
+          "type": "Patient"
+        },
+        "effectivePeriod": {
+          "start": "2022-01-01",
+          "end": "2022-01-01"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:medicationId-2",
+      "resource": {
+        "resourceType": "MedicationStatement",
+        "id": "medicationId-2",
+        "meta": {
+          "profile": [
+            "http://hl7.org/fhir/us/mcode/StructureDefinition/mcode-cancer-related-medication-statement"
+          ]
+        },
+        "status": "completed",
+        "medicationCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+              "code": "2169297",
+              "display": "alpelisib Oral Product"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:Ancora-13",
+          "type": "Patient"
+        },
+        "effectivePeriod": {
+          "start": "2022-01-01",
+          "end": "2022-01-01"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:observation-id-3",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "observation-id-3",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "16112-5",
+              "display": "Estrogen receptor [Interpretation] in Tissue"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:Ancora-13",
+          "type": "Patient"
+        },
+        "effectiveDateTime": "2022-01-02",
+        "valueCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "260385009",
+              "display": "Negative (qualifier value)"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:observation-id-4",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "observation-id-4",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "40557-1",
+              "display": "Progesterone receptor Ag [Presence] in Tissue by Immune stain"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:Ancora-13",
+          "type": "Patient"
+        },
+        "effectiveDateTime": "2022-01-02",
+        "valueCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "260385009",
+              "display": "Negative (qualifier value)"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:observation-id-5",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "observation-id-5",
+        "status": "final",
+        "code": {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "18474-7",
+              "display": "HER2 Ag [Presence] in Tissue by Immune stain"
+            }
+          ]
+        },
+        "subject": {
+          "reference": "urn:uuid:Ancora-13",
+          "type": "Patient"
+        },
+        "effectiveDateTime": "2022-01-02",
+        "valueCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "260385009",
+              "display": "Negative (qualifier value)"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
