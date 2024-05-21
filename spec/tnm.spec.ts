@@ -1,4 +1,10 @@
-import { parseTNM, convertTNMToCancerStage, convertTNMValuesToCancerStage } from '../src/tnm';
+import {
+  parseTNM,
+  convertTNMToCancerStage,
+  convertTNMValuesToCancerStage,
+  convertCodeableConceptToTNM,
+  extractTNM
+} from '../src/tnm';
 
 describe('parseTNM()', () => {
   it('parses a simple set of fields', () => {
@@ -29,6 +35,14 @@ describe('parseTNM()', () => {
         parameter: 'T',
         value: null,
         prefixModifiers: '',
+        suffixModifiers: 'is'
+      }
+    ]);
+    expect(parseTNM('cTis')).toEqual([
+      {
+        parameter: 'T',
+        value: null,
+        prefixModifiers: 'c',
         suffixModifiers: 'is'
       }
     ]);
@@ -91,5 +105,331 @@ describe('convertTNMValuesToCancerStage()', () => {
         expect(convertTNMValuesToCancerStage(t, n, 1)).toEqual(4);
       }
     }
+  });
+});
+
+describe('convertCodeableConcetpToTNM', () => {
+  it('handles blank codeable concepts', () => {
+    // Everything in a codeable concept is undefined, so nothing is valid
+    expect(convertCodeableConceptToTNM({})).toBeUndefined();
+  });
+  it('handles a codeable concept with a system but no code', () => {
+    expect(
+      convertCodeableConceptToTNM({
+        coding: [
+          {
+            system: 'http://snomed.info/sct'
+          }
+        ]
+      })
+    ).toBeUndefined();
+  });
+  it('handles a codeable concept with a code but no system', () => {
+    expect(
+      convertCodeableConceptToTNM({
+        coding: [
+          {
+            code: '1228923003'
+          }
+        ]
+      })
+    ).toBeUndefined();
+  });
+  it('handles a codeable concept with an unknown system/code', () => {
+    expect(
+      convertCodeableConceptToTNM({
+        coding: [
+          {
+            system: 'http://www.example.com/invalid',
+            code: 'also-invalid'
+          }
+        ]
+      })
+    ).toBeUndefined();
+  });
+});
+
+describe('extractTNM()', () => {
+  it('does not overwrite with later values', () => {
+    // This tests "early quit" sort of
+    expect(
+      extractTNM([
+        {
+          resourceType: 'Observation',
+          code: {},
+          status: 'final',
+          valueCodeableConcept: {
+            coding: [
+              {
+                system: 'http://snomed.info/sct',
+                code: '1228923003'
+              }
+            ]
+          }
+        },
+        {
+          resourceType: 'Observation',
+          code: {},
+          status: 'final',
+          valueCodeableConcept: {
+            coding: [
+              {
+                system: 'http://snomed.info/sct',
+                code: '1229897000'
+              }
+            ]
+          }
+        },
+        {
+          resourceType: 'Observation',
+          code: {},
+          status: 'final',
+          valueCodeableConcept: {
+            coding: [
+              {
+                system: 'http://snomed.info/sct',
+                code: '1229913001'
+              }
+            ]
+          }
+        },
+        {
+          resourceType: 'Observation',
+          code: {},
+          status: 'final',
+          valueCodeableConcept: {
+            coding: [
+              {
+                system: 'http://snomed.info/sct',
+                code: '1228904005'
+              }
+            ]
+          }
+        },
+        {
+          resourceType: 'Observation',
+          code: {},
+          status: 'final',
+          valueCodeableConcept: {
+            coding: [
+              {
+                system: 'http://snomed.info/sct',
+                code: '1229889007'
+              }
+            ]
+          }
+        },
+        {
+          resourceType: 'Observation',
+          code: {},
+          status: 'final',
+          valueCodeableConcept: {
+            coding: [
+              {
+                system: 'http://snomed.info/sct',
+                code: '1229901006'
+              }
+            ]
+          }
+        }
+      ])
+    ).toEqual({
+      tumor: 4,
+      node: 3,
+      metastasis: 1
+    });
+    // So check each field individually as well
+    expect(
+      extractTNM([
+        {
+          resourceType: 'Observation',
+          code: {},
+          status: 'final',
+          valueCodeableConcept: {
+            coding: [
+              {
+                system: 'http://snomed.info/sct',
+                code: '1228923003'
+              }
+            ]
+          }
+        },
+        {
+          resourceType: 'Observation',
+          code: {},
+          status: 'final',
+          valueCodeableConcept: {
+            coding: [
+              {
+                system: 'http://snomed.info/sct',
+                code: '1228904005'
+              }
+            ]
+          }
+        }
+      ])
+    ).toEqual({
+      tumor: 4
+    });
+    expect(
+      extractTNM([
+        {
+          resourceType: 'Observation',
+          code: {},
+          status: 'final',
+          valueCodeableConcept: {
+            coding: [
+              {
+                system: 'http://snomed.info/sct',
+                code: '1229897000'
+              }
+            ]
+          }
+        },
+        {
+          resourceType: 'Observation',
+          code: {},
+          status: 'final',
+          valueCodeableConcept: {
+            coding: [
+              {
+                system: 'http://snomed.info/sct',
+                code: '1229889007'
+              }
+            ]
+          }
+        }
+      ])
+    ).toEqual({
+      node: 3
+    });
+    expect(
+      extractTNM([
+        {
+          resourceType: 'Observation',
+          code: {},
+          status: 'final',
+          valueCodeableConcept: {
+            coding: [
+              {
+                system: 'http://snomed.info/sct',
+                code: '1229913001'
+              }
+            ]
+          }
+        },
+        {
+          resourceType: 'Observation',
+          code: {},
+          status: 'final',
+          valueCodeableConcept: {
+            coding: [
+              {
+                system: 'http://snomed.info/sct',
+                code: '1229901006'
+              }
+            ]
+          }
+        }
+      ])
+    ).toEqual({
+      metastasis: 1
+    });
+  });
+  it('extracts expected values', () => {
+    expect(
+      extractTNM([
+        // Observation with an unknown system
+        {
+          resourceType: 'Observation',
+          code: {},
+          status: 'final',
+          valueCodeableConcept: {
+            coding: [
+              {
+                system: 'http://example.com/ignore-this',
+                code: '1229901006'
+              }
+            ]
+          }
+        },
+        // Code that's valid FHIR but will never match anything
+        {
+          resourceType: 'Observation',
+          code: {},
+          status: 'final',
+          valueCodeableConcept: {
+            coding: [
+              {
+                system: 'http://snomed.info/sct',
+                code: 'invalid SNOMED code'
+              }
+            ]
+          }
+        },
+        // Non-observation resource that should be ignored
+        {
+          resourceType: 'Patient'
+        },
+        // Tumor observation
+        {
+          resourceType: 'Observation',
+          code: {},
+          status: 'final',
+          valueCodeableConcept: {
+            coding: [
+              {
+                system: 'http://snomed.info/sct',
+                code: '1228869002'
+              }
+            ]
+          }
+        },
+        // Node observation
+        {
+          resourceType: 'Observation',
+          code: {},
+          status: 'final',
+          valueCodeableConcept: {
+            coding: [
+              {
+                system: 'http://snomed.info/sct',
+                code: '1229889007'
+              }
+            ]
+          }
+        },
+        // Metastasis observation
+        {
+          resourceType: 'Observation',
+          code: {},
+          status: 'final',
+          valueCodeableConcept: {
+            coding: [
+              {
+                system: 'http://snomed.info/sct',
+                code: '1229901006'
+              }
+            ]
+          }
+        }
+      ])
+    ).toEqual({
+      tumor: 1,
+      node: 1,
+      metastasis: 0
+    });
+  });
+  it('handles Observations without valueCodeableConcepts', () => {
+    expect(
+      extractTNM([
+        {
+          resourceType: 'Observation',
+          code: {},
+          status: 'final',
+          valueBoolean: true
+        }
+      ])
+    ).toEqual({});
   });
 });

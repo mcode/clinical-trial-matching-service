@@ -1,3 +1,6 @@
+import { Bundle, CodeableConcept, FhirResource, Observation } from "fhir/r4";
+import TNM_CODES, { MetastasisStage, NodeStage, TumorStage, TNMStage, TNMCodes } from './tnm-codes';
+
 export type CancerStage = 0 | 1 | 2 | 3 | 4;
 
 export interface TNMField {
@@ -91,7 +94,7 @@ export function convertTNMToCancerStage(tnm: string): CancerStage | null | undef
  * @param tumor the tumor number (0-4, with 0.5 being used for Tis)
  * @param node the node number
  * @param metastasis the metastasis number
- * @returns a corresponding cancer stage number
+ * @returns a corresponding cancer stage number, or null for "no cancer"
  */
 export function convertTNMValuesToCancerStage(tumor: number, node: number, metastasis: number): CancerStage | null {
   if (metastasis > 0) {
@@ -112,4 +115,94 @@ export function convertTNMValuesToCancerStage(tumor: number, node: number, metas
     return null;
   }
   return 0;
+}
+
+export interface TNMStageValue {
+  type: 'T' | 'N' | 'M';
+  stage: TNMStage;
+}
+
+/**
+ * Attempts to convert the given codeable concept into a TNM stage value. The
+ * stage value may be a single T, N, or M stage value.
+ *
+ * If the code cannot be converted, this returns undefined.
+ * @param concept the concept to decode
+ */
+export function convertCodeableConceptToTNM(concept: CodeableConcept): TNMStageValue | undefined {
+  const codes = concept.coding;
+  if (Array.isArray(codes)) {
+    // Have codes to check
+    for (const code of codes) {
+      // See if we have a code to check at all
+      if (code.system && code.code) {
+        // See if this code exists
+        for (const type in TNM_CODES) {
+          const systems = TNM_CODES[type as keyof TNMCodes];
+          if (code.system in systems && code.code in systems[code.system]) {
+            const value = systems[code.system][code.code];
+            return {
+              type: type as keyof TNMCodes,
+              stage: value,
+            }
+          }
+        }
+      }
+    }
+  }
+  // If we've fallen through, we never found a matching code, so return undefined
+  // (which will happen automatically, but make it explicit anyway)
+  return undefined;
+}
+
+export interface TNMValues {
+  tumor?: TumorStage;
+  node?: NodeStage;
+  metastasis?: MetastasisStage;
+}
+
+/**
+ * Extracts a set of TNM values (if possible) from the given set of resources.
+ * This will attempt to extract the first TNM values found in the list. If
+ * multiple resources define a TNM value, only the first found is used. So if
+ * there are two resources, the first which gives a value of T1, and the second
+ * that gives a value of T2, this returns `{ tumor: 1 }`.
+ * @param resources the resources to extra from
+ * @returns the TNM values that could be extracted
+ */
+export function extractTNM(resources: FhirResource[]): TNMValues {
+  const result: TNMValues = {};
+  for (const resource of resources) {
+    if (resource.resourceType === 'Observation') {
+      // TODO: Ignore resources with status = 'entered-in-error'?
+      // Take it at its word (sort of)
+      const observation = resource as Observation;
+      if (observation.valueCodeableConcept) {
+        // Try and look this up
+        const value = convertCodeableConceptToTNM(observation.valueCodeableConcept);
+        if (value) {
+          switch (value.type) {
+            case 'T':
+              if (result.tumor === undefined)
+                result.tumor = value.stage;
+              break;
+            case 'N':
+              // Assume the values coming out of convertCodeableConceptToTNM are right
+              if (result.node === undefined)
+                result.node = value.stage as NodeStage;
+              break;
+            case 'M':
+              if (result.metastasis === undefined)
+                result.metastasis = value.stage as MetastasisStage;
+              break;
+          }
+          // If we have all values, return immediately
+          if (result.tumor !== undefined && result.node !== undefined && result.metastasis !== undefined) {
+            return result;
+          }
+        }
+      }
+    }
+  }
+  return result;
 }
