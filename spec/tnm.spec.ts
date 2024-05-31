@@ -1,3 +1,4 @@
+import { Observation } from 'fhir/r4';
 import {
   parseTNM,
   convertTNMToCancerStage,
@@ -5,6 +6,37 @@ import {
   convertCodeableConceptToTNM,
   extractTNM
 } from '../src/tnm';
+import { SNOMED_SYSTEM_URI } from '../src/fhir-constants';
+import TNM_CODES, {
+  TNM_SNOMED_TUMOR_CODES,
+  TNM_SNOMED_NODE_CODES,
+  TNM_SNOMED_METASTASIS_CODES
+} from '../src/tnm-codes';
+
+// To make the tests more readable, grab out a code to use for each TNM type
+const SNOMED_TUMOR_CODE = TNM_SNOMED_TUMOR_CODES[0];
+const SNOMED_NODE_CODE = TNM_SNOMED_NODE_CODES[0];
+const SNOMED_METASTASIS_CODE = TNM_SNOMED_METASTASIS_CODES[0];
+
+// Function to find a matching code
+function find<T extends string, C>(o: Record<T, C>, value: C): T {
+  const r = Object.entries(o).find(([, v]) => v === value);
+  if (r) {
+    return r[0] as T;
+  } else {
+    throw new Error(`No value ${value} found`);
+  }
+}
+
+// Various codes that map to various values - again, to make the tests readable
+// (as well as ensure mapping changes can't break things)
+const SNOMED_T1_CODE = find(TNM_CODES['T'][SNOMED_SYSTEM_URI], 1);
+const SNOMED_T4_CODE = find(TNM_CODES['T'][SNOMED_SYSTEM_URI], 4);
+const SNOMED_N1_CODE = find(TNM_CODES['N'][SNOMED_SYSTEM_URI], 1);
+const SNOMED_N2_CODE = find(TNM_CODES['N'][SNOMED_SYSTEM_URI], 2);
+const SNOMED_N3_CODE = find(TNM_CODES['N'][SNOMED_SYSTEM_URI], 3);
+const SNOMED_M0_CODE = find(TNM_CODES['M'][SNOMED_SYSTEM_URI], 0);
+const SNOMED_M1_CODE = find(TNM_CODES['M'][SNOMED_SYSTEM_URI], 1);
 
 describe('parseTNM()', () => {
   it('parses a simple set of fields', () => {
@@ -118,7 +150,7 @@ describe('convertCodeableConcetpToTNM', () => {
       convertCodeableConceptToTNM({
         coding: [
           {
-            system: 'http://snomed.info/sct'
+            system: SNOMED_SYSTEM_URI
           }
         ]
       })
@@ -149,188 +181,79 @@ describe('convertCodeableConcetpToTNM', () => {
   });
 });
 
+/**
+ *
+ * @param code the code of the thing being observed
+ * @param value the value
+ * @returns an Observation
+ */
+function createObservation(code: string, value: string): Observation {
+  return {
+    resourceType: 'Observation',
+    code: {
+      coding: [
+        {
+          system: SNOMED_SYSTEM_URI,
+          code: code
+        }
+      ]
+    },
+    status: 'final',
+    valueCodeableConcept: {
+      coding: [
+        {
+          system: SNOMED_SYSTEM_URI,
+          code: value
+        }
+      ]
+    }
+  };
+}
+
 describe('extractTNM()', () => {
   it('does not overwrite with later values', () => {
-    // This tests "early quit" sort of
+    // This tests "early quit" sort of...
     expect(
       extractTNM([
-        {
-          resourceType: 'Observation',
-          code: {},
-          status: 'final',
-          valueCodeableConcept: {
-            coding: [
-              {
-                system: 'http://snomed.info/sct',
-                code: '1228923003'
-              }
-            ]
-          }
-        },
-        {
-          resourceType: 'Observation',
-          code: {},
-          status: 'final',
-          valueCodeableConcept: {
-            coding: [
-              {
-                system: 'http://snomed.info/sct',
-                code: '1229897000'
-              }
-            ]
-          }
-        },
-        {
-          resourceType: 'Observation',
-          code: {},
-          status: 'final',
-          valueCodeableConcept: {
-            coding: [
-              {
-                system: 'http://snomed.info/sct',
-                code: '1229913001'
-              }
-            ]
-          }
-        },
-        {
-          resourceType: 'Observation',
-          code: {},
-          status: 'final',
-          valueCodeableConcept: {
-            coding: [
-              {
-                system: 'http://snomed.info/sct',
-                code: '1228904005'
-              }
-            ]
-          }
-        },
-        {
-          resourceType: 'Observation',
-          code: {},
-          status: 'final',
-          valueCodeableConcept: {
-            coding: [
-              {
-                system: 'http://snomed.info/sct',
-                code: '1229889007'
-              }
-            ]
-          }
-        },
-        {
-          resourceType: 'Observation',
-          code: {},
-          status: 'final',
-          valueCodeableConcept: {
-            coding: [
-              {
-                system: 'http://snomed.info/sct',
-                code: '1229901006'
-              }
-            ]
-          }
-        }
+        // T observation
+        createObservation(SNOMED_TUMOR_CODE, SNOMED_T4_CODE),
+        // N observation
+        createObservation(SNOMED_NODE_CODE, SNOMED_N3_CODE),
+        // M observation
+        createObservation(SNOMED_METASTASIS_CODE, SNOMED_M1_CODE),
+        // T observation
+        createObservation(SNOMED_TUMOR_CODE, SNOMED_T1_CODE),
+        // N observation
+        createObservation(SNOMED_NODE_CODE, SNOMED_N1_CODE),
+        // M observation
+        createObservation(SNOMED_METASTASIS_CODE, SNOMED_M0_CODE)
       ])
     ).toEqual({
       tumor: 4,
       node: 3,
       metastasis: 1
     });
-    // So check each field individually as well
+    // ...so check each field individually as well
     expect(
       extractTNM([
-        {
-          resourceType: 'Observation',
-          code: {},
-          status: 'final',
-          valueCodeableConcept: {
-            coding: [
-              {
-                system: 'http://snomed.info/sct',
-                code: '1228923003'
-              }
-            ]
-          }
-        },
-        {
-          resourceType: 'Observation',
-          code: {},
-          status: 'final',
-          valueCodeableConcept: {
-            coding: [
-              {
-                system: 'http://snomed.info/sct',
-                code: '1228904005'
-              }
-            ]
-          }
-        }
+        createObservation(SNOMED_TUMOR_CODE, SNOMED_T4_CODE),
+        createObservation(SNOMED_TUMOR_CODE, SNOMED_T1_CODE)
       ])
     ).toEqual({
       tumor: 4
     });
     expect(
       extractTNM([
-        {
-          resourceType: 'Observation',
-          code: {},
-          status: 'final',
-          valueCodeableConcept: {
-            coding: [
-              {
-                system: 'http://snomed.info/sct',
-                code: '1229897000'
-              }
-            ]
-          }
-        },
-        {
-          resourceType: 'Observation',
-          code: {},
-          status: 'final',
-          valueCodeableConcept: {
-            coding: [
-              {
-                system: 'http://snomed.info/sct',
-                code: '1229889007'
-              }
-            ]
-          }
-        }
+        createObservation(SNOMED_NODE_CODE, SNOMED_N3_CODE),
+        createObservation(SNOMED_NODE_CODE, SNOMED_N1_CODE)
       ])
     ).toEqual({
       node: 3
     });
     expect(
       extractTNM([
-        {
-          resourceType: 'Observation',
-          code: {},
-          status: 'final',
-          valueCodeableConcept: {
-            coding: [
-              {
-                system: 'http://snomed.info/sct',
-                code: '1229913001'
-              }
-            ]
-          }
-        },
-        {
-          resourceType: 'Observation',
-          code: {},
-          status: 'final',
-          valueCodeableConcept: {
-            coding: [
-              {
-                system: 'http://snomed.info/sct',
-                code: '1229901006'
-              }
-            ]
-          }
-        }
+        createObservation(SNOMED_METASTASIS_CODE, SNOMED_M1_CODE),
+        createObservation(SNOMED_METASTASIS_CODE, SNOMED_M0_CODE)
       ])
     ).toEqual({
       metastasis: 1
@@ -342,77 +265,36 @@ describe('extractTNM()', () => {
         // Observation with an unknown system
         {
           resourceType: 'Observation',
-          code: {},
+          code: {
+            coding: [
+              {
+                system: SNOMED_SYSTEM_URI,
+                code: SNOMED_NODE_CODE
+              }
+            ]
+          },
           status: 'final',
           valueCodeableConcept: {
             coding: [
               {
                 system: 'http://example.com/ignore-this',
-                code: '1229901006'
+                code: SNOMED_T1_CODE
               }
             ]
           }
         },
         // Code that's valid FHIR but will never match anything
-        {
-          resourceType: 'Observation',
-          code: {},
-          status: 'final',
-          valueCodeableConcept: {
-            coding: [
-              {
-                system: 'http://snomed.info/sct',
-                code: 'invalid SNOMED code'
-              }
-            ]
-          }
-        },
+        createObservation(SNOMED_NODE_CODE, 'invalid SNOMED code'),
         // Non-observation resource that should be ignored
         {
           resourceType: 'Patient'
         },
         // Tumor observation
-        {
-          resourceType: 'Observation',
-          code: {},
-          status: 'final',
-          valueCodeableConcept: {
-            coding: [
-              {
-                system: 'http://snomed.info/sct',
-                code: '1228869002'
-              }
-            ]
-          }
-        },
+        createObservation(SNOMED_TUMOR_CODE, SNOMED_T1_CODE),
         // Node observation
-        {
-          resourceType: 'Observation',
-          code: {},
-          status: 'final',
-          valueCodeableConcept: {
-            coding: [
-              {
-                system: 'http://snomed.info/sct',
-                code: '1229889007'
-              }
-            ]
-          }
-        },
+        createObservation(SNOMED_NODE_CODE, SNOMED_N1_CODE),
         // Metastasis observation
-        {
-          resourceType: 'Observation',
-          code: {},
-          status: 'final',
-          valueCodeableConcept: {
-            coding: [
-              {
-                system: 'http://snomed.info/sct',
-                code: '1229901006'
-              }
-            ]
-          }
-        }
+        createObservation(SNOMED_METASTASIS_CODE, SNOMED_M0_CODE)
       ])
     ).toEqual({
       tumor: 1,
@@ -420,12 +302,82 @@ describe('extractTNM()', () => {
       metastasis: 0
     });
   });
+  it('ignores code/value mismatches when checking codes', () => {
+    expect(
+      extractTNM([
+        // N code as a value to a T code
+        createObservation(SNOMED_TUMOR_CODE, SNOMED_N1_CODE)
+      ])
+    ).toEqual({});
+    expect(
+      extractTNM([
+        // M code as a value to a N code
+        createObservation(SNOMED_NODE_CODE, SNOMED_M0_CODE)
+      ])
+    ).toEqual({});
+    expect(
+      extractTNM([
+        // N code as a value to a T code
+        createObservation(SNOMED_TUMOR_CODE, SNOMED_N1_CODE),
+        // Use something invalid for the observed thing code
+        createObservation('invalid', SNOMED_N2_CODE),
+        createObservation(SNOMED_NODE_CODE, SNOMED_N3_CODE)
+      ])
+    ).toEqual({
+      node: 3
+    });
+  });
+  it('returns code/value mismatches when not checking codes', () => {
+    expect(
+      extractTNM(
+        [
+          // N code as a value to a T code
+          createObservation(SNOMED_TUMOR_CODE, SNOMED_N1_CODE)
+        ],
+        { checkCodes: false }
+      )
+    ).toEqual({
+      node: 1
+    });
+    expect(
+      extractTNM(
+        [
+          // M code as a value to a N code
+          createObservation(SNOMED_NODE_CODE, SNOMED_M0_CODE)
+        ],
+        { checkCodes: false }
+      )
+    ).toEqual({
+      metastasis: 0
+    });
+    expect(
+      extractTNM(
+        [
+          // N code as a value to a T code
+          createObservation(SNOMED_TUMOR_CODE, SNOMED_N1_CODE),
+          // Use something invalid for the observed thing code
+          createObservation('invalid', SNOMED_N2_CODE),
+          createObservation(SNOMED_NODE_CODE, SNOMED_N3_CODE)
+        ],
+        { checkCodes: false }
+      )
+    ).toEqual({
+      node: 1
+    });
+  });
   it('handles Observations without valueCodeableConcepts', () => {
     expect(
       extractTNM([
         {
           resourceType: 'Observation',
-          code: {},
+          code: {
+            coding: [
+              {
+                system: SNOMED_SYSTEM_URI,
+                code: SNOMED_METASTASIS_CODE
+              }
+            ]
+          },
           status: 'final',
           valueBoolean: true
         }

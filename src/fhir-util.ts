@@ -1,4 +1,4 @@
-import { FhirResource } from 'fhir/r4';
+import { CodeableConcept, FhirResource } from 'fhir/r4';
 
 export enum FHIRDateAccuracy {
   YEAR,
@@ -132,6 +132,56 @@ export class FHIRDate {
     }
     return new FHIRDate(dateObject, accuracy, leapSecond);
   }
+}
+
+/**
+ * Checks to see if any of the given codes are in the given codeable concept.
+ * @param concept the concept to check
+ * @param system the expected system for the codes to check
+ * @param codes the expected codes
+ * @returns true if any code is found, false otherwise
+ */
+export function codeableConceptContainsCode(concept: CodeableConcept, system: string, codes: string[]): boolean {
+  if (Array.isArray(concept.coding)) {
+    for (const code of concept.coding) {
+      if (typeof code === 'object' && code.system === system && code.code && codes.includes(code.code)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Checks to see if any of the given codeable concept contains any code in the
+ * mapping of coding systems to codes.
+ *
+ * The codes are a mapping of systems to codes, for example:
+ *
+ * ```
+ *  {
+ *    "http://snomed.info/sct": [ "277206009", "277208005" ]
+ *  }
+ * ```
+ * @param concept the concept to check
+ * @param codes a mapping of systems to codes to check
+ * @returns
+ */
+export function codeableConceptContains(concept: CodeableConcept, codes: Record<string, string[]>): boolean {
+  if (Array.isArray(concept.coding)) {
+    for (const code of concept.coding) {
+      if (
+        typeof code === 'object' &&
+        code.system &&
+        code.code &&
+        code.system in codes &&
+        codes[code.system].includes(code.code)
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 /**

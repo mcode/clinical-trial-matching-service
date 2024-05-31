@@ -1,5 +1,16 @@
-import { Bundle, CodeableConcept, FhirResource, Observation } from "fhir/r4";
-import TNM_CODES, { MetastasisStage, NodeStage, TumorStage, TNMStage, TNMCodes } from './tnm-codes';
+import { CodeableConcept, FhirResource, Observation } from 'fhir/r4';
+import TNM_CODES, {
+  MetastasisStage,
+  NodeStage,
+  TumorStage,
+  TNMStage,
+  TNMCodes,
+  TNM_SNOMED_TUMOR_CODES,
+  TNM_SNOMED_NODE_CODES,
+  TNM_SNOMED_METASTASIS_CODES
+} from './tnm-codes';
+import { SNOMED_SYSTEM_URI } from './fhir-constants';
+import { codeableConceptContainsCode } from './fhir-util';
 
 export type CancerStage = 0 | 1 | 2 | 3 | 4;
 
@@ -79,7 +90,7 @@ export function convertTNMToCancerStage(tnm: string): CancerStage | null | undef
         }
         break;
       default:
-        // Ignore this field
+      // Ignore this field
     }
   }
   if (typeof t === 'number' && typeof n === 'number' && typeof m === 'number') {
@@ -143,8 +154,8 @@ export function convertCodeableConceptToTNM(concept: CodeableConcept): TNMStageV
             const value = systems[code.system][code.code];
             return {
               type: type as keyof TNMCodes,
-              stage: value,
-            }
+              stage: value
+            };
           }
         }
       }
@@ -161,6 +172,28 @@ export interface TNMValues {
   metastasis?: MetastasisStage;
 }
 
+export interface ExtractTNMOptions {
+  checkCodes?: boolean;
+}
+
+/**
+ * Checks the code from a given observation to check
+ * @param observation the observation to check
+ */
+function expectedTNM(observation: Observation): 'T' | 'N' | 'M' | null {
+  const code = observation.code;
+  if (codeableConceptContainsCode(code, SNOMED_SYSTEM_URI, TNM_SNOMED_TUMOR_CODES)) {
+    return 'T';
+  }
+  if (codeableConceptContainsCode(code, SNOMED_SYSTEM_URI, TNM_SNOMED_NODE_CODES)) {
+    return 'N';
+  }
+  if (codeableConceptContainsCode(code, SNOMED_SYSTEM_URI, TNM_SNOMED_METASTASIS_CODES)) {
+    return 'M';
+  }
+  return null;
+}
+
 /**
  * Extracts a set of TNM values (if possible) from the given set of resources.
  * This will attempt to extract the first TNM values found in the list. If
@@ -170,30 +203,38 @@ export interface TNMValues {
  * @param resources the resources to extra from
  * @returns the TNM values that could be extracted
  */
-export function extractTNM(resources: FhirResource[]): TNMValues {
+export function extractTNM(resources: FhirResource[], options?: ExtractTNMOptions): TNMValues {
+  // Default to checking codes
+  const checkCodes = options?.checkCodes ?? true;
   const result: TNMValues = {};
   for (const resource of resources) {
     if (resource.resourceType === 'Observation') {
       // TODO: Ignore resources with status = 'entered-in-error'?
-      // Take it at its word (sort of)
+      // Are there any other statuses that should be ignored?
       const observation = resource as Observation;
+      const expectedType = checkCodes ? expectedTNM(observation) : null;
+      if (checkCodes && expectedType === null) {
+        // No code found, skip this resource
+        continue;
+      }
       if (observation.valueCodeableConcept) {
         // Try and look this up
         const value = convertCodeableConceptToTNM(observation.valueCodeableConcept);
         if (value) {
+          if (checkCodes && value.type != expectedType) {
+            // If this doesn't match, skip this
+            continue;
+          }
           switch (value.type) {
             case 'T':
-              if (result.tumor === undefined)
-                result.tumor = value.stage;
+              if (result.tumor === undefined) result.tumor = value.stage;
               break;
             case 'N':
               // Assume the values coming out of convertCodeableConceptToTNM are right
-              if (result.node === undefined)
-                result.node = value.stage as NodeStage;
+              if (result.node === undefined) result.node = value.stage as NodeStage;
               break;
             case 'M':
-              if (result.metastasis === undefined)
-                result.metastasis = value.stage as MetastasisStage;
+              if (result.metastasis === undefined) result.metastasis = value.stage as MetastasisStage;
               break;
           }
           // If we have all values, return immediately

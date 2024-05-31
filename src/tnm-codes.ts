@@ -1,6 +1,8 @@
 // This was originally going to be a JSON file, but importing JSON files proved problematic.
 // Doing it as TypeScript also allows type information to be included.
 
+import { SNOMED_SYSTEM_URI } from './fhir-constants';
+
 /**
  * Valid stage values for a tumor stage
  */
@@ -18,9 +20,24 @@ export interface TNMCodes extends Record<'T' | 'N' | 'M', SystemCodeMap<TNMStage
   M: SystemCodeMap<MetastasisStage>;
 }
 
+/**
+ * Codes that represent various types of TNM tumor codes.
+ */
+export const TNM_SNOMED_TUMOR_CODES = ['78873005', '399504009', '384625004'];
+
+/**
+ * Codes that represent various types of TNM node codes.
+ */
+export const TNM_SNOMED_NODE_CODES = ['277206009', '399534004', '371494008'];
+
+/**
+ * Codes that represent various types of TNM metastasis codes.
+ */
+export const TNM_SNOMED_METASTASIS_CODES = ['277208005', '399387003', '371497001'];
+
 export const TNM_CODES: TNMCodes = {
   T: {
-    'http://snomed.info/sct': {
+    [SNOMED_SYSTEM_URI]: {
       '1228863001': 0,
       '1228882005': 0,
       '1228951007': 0,
@@ -136,7 +153,7 @@ export const TNM_CODES: TNMCodes = {
     }
   },
   N: {
-    'http://snomed.info/sct': {
+    [SNOMED_SYSTEM_URI]: {
       '1229878000': 0,
       '1229879008': 0,
       '1229880006': 0,
@@ -196,7 +213,7 @@ export const TNM_CODES: TNMCodes = {
     }
   },
   M: {
-    'http://snomed.info/sct': {
+    [SNOMED_SYSTEM_URI]: {
       '1229901006': 0,
       '1229902004': 0,
       '1229903009': 1,
