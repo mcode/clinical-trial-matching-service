@@ -3,6 +3,7 @@ import * as bodyParser from 'body-parser';
 import { Bundle, ResearchStudy } from 'fhir/r4';
 import { isHttpError, restrictToHttpErrors } from './errors';
 import { isBundle } from './fhir-type-guards';
+import { QueryParameters, parseQueryParameters } from './query-parameters';
 import * as http from 'http';
 
 // SearchSet is just a bundle which is a searchset containing ResearchStudies
@@ -10,7 +11,7 @@ export interface SearchSet<T = ResearchStudy> extends Bundle<T> {
   type: 'searchset';
 }
 
-export type ClinicalTrialMatcher = (patientBundle: Bundle) => Promise<SearchSet>;
+export type ClinicalTrialMatcher = (patientBundle: Bundle, parameters: QueryParameters) => Promise<SearchSet>;
 
 /**
  * Server configuration.
@@ -210,7 +211,7 @@ export class ClinicalTrialMatchingService {
         }
       };
       try {
-        this.matcher(patientBundle)
+        this.matcher(patientBundle, parseQueryParameters(patientBundle))
           .then((result) => {
             response.status(200).send(JSON.stringify(result));
           })
