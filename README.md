@@ -48,7 +48,7 @@ The following configuration should be in the `devDependencies` of any wrapper th
 ```json
 "devDependencies": {
   "@types/express": "^4.17.17",
-  "@types/fhir": "^0.0.37",
+  "@types/fhir": "^0.0.41",
   "typescript": "^5.1.6"
 }
 ```
