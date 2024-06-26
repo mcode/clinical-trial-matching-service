@@ -13,13 +13,14 @@ Implementing an underlying matching service should be fairly simple: create a ne
 ```typescript
 import ClinicalTrialMatchingService, {
   Bundle,
+  QueryParameters,
   ResearchStudy,
   SearchSet
 } from 'clinical-trial-matching-service';
 // Import the actual implementation which is outside the scope
 import findMatchingServices from './matching-implementation';
 
-function customMatchingFunction(patientData: Bundle): Promise<SearchSet> {
+function customMatchingFunction(patientData: Bundle, parameters: QueryParameters): Promise<SearchSet> {
   return new Promise((resolve, reject) => {
     // Code to do the searching:
     const results: ResearchStudy[] = findMatchingServices(patientData);
@@ -28,7 +29,7 @@ function customMatchingFunction(patientData: Bundle): Promise<SearchSet> {
 }
 
 const service = new ClinicalTrialMatchingService(customMatchingFunction);
-service.listen().catch(err => {
+service.listen().catch((err) => {
   // Handle listen failing
   console.error('Server failed to start:');
   console.error(err);
