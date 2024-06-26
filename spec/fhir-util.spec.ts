@@ -1,5 +1,11 @@
 import { FhirResource } from 'fhir/r4';
-import { FHIRDate, FHIRDateAccuracy, resourceContainsProfile } from '../src/fhir-util';
+import {
+  FHIRDate,
+  FHIRDateAccuracy,
+  codeableConceptContains,
+  codeableConceptContainsCode,
+  resourceContainsProfile
+} from '../src/fhir-util';
 
 describe('#resourceContainsProfile', () => {
   it('handles resources with no meta', () => {
@@ -115,5 +121,147 @@ describe('FHIRDate', () => {
         FHIRDate.parse('0000-01-01');
       }).toThrowError('Invalid year 0 in dateTime "0000-01-01"');
     });
+  });
+});
+
+describe('codeableConceptContains', () => {
+  // Simple test set
+  const CODE_SET = { '1_2': ['1', '2'], '3_4': ['3', '4'] };
+  it('handles a codeable concept with no codes', () => {
+    expect(codeableConceptContains({}, CODE_SET)).toBeFalse();
+  });
+  it('returns false for codes in the other system', () => {
+    expect(
+      codeableConceptContains(
+        {
+          coding: [
+            {
+              system: '1_2',
+              code: '3'
+            },
+            {
+              system: '3_4',
+              code: '1'
+            }
+          ]
+        },
+        CODE_SET
+      )
+    ).toBeFalse();
+  });
+  it('handles partial codes', () => {
+    expect(
+      codeableConceptContains(
+        {
+          coding: [
+            {
+              code: '1'
+            },
+            {
+              system: '3_4'
+            }
+          ]
+        },
+        CODE_SET
+      )
+    ).toBeFalse();
+  });
+  it('returns true for codes that exist', () => {
+    expect(
+      codeableConceptContains(
+        {
+          coding: [
+            {
+              system: 'ignore me',
+              code: 'code'
+            },
+            {
+              system: '3_4',
+              code: '4'
+            }
+          ]
+        },
+        CODE_SET
+      )
+    ).toBeTrue();
+  });
+});
+
+describe('codeableConceptContainsCode', () => {
+  // Simple test set
+  const SYSTEM = '1_2';
+  const CODE_SET = ['1', '2'];
+  it('handles a codeable concept with no codes', () => {
+    expect(codeableConceptContainsCode({}, SYSTEM, CODE_SET)).toBeFalse();
+  });
+  it("returns false for codes that don't exist", () => {
+    expect(
+      codeableConceptContainsCode(
+        {
+          coding: [
+            {
+              system: '1_2',
+              code: '3'
+            }
+          ]
+        },
+        SYSTEM,
+        CODE_SET
+      )
+    ).toBeFalse();
+  });
+  it('returns false for codes in another system', () => {
+    expect(
+      codeableConceptContainsCode(
+        {
+          coding: [
+            {
+              system: '3_4',
+              code: '1'
+            }
+          ]
+        },
+        SYSTEM,
+        CODE_SET
+      )
+    ).toBeFalse();
+  });
+  it('handles partial codes', () => {
+    expect(
+      codeableConceptContainsCode(
+        {
+          coding: [
+            {
+              code: '1'
+            },
+            {
+              system: '3_4'
+            }
+          ]
+        },
+        SYSTEM,
+        CODE_SET
+      )
+    ).toBeFalse();
+  });
+  it('returns true for codes that exist', () => {
+    expect(
+      codeableConceptContainsCode(
+        {
+          coding: [
+            {
+              system: 'ignore me',
+              code: 'code'
+            },
+            {
+              system: '1_2',
+              code: '2'
+            }
+          ]
+        },
+        SYSTEM,
+        CODE_SET
+      )
+    ).toBeTrue();
   });
 });

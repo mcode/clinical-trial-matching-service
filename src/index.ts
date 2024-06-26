@@ -7,6 +7,7 @@ export * from './research-study';
 export * from './searchset';
 export * from './clinicaltrialsgov';
 export * from './fhir-util';
+export * from './tnm';
 export { CodeMapper, CodeSystemEnum } from './codeMapper';
 export * from './mcodeextractor';
 export { Study } from './ctg-api';
