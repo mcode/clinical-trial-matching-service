@@ -11,24 +11,19 @@ export * from './tnm';
 export { CodeMapper, CodeSystemEnum } from './codeMapper';
 export * from './mcodeextractor';
 export { Study } from './ctg-api';
+export { BasicHttpError, HttpError, ServerError, ClientError } from './errors';
+export { QueryParameters } from './query-parameters';
 export { ClinicalTrialsGovAPI } from './clinicaltrialsgov-api';
 export { createResearchStudyFromClinicalStudy } from './study-fhir-converter';
-
-// The export { v } from "mod" forms do not appear to work for types yet, so
-// they have to be imported and then exported...
-import BasicHttpError, { HttpError, ServerError, ClientError } from './errors';
-import ClinicalTrialMatchingService, { ClinicalTrialMatcher, Configuration } from './server';
-
-// Export the utility for configuring from the environment
 export * from './env';
 
+// In order to export a default, we need to import it, so import it
+import ClinicalTrialMatchingService, { ClinicalTrialMatcher, Configuration } from './server';
+
+// And re-export it
 export default ClinicalTrialMatchingService;
 export {
   ClinicalTrialMatcher,
   ClinicalTrialMatchingService,
   Configuration as ServiceConfiguration,
-  BasicHttpError,
-  HttpError,
-  ClientError,
-  ServerError
 };

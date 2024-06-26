@@ -41,7 +41,7 @@ export function restrictToHttpErrors(httpStatus: number, statusIfInvalid = 500):
  * If the error code used is outside the range [400,599] it will be converted to
  * 500.
  */
-export default class BasicHttpError extends Error {
+export class BasicHttpError extends Error {
   private _httpStatus: number;
   constructor(message: string, httpStatus = 500) {
     super(message);
@@ -52,6 +52,8 @@ export default class BasicHttpError extends Error {
     return this._httpStatus;
   }
 }
+
+export default BasicHttpError;
 
 /**
  * Simply marks an error as an internal error: an error happened within the
