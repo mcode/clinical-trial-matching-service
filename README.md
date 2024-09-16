@@ -4,7 +4,7 @@
 
 Provides a generic backend library for Clinical Trial Matching Service implementations. This provides the generic shell for services that connect to an actual clinical trial matching service. It receives a FHIR Bundle of patient information, and then uses that to generate a FHIR search result that contains FHIR ResearchStudy objects that describe matching clinical trials.
 
-For more information on the architecture and data schemas of the clinical trial matching system, please visit the clinical-trial-matching-engine [wiki](https://github.com/mcode/clinical-trial-matching-engine/wiki).
+For more information on the architecture and data schemas of the clinical trial matching system, please visit the [clinical-trial-matching-app wiki](https://github.com/mcode/clinical-trial-matching-app/wiki).
 
 ## Implementing a Matching Service
 
@@ -20,12 +20,9 @@ import ClinicalTrialMatchingService, {
 // Import the actual implementation which is outside the scope
 import findMatchingServices from './matching-implementation';
 
-function customMatchingFunction(patientData: Bundle, parameters: QueryParameters): Promise<SearchSet> {
-  return new Promise((resolve, reject) => {
-    // Code to do the searching:
-    const results: ResearchStudy[] = findMatchingServices(patientData);
-    resolve(new SearchSet(results));
-  });
+async function customMatchingFunction(patientData: Bundle, parameters: QueryParameters): Promise<SearchSet> {
+  const results: ResearchStudy[] = await findMatchingServices(patientData);
+  return new SearchSet(results);
 }
 
 const service = new ClinicalTrialMatchingService(customMatchingFunction);
@@ -64,7 +61,7 @@ The `ClinicalTrialMatchingService` can optionally take a `Configuration` object 
  * `host` - the host address to bind to
  * `urlPrefix` - if given, the prefix to use for all configured request paths (note that it's normalized: `"/prefix"` and `"prefix/"` both cause the application to generate paths that begin with `"/prefix/"`.)
 
-For more information about how `port` and `host` are used, read the [Node.js `net.Server#listen` documentation](https://nodejs.org/dist/latest-v12.x/docs/api/net.html#net_server_listen_port_host_backlog_callback).
+For more information about how `port` and `host` are used, read the [Node.js `net.Server#listen` documentation](https://nodejs.org/dist/latest-v20.x/docs/api/net.html#net_server_listen_port_host_backlog_callback).
 
 Note: If the `PASSENGER_BASE_URI` environment variable is set, this is used as the value for `urlPrefix`. This is to provide compatibility when running within Passenger with a base URI set via Passenger's configuration.
 
